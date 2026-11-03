@@ -1,0 +1,199 @@
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../fonts/barlow-condensed-latin-500-normal.woff2') format('woff2');
+  font-weight: 500; font-display: swap;
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../fonts/barlow-condensed-latin-600-normal.woff2') format('woff2');
+  font-weight: 600; font-display: swap;
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../fonts/barlow-condensed-latin-700-normal.woff2') format('woff2');
+  font-weight: 700; font-display: swap;
+}
+
+:root {
+  --fond: #f4f5f2;
+  --surface: #ffffff;
+  --surface-2: #eceee9;
+  --ligne: #dcdfd8;
+  --texte: #15171b;
+  --texte-2: #4d5460;
+  --texte-3: #7a818c;
+  --accent: #c8f031;          /* remplissage des boutons, pastilles */
+  --accent-texte: #15171b;    /* texte posé sur l'accent */
+  --accent-trait: #4f7a00;    /* traces, liens : lisible sur le fond */
+  --puissance: #6d4fd8;
+  --cardio: #d43b4c;
+  --danger: #c0392b;
+  --ombre: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 5%);
+  --rayon: 16px;
+  --police-chiffres: 'Barlow Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fond: #0e1014;
+    --surface: #171a20;
+    --surface-2: #1f232b;
+    --ligne: #2a2f39;
+    --texte: #eef1f5;
+    --texte-2: #a7afbc;
+    --texte-3: #737c8a;
+    --accent: #c8f031;
+    --accent-texte: #12140c;
+    --accent-trait: #c8f031;
+    --puissance: #a995ff;
+    --cardio: #ff6b7a;
+    --danger: #ff7b6b;
+    --ombre: none;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fond: #0e1014; --surface: #171a20; --surface-2: #1f232b; --ligne: #2a2f39;
+  --texte: #eef1f5; --texte-2: #a7afbc; --texte-3: #737c8a;
+  --accent: #c8f031; --accent-texte: #12140c; --accent-trait: #c8f031;
+  --puissance: #a995ff; --cardio: #ff6b7a; --danger: #ff7b6b; --ombre: none;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--texte);
+  font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+main { max-width: 640px; margin: 0 auto; padding: 0 16px 24px; }
+button { font: inherit; color: inherit; }
+
+/* ---- Barre du haut ---- */
+.barre {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 640px; margin: 0 auto;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
+  background: color-mix(in srgb, var(--fond) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+.titre {
+  margin: 0;
+  font-family: var(--police-chiffres);
+  font-weight: 700; font-size: 30px; letter-spacing: 0.01em; line-height: 1;
+}
+.icone-btn {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--ligne); background: var(--surface);
+  cursor: pointer;
+}
+.icone-btn.tourne svg { animation: tourne 0.9s linear infinite; }
+@keyframes tourne { to { transform: rotate(360deg); } }
+
+/* ---- Cartes ---- */
+.carte {
+  background: var(--surface);
+  border: 1px solid var(--ligne);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+  padding: 16px;
+  margin-top: 12px;
+}
+
+/* ---- Synchronisation ---- */
+.synchro-etat { display: flex; gap: 12px; align-items: flex-start; }
+.pastille {
+  flex: none; width: 10px; height: 10px; margin-top: 7px; border-radius: 50%;
+  background: var(--texte-3);
+}
+.pastille.ok { background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+.pastille.attente { background: #f0a630; }
+.synchro-titre { margin: 0; font-weight: 600; }
+.synchro-detail { margin: 2px 0 0; color: var(--texte-2); font-size: 14px; }
+.progression { margin: 10px 0 0; font-size: 14px; color: var(--texte-2); font-variant-numeric: tabular-nums; }
+.synchro-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.btn {
+  min-height: 44px; padding: 0 18px; border-radius: 999px;
+  font-weight: 600; cursor: pointer; border: 1px solid transparent;
+}
+.btn.principal { background: var(--accent); color: var(--accent-texte); }
+.btn.secondaire { background: transparent; border-color: var(--ligne); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.lien {
+  margin-top: 10px; padding: 6px 0; border: 0; background: none;
+  color: var(--texte-2); font-size: 14px; text-decoration: underline; cursor: pointer;
+}
+
+/* ---- État vide ---- */
+.vide h2 { margin: 0 0 8px; font-size: 18px; }
+.vide ol { margin: 0; padding-left: 20px; color: var(--texte-2); }
+.vide li { margin: 6px 0; }
+.vide .note { margin: 12px 0 0; font-size: 14px; color: var(--texte-3); }
+
+/* ---- Liste des sorties ---- */
+.mois { margin-top: 26px; }
+.mois-entete { padding: 0 4px 6px; }
+.mois-titre {
+  margin: 0; font-family: var(--police-chiffres); font-weight: 600; font-size: 24px; line-height: 1.15;
+}
+.mois-cumul {
+  margin: 2px 0 0; color: var(--texte-2); font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sortie {
+  background: var(--surface); border: 1px solid var(--ligne); border-radius: var(--rayon);
+  box-shadow: var(--ombre); margin-top: 8px; overflow: hidden;
+}
+.sortie > summary { list-style: none; cursor: pointer; }
+.sortie > summary::-webkit-details-marker { display: none; }
+.sortie-tete {
+  display: grid; grid-template-columns: 60px 1fr; gap: 14px; align-items: center;
+  padding: 14px 14px 14px 12px;
+}
+.vignette {
+  width: 60px; height: 60px; border-radius: 12px; background: var(--surface-2);
+  display: grid; place-items: center;
+}
+.vignette svg { display: block; }
+.vignette path { fill: none; stroke: var(--accent-trait); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.vignette circle { fill: var(--texte); }
+.sortie-titre { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.sortie-nom { margin: 0; font-weight: 600; font-size: 15px; }
+.sortie-date { color: var(--texte-3); font-size: 13px; white-space: nowrap; }
+.chiffres { display: flex; gap: 18px; margin-top: 4px; flex-wrap: wrap; }
+.chiffre { font-family: var(--police-chiffres); font-weight: 600; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.chiffre small { font-family: system-ui, sans-serif; font-weight: 500; font-size: 12px; color: var(--texte-3); margin-left: 2px; }
+.effort { display: flex; gap: 14px; margin-top: 6px; font-size: 13px; color: var(--texte-2); flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.effort .p { color: var(--puissance); font-weight: 600; }
+.effort .c { color: var(--cardio); font-weight: 600; }
+
+.sortie-details {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px; margin: 0; background: var(--ligne); border-top: 1px solid var(--ligne);
+}
+.detail { background: var(--surface); padding: 10px 14px; }
+.detail dt { font-size: 12px; color: var(--texte-3); }
+.detail dd { margin: 0; font-family: var(--police-chiffres); font-weight: 600; font-size: 19px; font-variant-numeric: tabular-nums; }
+.detail-note { grid-column: 1 / -1; margin: 0; background: var(--surface); padding: 10px 14px; font-size: 13px; color: var(--texte-3); }
+
+/* ---- Pied, toast ---- */
+.pied { max-width: 640px; margin: 0 auto; padding: 8px 16px 28px; color: var(--texte-3); font-size: 12px; text-align: center; }
+.pied p { margin: 0; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 12px;
+  background: var(--texte); color: var(--fond); font-size: 14px; box-shadow: 0 6px 24px rgb(0 0 0 / 25%);
+  z-index: 20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icone-btn.tourne svg { animation: none; }
+}

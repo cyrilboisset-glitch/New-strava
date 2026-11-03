@@ -1,0 +1,30 @@
+{
+  "name": "Mes sorties",
+  "short_name": "Sorties",
+  "description": "Mes sorties vélo, récupérées depuis Gadgetbridge, sans Strava.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e1014",
+  "theme_color": "#0e1014",
+  "icons": [
+    { "src": "icons/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "partage",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "fichiers",
+          "accept": [".fit", ".zip", "application/octet-stream", "application/zip", "application/vnd.ant.fit"]
+        }
+      ]
+    }
+  }
+}

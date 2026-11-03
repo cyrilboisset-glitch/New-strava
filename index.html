@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mes sorties</title>
+  <meta name="description" content="Mes sorties vélo, récupérées depuis Gadgetbridge, sans Strava.">
+  <meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f5f2" media="(prefers-color-scheme: light)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icone-192.png">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="vendor/jszip.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="barre">
+    <h1 class="titre">Mes sorties</h1>
+    <button id="btn-synchro-haut" class="icone-btn" type="button" aria-label="Synchroniser" hidden>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <section id="carte-synchro" class="carte synchro" aria-live="polite">
+      <div class="synchro-etat">
+        <span id="pastille" class="pastille" aria-hidden="true"></span>
+        <div>
+          <p id="synchro-titre" class="synchro-titre">Chargement…</p>
+          <p id="synchro-detail" class="synchro-detail"></p>
+        </div>
+      </div>
+      <p id="progression" class="progression" hidden></p>
+      <div class="synchro-actions">
+        <button id="btn-dossier" class="btn principal" type="button" hidden>Choisir le dossier Gadgetbridge</button>
+        <button id="btn-synchro" class="btn principal" type="button" hidden>Synchroniser</button>
+        <button id="btn-importer" class="btn secondaire" type="button">Importer un fichier</button>
+        <input id="champ-fichier" type="file" accept=".zip,.fit,application/zip,application/octet-stream" multiple hidden>
+      </div>
+      <button id="btn-changer-dossier" class="lien" type="button" hidden>Changer de dossier</button>
+    </section>
+
+    <section id="vide" class="carte vide" hidden>
+      <h2>Aucune sortie pour l'instant</h2>
+      <ol>
+        <li>Dans Gadgetbridge, l'export automatique du zip dépose une sauvegarde dans un dossier (par exemple <b>Documents/Gadgetbridge</b>).</li>
+        <li>Touchez <b>Choisir le dossier Gadgetbridge</b> et sélectionnez ce dossier.</li>
+        <li>L'appli lit le zip le plus récent et importe les sorties qu'elle ne connaît pas encore.</li>
+      </ol>
+      <p class="note">Vous pouvez aussi importer un zip ou un fichier .fit à la main, ou partager un .fit depuis Gadgetbridge vers cette appli une fois installée.</p>
+    </section>
+
+    <div id="liste"></div>
+  </main>
+
+  <footer class="pied">
+    <p>Données gardées sur ce téléphone · <span id="version"></span></p>
+  </footer>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

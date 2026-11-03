@@ -1,0 +1,9 @@
+{
+  "name": "new-strava",
+  "private": true,
+  "type": "module",
+  "description": "Appli perso de suivi des sorties vélo, sans Strava",
+  "scripts": {
+    "test": "node tests/test-fit.mjs"
+  }
+}
