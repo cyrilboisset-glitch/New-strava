@@ -74,10 +74,10 @@ async function texteToast(page) {
   // 2. Archive Strava
   await page.setInputFiles('#champ-fichier', { name: 'export_12345678.zip', mimeType: 'application/zip', buffer: zipBytes });
   const t = await texteToast(page);
-  verif('archive : 4 nouvelles, 1 déjà connue', t.includes('4 nouvelles sorties') && t.includes('1 déjà connue') && !t.includes('illisible'), t);
+  verif('archive : 6 nouvelles, 1 déjà connue', t.includes('6 nouvelles sorties') && t.includes('1 déjà connue') && !t.includes('illisible'), t);
 
   const sorties = await page.$$eval('.sortie', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
-  verif('5 sorties en tout', sorties.length === 5, String(sorties.length));
+  verif('7 sorties en tout', sorties.length === 7, String(sorties.length));
   const trouve = (nom) => sorties.find((s) => s.includes(nom)) ?? '';
   const attendus = {
     'Sortie du matin': ['Dim. 1 juin · 10:00', '30,0km', '1 h 00', '400m D+', '200 W NP', 'Vélo de route'],
@@ -85,6 +85,8 @@ async function texteToast(page) {
     Footing: ['Dim. 20 avr. · 11:00', '1,8km', '10 min', '250 W', '150 bpm', 'Course à pied', 'Fichier TCX de Strava'],
     'Home trainer sans capteur': ['Lun. 3 mars · 19:15', '25,0km', '59 min', 'Vélo virtuel', 'Sans trace'],
     'Fichier vide': ['Dim. 2 févr. · 11:00', '0,1km', '1 min'],
+    'Séance haut du corps': ['Mer. 5 mars · 18:00', '45 min', 'Musculation'],
+    Balade: ['Sam. 8 févr. · 14:00', '5,2km', '1 h 10', '40m D+', 'Marche'],
   };
   for (const [nom, morceaux] of Object.entries(attendus)) {
     const s = trouve(nom);
@@ -110,9 +112,49 @@ async function texteToast(page) {
   // 3. Même archive une seconde fois : rien de nouveau
   await page.setInputFiles('#champ-fichier', { name: 'export_12345678.zip', mimeType: 'application/zip', buffer: zipBytes });
   const t2 = await texteToast(page);
-  verif('réimport : aucune nouvelle, 5 déjà connues', t2.includes('Aucune nouvelle sortie') && t2.includes('5 déjà connues'), t2);
+  verif('réimport : aucune nouvelle, 7 déjà connues', t2.includes('Aucune nouvelle sortie') && t2.includes('7 déjà connues'), t2);
 
-  // 4. Un .gpx seul (hors archive) : nom pris dans le fichier
+  // 4. Tri par activité
+  const filtres = async () => page.$$eval('.filtre', (els) => els.map((e) => `${e.textContent.replace(/\s+/g, ' ').trim()}${e.getAttribute('aria-pressed') === 'true' ? '*' : ''}`));
+  const f1 = await filtres();
+  verif('boutons de tri', JSON.stringify(f1) === JSON.stringify(['Tout 7*', 'Vélo 4', 'Course à pied 1', 'Marche 1', 'Musculation 1']), JSON.stringify(f1));
+  await page.click('.filtre:has-text("Vélo")');
+  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
+  const noms = await page.$$eval('.sortie-nom', (els) => els.map((e) => e.textContent));
+  verif('Vélo : 4 sorties', JSON.stringify(noms) === JSON.stringify(['Sortie du matin', 'Col du test', 'Home trainer sans capteur', 'Fichier vide']), JSON.stringify(noms));
+  const cumuls = await page.$$eval('.mois-cumul', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ')));
+  verif('totaux du mois de mars sans la musculation', cumuls[2] === '1 sortie · 25,0 km · 59 min · 0 m D+', JSON.stringify(cumuls));
+  verif('totaux de février sans la marche', cumuls[3] === '1 sortie · 0,1 km · 1 min · 0 m D+', JSON.stringify(cumuls));
+  await page.screenshot({ path: path.join(CAPTURES, 'strava-2-tri-velo.png') });
+  await page.reload();
+  await page.waitForSelector('.filtre');
+  verif('tri gardé après réouverture', (await filtres())[1] === 'Vélo 4*' && (await page.$$('.sortie')).length === 4, JSON.stringify(await filtres()));
+  await page.click('.filtre:has-text("Musculation")');
+  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 1);
+  verif('Musculation : la séance', (await page.textContent('.sortie-nom')) === 'Séance haut du corps');
+  await page.screenshot({ path: path.join(CAPTURES, 'strava-3-tri-musculation.png') });
+  verif('pas de défilement horizontal avec les boutons', !(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)));
+
+  // 5. Musculation importée par la v0.2 comme « Entraînement » : un réimport la corrige
+  await page.evaluate(async () => {
+    const req = indexedDB.open('mes-sorties', 1);
+    const db = await new Promise((r) => { req.onsuccess = () => r(req.result); });
+    const tx = db.transaction('sorties', 'readwrite');
+    const st = tx.objectStore('sorties');
+    const q = st.get('strava-666');
+    q.onsuccess = () => { const { typeStrava, ...reste } = q.result; st.put({ ...reste, sport: 10, sousSport: 0, nomSport: 'Entraînement' }); };
+    await new Promise((r) => { tx.oncomplete = r; });
+  });
+  await page.reload();
+  await page.waitForSelector('.filtre');
+  verif('ancienne version : rangée dans Entraînement', (await filtres()).includes('Entraînement 1'), JSON.stringify(await filtres()));
+  await page.setInputFiles('#champ-fichier', { name: 'export_12345678.zip', mimeType: 'application/zip', buffer: zipBytes });
+  verif('réimport sans doublon', (await texteToast(page)).includes('Aucune nouvelle sortie'));
+  const f2 = await filtres();
+  verif('réimport : remise dans Musculation', f2.includes('Musculation 1') && !f2.some((f) => f.startsWith('Entraînement')), JSON.stringify(f2));
+  await page.click('.filtre:has-text("Tout")');
+
+  // 6. Un .gpx seul (hors archive) : nom pris dans le fichier
   await page.evaluate(async () => {
     const req = indexedDB.open('mes-sorties', 1);
     const db = await new Promise((r) => { req.onsuccess = () => r(req.result); });

@@ -60,11 +60,14 @@ export async function enregistrerSortie(resume, octets, fichier = { format: 'fit
   });
 }
 
-// Donne un nom (celui de Strava) à une sortie qui n'en a pas encore.
-export async function completerNom(id, nom) {
+// Complète une sortie déjà présente avec ce que donne Strava : son nom
+// s'il manque, et son type (`maj` : fonction qui renvoie les champs à changer).
+export async function completerSortie(id, maj) {
   const store = await magasin('sorties', 'readwrite');
   const sortie = await requete(store.get(id));
-  if (sortie && !sortie.nom) await requete(store.put({ ...sortie, nom }));
+  if (!sortie) return;
+  const champs = maj(sortie);
+  if (champs && Object.keys(champs).length) await requete(store.put({ ...sortie, ...champs }));
 }
 
 export async function lireReglage(cle) {

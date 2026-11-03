@@ -76,7 +76,8 @@ const TYPES = [
   [/walk|marche/i, 11, 0, 'Marche'],
   [/hike|randonn/i, 17, 0, 'Randonnée'],
   [/swim|natation/i, 5, 0, 'Natation'],
-  [/workout|weight|training|entra[iî]nement|musculation/i, 10, 0, 'Entraînement'],
+  [/weight|musculation|renforcement/i, 10, 20, 'Musculation'],
+  [/workout|training|entra[iî]nement|crossfit/i, 10, 0, 'Entraînement'],
 ];
 
 export function typeStrava(texte) {

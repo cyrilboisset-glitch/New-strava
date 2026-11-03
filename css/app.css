@@ -131,6 +131,21 @@ button { font: inherit; color: inherit; }
   color: var(--texte-2); font-size: 14px; text-decoration: underline; cursor: pointer;
 }
 
+/* ---- Tri par activité ---- */
+.filtres {
+  display: flex; gap: 8px; margin: 18px -16px 0; padding: 2px 16px 4px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.filtres::-webkit-scrollbar { display: none; }
+.filtre {
+  flex: none; min-height: 38px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--ligne); background: transparent; color: var(--texte);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.filtre-n { color: var(--texte-3); font-weight: 500; font-variant-numeric: tabular-nums; margin-left: 2px; }
+.filtre[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-texte); }
+.filtre[aria-pressed="true"] .filtre-n { color: var(--accent-texte); opacity: 0.7; }
+
 /* ---- État vide ---- */
 .vide h2 { margin: 0 0 8px; font-size: 18px; }
 .vide ol { margin: 0; padding-left: 20px; color: var(--texte-2); }

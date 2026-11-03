@@ -5,7 +5,7 @@ import { lireFit, TYPE_FICHIER_ACTIVITE } from './fit.js';
 import { resumerSortie, identifiantSortie, nomSport } from './sortie.js';
 import { lireGpx, lireTcx, resumerTrace } from './trace.js';
 import { lireActivitesCsv, typeStrava, resumerSansTrace } from './strava.js';
-import { toutesLesSorties, sortieExiste, enregistrerSortie, completerNom, lireReglage, ecrireReglage } from './db.js';
+import { toutesLesSorties, sortieExiste, enregistrerSortie, completerSortie, lireReglage, ecrireReglage } from './db.js';
 
 const ECART_DOUBLON_MS = 60 * 1000; // même départ à 1 min près = même sortie
 const EXTENSIONS = /\.(fit|gpx|tcx)(\.gz)?$/i;
@@ -22,10 +22,23 @@ async function degzip(octets) {
 
 const nomCourt = (chemin) => chemin.split('/').pop();
 
-// Sortie déjà là : on la compte, et on lui donne le nom Strava s'il manque.
+// Sortie déjà là : on la compte, et on la complète avec le CSV Strava :
+// nom s'il manque ; type si la sortie vient de Strava sans FIT précis
+// (corrige par exemple la musculation importée avant la v0.3.0 comme
+// « Entraînement » : il suffit de réimporter l'archive).
 async function doublon(bilan, idExistant, infos) {
   bilan.dejaLa++;
-  if (infos?.nom && idExistant) await completerNom(idExistant, infos.nom);
+  if (!infos || !idExistant) return;
+  await completerSortie(idExistant, (s) => {
+    const champs = {};
+    if (infos.nom && !s.nom) champs.nom = infos.nom;
+    if (infos.type && s.typeStrava !== infos.type) {
+      champs.typeStrava = infos.type;
+      const typeFitVague = s.format !== 'fit' || s.sport === 0 || (s.sport === 10 && !s.sousSport);
+      if (s.source === 'strava' && typeFitVague) Object.assign(champs, typeStrava(infos.type));
+    }
+    return champs;
+  });
 }
 
 function memeDepart(connues, debut) {
@@ -40,6 +53,7 @@ async function enregistrer(resume, octets, fichier, bilan, connues, infos) {
   if (infos) {
     resume.source = 'strava';
     resume.idStrava = infos.idStrava;
+    if (infos.type) resume.typeStrava = infos.type;
     if (infos.nom) resume.nom = infos.nom;
   }
   if (fichier) resume.format = fichier.format;
@@ -69,7 +83,7 @@ async function importerActivite(octets, chemin, bilan, connues, infos = null) {
       const idProvisoire = identifiantSortie(entete);
       if (idProvisoire && await sortieExiste(idProvisoire)) return doublon(bilan, idProvisoire, infos);
       resume = resumerSortie(lireFit(brut), nom);
-      if (resume.sport === 0 && infos?.type) Object.assign(resume, typeStrava(infos.type));
+      if ((resume.sport === 0 || (resume.sport === 10 && !resume.sousSport)) && infos?.type) Object.assign(resume, typeStrava(infos.type));
     } else {
       const texte = new TextDecoder().decode(brut);
       const lu = format === 'gpx' ? lireGpx(texte) : lireTcx(texte);

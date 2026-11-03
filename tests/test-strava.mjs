@@ -3,6 +3,7 @@
 // Lancer depuis la racine du dépôt : node tests/test-strava.mjs
 import { lireCsv, dateStrava, lireActivitesCsv, typeStrava, resumerSansTrace } from '../js/strava.js';
 import { lireGpx, lireTcx, resumerTrace, puissanceNormalisee } from '../js/trace.js';
+import { familleSortie } from '../js/sortie.js';
 import { fauxGpx, fauxTcx, CSV_STRAVA } from './fausse-archive.mjs';
 
 let echecs = 0;
@@ -26,6 +27,9 @@ egal('Ride', typeStrava('Ride').nomSport, 'Vélo');
 egal('Virtual Ride', typeStrava('Virtual Ride'), { sport: 2, sousSport: 58, nomSport: 'Vélo virtuel' });
 egal('Gravel Ride', typeStrava('Gravel Ride').nomSport, 'Gravel');
 egal('Course à pied (fr)', typeStrava('Course à pied').sport, 1);
+egal('Weight Training = musculation', typeStrava('Weight Training'), { sport: 10, sousSport: 20, nomSport: 'Musculation' });
+egal('Musculation (fr)', typeStrava('Musculation').nomSport, 'Musculation');
+egal('Workout = entraînement', typeStrava('Workout'), { sport: 10, sousSport: 0, nomSport: 'Entraînement' });
 egal('type inconnu gardé tel quel', typeStrava('Kitesurf').nomSport, 'Kitesurf');
 
 // activities.csv
@@ -33,7 +37,7 @@ const csv = lireActivitesCsv(CSV_STRAVA);
 egal('lignes avec fichier', [...csv.parFichier.keys()].sort(), ['activities/111.fit.gz', 'activities/222.gpx', 'activities/333.tcx.gz', 'activities/444.gpx']);
 const gpx = csv.parFichier.get('activities/222.gpx');
 egal('nom et type de la sortie GPX', [gpx.idStrava, gpx.nom, gpx.type], ['222', 'Col du test', 'Ride']);
-egal('une saisie à la main', csv.sansFichier.length, 1);
+egal('trois saisies à la main', csv.sansFichier.length, 3);
 const manuelle = csv.sansFichier[0];
 egal('saisie à la main : chiffres', [manuelle.debut, manuelle.tempsEcouleS, manuelle.tempsMouvementS, manuelle.distanceM, manuelle.denivelePosM],
   [Date.UTC(2025, 2, 3, 18, 15, 0), 3600, 3540, 25000, 0]);
@@ -70,6 +74,12 @@ const t = lireTcx(fauxTcx());
 egal('TCX : points et type', [t.records.length, t.sport], [601, 1]);
 const rt = resumerTrace(t.records, { id: 'x', nomFichier: 'x.tcx' });
 egal('TCX : distance, durée, FC, puissance', [rt.distanceM, rt.dureeChronoS, rt.fcMoy, rt.puissanceMoyW], [1800, 600, 150, 250]);
+
+// Familles pour le tri de la liste
+const famille = (sport, sousSport, nomSport = '') => familleSortie({ sport, sousSport, nomSport }).nom;
+egal('familles', [famille(2, 7), famille(2, 46), famille(2, 6), famille(21, 0), famille(1, 3), famille(11, 0), famille(10, 20), famille(10, 0), famille(0, 0, 'Kitesurf'), famille(0, 0, 'Activité')],
+  ['Vélo', 'Vélo', 'Vélo', 'Vélo', 'Course à pied', 'Marche', 'Musculation', 'Entraînement', 'Kitesurf', 'Autre']);
+egal('vélo électrique et vélo : même famille', familleSortie({ sport: 21 }).cle, familleSortie({ sport: 2, sousSport: 7 }).cle);
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);

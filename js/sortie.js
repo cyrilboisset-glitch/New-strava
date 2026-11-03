@@ -6,11 +6,28 @@ const SPORTS = {
 };
 const SOUS_SPORTS_VELO = { 6: 'Home trainer', 7: 'Vélo de route', 8: 'VTT', 46: 'Gravel', 58: 'Vélo virtuel' };
 const SOUS_SPORTS_COURSE = { 1: 'Tapis de course', 3: 'Trail' };
+const SOUS_SPORT_MUSCULATION = 20; // FIT : sub_sport strength_training
 
 export function nomSport(sport, sousSport) {
   if (sport === 2 && SOUS_SPORTS_VELO[sousSport]) return SOUS_SPORTS_VELO[sousSport];
   if (sport === 1 && SOUS_SPORTS_COURSE[sousSport]) return SOUS_SPORTS_COURSE[sousSport];
+  if (sport === 10 && sousSport === SOUS_SPORT_MUSCULATION) return 'Musculation';
   return SPORTS[sport] ?? 'Activité';
+}
+
+// Familles d'activités pour le tri de la liste. Tous les vélos (route,
+// gravel, VTT, home trainer, virtuel, électrique) vont dans « Vélo ».
+const FAMILLES = {
+  2: 'Vélo', 21: 'Vélo', 1: 'Course à pied', 11: 'Marche', 17: 'Randonnée', 5: 'Natation', 10: 'Entraînement',
+};
+
+/** Famille d'une sortie : { cle, nom } */
+export function familleSortie(s) {
+  if (s.sport === 10 && s.sousSport === SOUS_SPORT_MUSCULATION) return { cle: 'musculation', nom: 'Musculation' };
+  if (FAMILLES[s.sport]) return { cle: `sport-${s.sport === 21 ? 2 : s.sport}`, nom: FAMILLES[s.sport] };
+  // Types Strava inconnus (Kitesurf, Yoga…) : chacun sa famille, sous son nom
+  const nom = s.nomSport && s.nomSport !== 'Activité' ? s.nomSport : 'Autre';
+  return { cle: `autre-${nom}`, nom };
 }
 
 // Identifiant stable : numéro de série du compteur + heure de création du
