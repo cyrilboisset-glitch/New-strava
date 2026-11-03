@@ -3,7 +3,7 @@
 // Changer VERSION à chaque mise en ligne pour que le téléphone se mette à jour.
 import { deposerPartage } from './js/db.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.2.1';
 const CACHE = `mes-sorties-${VERSION}`;
 const FICHIERS = [
   './', 'index.html', 'manifest.webmanifest',
@@ -17,7 +17,11 @@ const FICHIERS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FICHIERS)).then(() => self.skipWaiting()));
+  // cache: 'reload' : toujours la version du serveur, jamais une copie
+  // gardée par le navigateur (sinon une ancienne page pourrait revenir)
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(FICHIERS.map((f) => new Request(f, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

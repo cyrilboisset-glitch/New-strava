@@ -5,7 +5,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.2.0 · archive Strava';
+export const VERSION_APPLI = '0.2.1 · archive Strava';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -17,6 +17,7 @@ const el = {
 
 let dossier = null;
 let occupe = false;
+let rechargerApres = false; // nouvelle version arrivée pendant un import
 
 // ---- Formats -------------------------------------------------------------
 
@@ -178,6 +179,7 @@ function toast(texte) {
 
 function occuper(oui) {
   occupe = oui;
+  if (!oui && rechargerApres) { location.reload(); return; }
   for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnHaut]) b.disabled = oui;
   el.btnHaut.classList.toggle('tourne', oui);
 }
@@ -282,11 +284,28 @@ el.champ.addEventListener('change', async () => {
   await importerDepuis(fichiers);
 });
 
+// Mise à jour : à chaque ouverture ou retour dans l'appli, on demande au
+// navigateur de vérifier sw.js ; si une nouvelle version prend la main,
+// la page se recharge toute seule (après l'import en cours, s'il y en a un).
+function miseAJourAuto() {
+  const avaitUneVersion = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!avaitUneVersion) return; // première installation : rien à recharger
+    if (occupe) rechargerApres = true;
+    else location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { type: 'module', updateViaCache: 'none' })
+    .then((reg) => {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    })
+    .catch((e) => console.warn('Service worker', e));
+}
+
 async function demarrer() {
   $('version').textContent = `v${VERSION_APPLI}`;
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js', { type: 'module' }).catch((e) => console.warn('Service worker', e));
-  }
+  if ('serviceWorker' in navigator) miseAJourAuto();
   await afficherListe();
 
   // Fichiers reçus par le menu Partager d'Android
