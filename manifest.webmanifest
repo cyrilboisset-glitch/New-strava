@@ -22,7 +22,7 @@
       "files": [
         {
           "name": "fichiers",
-          "accept": [".fit", ".zip", "application/octet-stream", "application/zip", "application/vnd.ant.fit"]
+          "accept": [".fit", ".zip", ".gpx", ".tcx", ".gz", "application/octet-stream", "application/zip", "application/gzip", "application/gpx+xml", "application/vnd.ant.fit"]
         }
       ]
     }

@@ -5,7 +5,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.1.0 · étape 1';
+export const VERSION_APPLI = '0.2.0 · archive Strava';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -86,6 +86,7 @@ function carteSortie(s) {
 
   const details = [];
   const ajout = (nom, val) => { if (val != null && val !== '') details.push(`<div class="detail"><dt>${nom}</dt><dd>${val}</dd></div>`); };
+  if (s.nom) ajout('Type', echapper(s.nomSport));
   ajout('Vitesse moyenne', s.vitesseMoyMs != null ? `${nombre(s.vitesseMoyMs * 3.6, 1)} km/h` : null);
   ajout('Temps total', s.dureeTotaleS != null ? duree(s.dureeTotaleS) : null);
   ajout('Puissance moyenne', s.puissanceMoyW != null ? `${s.puissanceMoyW} W` : null);
@@ -98,7 +99,11 @@ function carteSortie(s) {
   ajout('Tours', s.nbTours || null);
   const note = [
     s.ftpCompteurW ? `IF et TSS calculés par le compteur avec une FTP de ${s.ftpCompteurW} W.` : '',
-    `${nombre(s.nbPoints)} points enregistrés.`,
+    s.sansTrace ? 'Sans trace (saisie à la main sur Strava ou fichier inutilisable) : chiffres repris de Strava.' : '',
+    s.format === 'gpx' || s.format === 'tcx'
+      ? `Fichier ${s.format.toUpperCase()}${s.source === 'strava' ? ' de Strava' : ''} : chiffres calculés depuis les points.` : '',
+    s.source === 'strava' && !s.sansTrace && s.format === 'fit' ? 'Fichier FIT récupéré dans l\'archive Strava.' : '',
+    s.nbPoints ? `${nombre(s.nbPoints)} points enregistrés.` : '',
   ].filter(Boolean).join(' ');
 
   return `
@@ -107,12 +112,12 @@ function carteSortie(s) {
       <div class="vignette">${vignette(s.trace)}</div>
       <div>
         <div class="sortie-titre">
-          <p class="sortie-nom">${echapper(s.nomSport)}</p>
+          <p class="sortie-nom">${echapper(s.nom || s.nomSport)}</p>
           <span class="sortie-date">${majuscule(fmtJour.format(d))} · ${fmtHeure.format(d)}</span>
         </div>
         <div class="chiffres">
           ${s.distanceM != null ? `<span class="chiffre">${km(s.distanceM)}<small>km</small></span>` : ''}
-          <span class="chiffre">${duree(s.dureeChronoS)}</span>
+          ${s.dureeChronoS != null ? `<span class="chiffre">${duree(s.dureeChronoS)}</span>` : ''}
           ${s.denivelePosM != null ? `<span class="chiffre">${nombre(s.denivelePosM)}<small>m D+</small></span>` : ''}
         </div>
         ${effort.length ? `<div class="effort">${effort.join('')}</div>` : ''}
@@ -191,7 +196,7 @@ async function afficherEtatDossier() {
   el.btnChanger.hidden = true;
 
   if (!dossierPossible) {
-    etat('Import manuel', "Ce navigateur ne permet pas de lire un dossier : importez le zip de Gadgetbridge ou un fichier .fit.");
+    etat('Import manuel', "Ce navigateur ne permet pas de lire un dossier : importez le zip de Gadgetbridge, l'archive Strava ou un fichier .fit.");
     return;
   }
   if (!dossier) {

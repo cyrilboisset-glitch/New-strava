@@ -19,14 +19,31 @@ BiNavi ──Bluetooth──> Gadgetbridge ──export auto du zip──> dossi
 2. Ouvrir l'appli dans Chrome, puis menu ⋮ → **Installer l'application**.
 3. Dans l'appli : **Choisir le dossier Gadgetbridge**.
 
-Autres façons d'importer : bouton **Importer un fichier** (zip ou .fit),
-ou partager un .fit depuis Gadgetbridge vers l'appli installée.
+Autres façons d'importer : bouton **Importer un fichier** (zip, .fit,
+.gpx, .tcx, compressés .gz ou non), ou partager un .fit depuis
+Gadgetbridge vers l'appli installée.
+
+### Anciennes sorties Strava
+
+1. Sur strava.com : Paramètres → Mon compte → Télécharger ou supprimer
+   votre compte → Demander une archive. Le lien arrive par mail.
+2. Télécharger le zip **sur le téléphone** (les données restent dans
+   l'appli de ce téléphone), sans le décompresser.
+3. Dans l'appli : **Importer un fichier** → choisir le zip.
+
+L'appli lit `activities.csv` (noms et types des sorties) et les fichiers
+de `activities/` (FIT, GPX, TCX, souvent en `.gz`). Les sorties saisies
+à la main sur Strava sont reprises depuis le CSV, sans trace. Les sorties
+déjà présentes (même départ à 1 min près) ne sont pas doublées ; elles
+reçoivent juste leur nom Strava. Si l'import est interrompu, il suffit
+de le relancer.
 
 ## Avancement
 
 | Étape | Contenu | État |
 |---|---|---|
 | 1 | Import du zip / des FIT, liste des sorties par mois | **Fait** |
+| 1 bis | Import de l'archive Strava (FIT, GPX, TCX, CSV) | **Fait** |
 | 2 | Détail d'une sortie : carte, courbes, zones, FTP réglable | À faire |
 | 3 | Historique et charge d'entraînement (forme / fatigue) | À faire |
 | 4 | Générateur de traces GPX, envoi au BiNavi via Gadgetbridge | À faire |
@@ -36,6 +53,8 @@ ou partager un .fit depuis Gadgetbridge vers l'appli installée.
 
 ```
 node tests/test-fit.mjs
+node tests/test-strava.mjs
+node tests/test-strava-navigateur.cjs
 ```
 
 Compare le lecteur FIT avec des valeurs de référence (fitparse). Les
