@@ -36,7 +36,7 @@
         <button id="btn-dossier" class="btn principal" type="button" hidden>Choisir le dossier Gadgetbridge</button>
         <button id="btn-synchro" class="btn principal" type="button" hidden>Synchroniser</button>
         <button id="btn-importer" class="btn secondaire" type="button">Importer un fichier</button>
-        <input id="champ-fichier" type="file" accept=".zip,.fit,application/zip,application/octet-stream" multiple hidden>
+        <input id="champ-fichier" type="file" accept=".zip,.fit,.gpx,.tcx,.gz,application/zip,application/gzip,application/octet-stream,application/gpx+xml" multiple hidden>
       </div>
       <button id="btn-changer-dossier" class="lien" type="button" hidden>Changer de dossier</button>
     </section>
@@ -49,6 +49,7 @@
         <li>L'appli lit le zip le plus récent et importe les sorties qu'elle ne connaît pas encore.</li>
       </ol>
       <p class="note">Vous pouvez aussi importer un zip ou un fichier .fit à la main, ou partager un .fit depuis Gadgetbridge vers cette appli une fois installée.</p>
+      <p class="note"><b>Anciennes sorties Strava :</b> touchez <b>Importer un fichier</b> et choisissez le zip de l'archive Strava (export du compte), tel quel, sans le décompresser.</p>
     </section>
 
     <div id="liste"></div>

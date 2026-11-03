@@ -166,7 +166,7 @@ button { font: inherit; color: inherit; }
 .vignette path { fill: none; stroke: var(--accent-trait); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
 .vignette circle { fill: var(--texte); }
 .sortie-titre { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-.sortie-nom { margin: 0; font-weight: 600; font-size: 15px; }
+.sortie-nom { margin: 0; font-weight: 600; font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
 .sortie-date { color: var(--texte-3); font-size: 13px; white-space: nowrap; }
 .chiffres { display: flex; gap: 18px; margin-top: 4px; flex-wrap: wrap; }
 .chiffre { font-family: var(--police-chiffres); font-weight: 600; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }

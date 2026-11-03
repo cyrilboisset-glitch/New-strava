@@ -72,7 +72,9 @@ lancer l'export maintenant (« Run AutoExport now »), puis Synchroniser.
 index.html, css/app.css     Interface (thème sombre/clair)
 js/fit.js                   Lecteur FIT (sans dépendance), testé
 js/sortie.js                Résumé d'une sortie pour la liste
-js/import.js                Import zip / FIT / dossier, anti-doublons
+js/import.js                Import zip / FIT / GPX / TCX / dossier, anti-doublons
+js/strava.js                Archive Strava : activities.csv, types, saisies à la main
+js/trace.js                 Lecture GPX/TCX, résumé calculé depuis les points
 js/db.js                    IndexedDB : sorties, fichiers FIT, réglages
 js/app.js                   Carte de synchro + liste par mois
 sw.js                       Hors ligne + réception des partages
@@ -84,6 +86,9 @@ tests/test-navigateur.cjs   Appli complète dans Chromium à 390 px (Playwright)
                             import zip/fit, doublons, faux dossier, détail,
                             mois, hors ligne, partage Android. Captures dans
                             tests/captures/ (non versionné)
+tests/test-strava.mjs       CSV, dates, GPX/TCX, calculs (données fabriquées)
+tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
+tests/fausse-archive.mjs    Fabrique GPX, TCX, FIT et CSV aux valeurs connues
 tests/donnees/              Sorties réelles, NON versionnées : sans elles les
                             deux tests ne vérifient rien. Fichiers attendus :
                             sortie-2026-10-12.fit (+ .ref.json pour test-fit)
@@ -99,14 +104,12 @@ Gadgetbridge, 5 montre Amazfit.
 Demandes posées le 3 nov. 2026, **Cyril a dit « ne fais rien pour
 l'instant »** — à proposer quand il voudra :
 
-- **Récupérer toutes les anciennes sorties Strava** : archive Strava
-  (strava.com → Paramètres → Mon compte → Télécharger votre compte →
-  Demander le téléchargement ; arrive par mail en quelques heures).
-  Contenu : `activities/` (FIT, souvent `.fit.gz`, parfois GPX) +
-  `activities.csv` (noms des sorties…). À ajouter : décompression gzip
-  (`DecompressionStream`), lecture GPX, noms depuis le CSV. Les doublons
-  avec Gadgetbridge sont déjà évités (même départ à 1 min près).
-  Cyril a été invité à demander l'archive : lui demander s'il l'a reçue.
+- **Anciennes sorties Strava : FAIT le 3 nov. 2026** (v0.2.0). Import du
+  zip d'archive Strava par « Importer un fichier » (`js/strava.js` pour le
+  CSV, `js/trace.js` pour GPX/TCX et calculs). Testé seulement sur une
+  fausse archive : l'archive réelle de Cyril fait 123 Mo, pas encore
+  essayée. À vérifier sur la vraie : en-têtes et format de date du CSV
+  (anglais ou français ?), colonnes « Distance » (km puis m supposé).
 - **Lire les sorties directement sur le BiNavi** (sans Gadgetbridge ni
   zip) : possible via Web Bluetooth (Chrome Android), en transposant le
   protocole iGPSport décodé par Gadgetbridge (code libre, AGPL ; dépôt

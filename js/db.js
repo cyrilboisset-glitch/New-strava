@@ -1,6 +1,7 @@
 // Stockage local (IndexedDB) : les sorties restent sur le téléphone.
 //   sorties  : résumé de chaque sortie (clé : id)
-//   fichiers : octets du FIT d'origine (clé : id), pour le détail
+//   fichiers : octets du fichier d'origine (clé : id), pour le détail ;
+//              format 'fit' (par défaut), 'gpx' ou 'tcx', gzip si compressé
 //   reglages : petites valeurs (dossier choisi, dernier zip lu…)
 //   partages : fichiers reçus par le menu Partager d'Android, en attente
 
@@ -46,16 +47,24 @@ export async function sortieExiste(id) {
   return (await requete((await magasin('sorties')).getKey(id))) !== undefined;
 }
 
-export async function enregistrerSortie(resume, octets) {
+// octets null : sortie sans fichier (saisie à la main sur Strava)
+export async function enregistrerSortie(resume, octets, fichier = { format: 'fit', gzip: false }) {
   const db = await ouvrirBase();
   const tx = db.transaction(['sorties', 'fichiers'], 'readwrite');
   tx.objectStore('sorties').put(resume);
-  tx.objectStore('fichiers').put({ id: resume.id, octets });
+  if (octets) tx.objectStore('fichiers').put({ id: resume.id, octets, ...fichier });
   return new Promise((resoudre, rejeter) => {
     tx.oncomplete = () => resoudre();
     tx.onerror = () => rejeter(tx.error);
     tx.onabort = () => rejeter(tx.error);
   });
+}
+
+// Donne un nom (celui de Strava) à une sortie qui n'en a pas encore.
+export async function completerNom(id, nom) {
+  const store = await magasin('sorties', 'readwrite');
+  const sortie = await requete(store.get(id));
+  if (sortie && !sortie.nom) await requete(store.put({ ...sortie, nom }));
 }
 
 export async function lireReglage(cle) {
