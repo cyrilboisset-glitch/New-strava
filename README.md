@@ -44,6 +44,7 @@ de le relancer.
 |---|---|---|
 | 1 | Import du zip / des FIT, liste des sorties par mois | **Fait** |
 | 1 bis | Import de l'archive Strava (FIT, GPX, TCX, CSV) | **Fait** |
+| 1 ter | Tri de la liste par activité (Vélo, Marche, Musculation…) | **Fait** |
 | 2 | Détail d'une sortie : carte, courbes, zones, FTP réglable | À faire |
 | 3 | Historique et charge d'entraînement (forme / fatigue) | À faire |
 | 4 | Générateur de traces GPX, envoi au BiNavi via Gadgetbridge | À faire |

@@ -1,23 +1,25 @@
 // Interface : carte de synchronisation + liste des sorties par mois.
-import { toutesLesSorties, lireReglage, viderPartages } from './db.js';
+import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages } from './db.js';
+import { familleSortie } from './sortie.js';
 import {
   importerFichiers, dossierPossible, choisirDossier, dossierMemorise,
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.2.1 · archive Strava';
+export const VERSION_APPLI = '0.3.0 · tri par activité';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   titre: $('synchro-titre'), detail: $('synchro-detail'), pastille: $('pastille'),
   progression: $('progression'), btnDossier: $('btn-dossier'), btnSynchro: $('btn-synchro'),
   btnHaut: $('btn-synchro-haut'), btnImporter: $('btn-importer'), champ: $('champ-fichier'),
-  btnChanger: $('btn-changer-dossier'), liste: $('liste'), vide: $('vide'), toast: $('toast'),
+  btnChanger: $('btn-changer-dossier'), liste: $('liste'), filtres: $('filtres'), vide: $('vide'), toast: $('toast'),
 };
 
 let dossier = null;
 let occupe = false;
 let rechargerApres = false; // nouvelle version arrivée pendant un import
+let filtre = 'tout'; // famille d'activités affichée (clé de familleSortie)
 
 // ---- Formats -------------------------------------------------------------
 
@@ -119,7 +121,7 @@ function carteSortie(s) {
         <div class="chiffres">
           ${s.distanceM != null ? `<span class="chiffre">${km(s.distanceM)}<small>km</small></span>` : ''}
           ${s.dureeChronoS != null ? `<span class="chiffre">${duree(s.dureeChronoS)}</span>` : ''}
-          ${s.denivelePosM != null ? `<span class="chiffre">${nombre(s.denivelePosM)}<small>m D+</small></span>` : ''}
+          ${s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM) ? `<span class="chiffre">${nombre(s.denivelePosM)}<small>m D+</small></span>` : ''}
         </div>
         ${effort.length ? `<div class="effort">${effort.join('')}</div>` : ''}
       </div>
@@ -128,9 +130,42 @@ function carteSortie(s) {
   </details>`;
 }
 
+// Boutons de tri : « Tout » + chaque famille présente, la plus fréquente d'abord
+function afficherFiltres(toutes) {
+  const familles = new Map();
+  for (const s of toutes) {
+    const f = familleSortie(s);
+    if (!familles.has(f.cle)) familles.set(f.cle, { ...f, n: 0 });
+    familles.get(f.cle).n++;
+  }
+  if (filtre !== 'tout' && !familles.has(filtre)) filtre = 'tout';
+  el.filtres.hidden = familles.size < 2;
+  const boutons = [{ cle: 'tout', nom: 'Tout', n: toutes.length },
+    ...[...familles.values()].sort((a, b) => b.n - a.n || a.nom.localeCompare(b.nom, 'fr'))];
+  el.filtres.innerHTML = boutons.map((f) => `
+    <button type="button" class="filtre" data-cle="${echapper(f.cle)}" aria-pressed="${f.cle === filtre}">
+      ${echapper(f.nom)} <span class="filtre-n">${nombre(f.n)}</span>
+    </button>`).join('');
+  // Bouton choisi visible même s'il est loin à droite dans la rangée
+  const actif = el.filtres.querySelector('[aria-pressed="true"]');
+  if (actif && filtre !== 'tout') el.filtres.scrollLeft = actif.offsetLeft - 16;
+}
+
+el.filtres.addEventListener('click', async (e) => {
+  const b = e.target.closest('.filtre');
+  if (!b || b.dataset.cle === filtre) return;
+  filtre = b.dataset.cle;
+  try { await ecrireReglage('filtre', filtre); } catch { /* sans importance */ }
+  await afficherListe();
+});
+
 async function afficherListe() {
-  const sorties = (await toutesLesSorties()).sort((a, b) => b.debut - a.debut);
-  el.vide.hidden = sorties.length > 0;
+  const toutes = await toutesLesSorties();
+  el.vide.hidden = toutes.length > 0;
+  afficherFiltres(toutes);
+  const sorties = toutes
+    .filter((s) => filtre === 'tout' || familleSortie(s).cle === filtre)
+    .sort((a, b) => b.debut - a.debut);
   const groupes = new Map();
   for (const s of sorties) {
     const d = new Date(s.debut);
@@ -148,7 +183,12 @@ async function afficherListe() {
     <section class="mois">
       <div class="mois-entete">
         <h2 class="mois-titre">${majuscule(fmtMois.format(new Date(liste[0].debut)))}</h2>
-        <p class="mois-cumul">${n} sortie${n > 1 ? 's' : ''} · ${km(dist)} km · ${duree(temps).replace(/ /g, ' ')} · ${nombre(dplus)} m D+</p>
+        <p class="mois-cumul">${[
+          `${n} sortie${n > 1 ? 's' : ''}`,
+          dist > 0 ? `${km(dist)} km` : '',
+          duree(temps).replace(/ /g, ' '),
+          dist > 0 ? `${nombre(dplus)} m D+` : '',
+        ].filter(Boolean).join(' · ')}</p>
       </div>
       ${liste.map(carteSortie).join('')}
     </section>`;
@@ -305,6 +345,7 @@ function miseAJourAuto() {
 
 async function demarrer() {
   $('version').textContent = `v${VERSION_APPLI}`;
+  try { filtre = (await lireReglage('filtre')) ?? 'tout'; } catch { /* filtre par défaut */ }
   if ('serviceWorker' in navigator) miseAJourAuto();
   await afficherListe();
 

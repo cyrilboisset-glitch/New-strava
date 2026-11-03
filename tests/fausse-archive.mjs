@@ -114,4 +114,6 @@ export const CSV_STRAVA = [
   '333,"Apr 20, 2025, 9:00:00 AM",Footing,Run,,600,1.80,,,false,,,activities/333.tcx.gz,,,600.0,600.0,1800.0,,,0.0',
   '444,"Feb 2, 2025, 10:00:00 AM",Fichier vide,Ride,,60,0.10,,,false,,,activities/444.gpx,,,60.0,60.0,100.0,,,0.0',
   '555,"Mar 3, 2025, 6:15:00 PM",Home trainer sans capteur,Virtual Ride,,3600,25.00,,,false,,,,,,3600.0,3540.0,25000.0,,,0.0',
+  '666,"Mar 5, 2025, 5:00:00 PM",Séance haut du corps,Weight Training,,2700,0.00,,,false,,,,,,2700.0,2700.0,0.0,,,0.0',
+  '777,"Feb 8, 2025, 1:00:00 PM",Balade,Walk,,4500,5.20,,,false,,,,,,4500.0,4200.0,5200.0,,,40.0',
 ].join('\n') + '\n';

@@ -110,6 +110,16 @@ l'instant »** — à proposer quand il voudra :
   fausse archive : l'archive réelle de Cyril fait 123 Mo, pas encore
   essayée. À vérifier sur la vraie : en-têtes et format de date du CSV
   (anglais ou français ?), colonnes « Distance » (km puis m supposé).
+- **Tri par activité : FAIT le 3 nov. 2026** (v0.3.0, « étape 1 ter »).
+  Boutons au-dessus de la liste, familles dans `familleSortie()`
+  (`js/sortie.js`) : tous les vélos ensemble (route, gravel, VTT, home
+  trainer, virtuel, électrique). Musculation séparée d'Entraînement
+  (Weight Training / Workout de Strava). Cyril avait déjà importé son
+  archive avec la v0.2 : il doit la **réimporter une fois** pour que ses
+  séances de musculation quittent « Entraînement » (pas de doublon).
+- **Sauvegarde / export des sorties** : proposée, Cyril a répondu « la
+  sauvegarde est déjà sur l'appli » (les données ne sont pourtant que
+  dans Chrome du téléphone). Ne pas insister, en reparler à l'étape 3.
 - **Lire les sorties directement sur le BiNavi** (sans Gadgetbridge ni
   zip) : possible via Web Bluetooth (Chrome Android), en transposant le
   protocole iGPSport décodé par Gadgetbridge (code libre, AGPL ; dépôt
