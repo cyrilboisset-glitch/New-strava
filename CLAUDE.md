@@ -29,8 +29,23 @@ téléphone (IndexedDB).
    et partage d'un .fit depuis Gadgetbridge (share target du manifeste,
    traité dans `sw.js`).
 
-⚠ À vérifier sur le téléphone de Cyril : que l'accès au dossier tient
-d'une ouverture à l'autre (sinon un appui sur « Synchroniser » suffit).
+Testé par Cyril le 3 nov. 2026 sur son Xiaomi : l'accès au dossier ne
+tient pas d'une ouverture à l'autre, il faut appuyer sur
+« Synchroniser » (une autorisation Android à chaque fois). **Cyril dit
+que ça lui convient** : ne pas chercher à le contourner.
+
+Délai à connaître : une sortie n'apparaît dans l'appli qu'après le
+prochain export zip de Gadgetbridge (fréquence réglée par Cyril). Pour
+l'avoir tout de suite : Gadgetbridge → Paramètres → Automatisations →
+lancer l'export maintenant (« Run AutoExport now »), puis Synchroniser.
+
+## En ligne
+
+- Adresse : https://cyrilboisset-glitch.github.io/New-strava/ (GitHub
+  Pages, branche `main`, dossier racine). Installée sur le téléphone de
+  Cyril comme appli (Chrome → Installer l'application).
+- Nom affiché : « Mes sorties » (le dépôt s'appelle New-strava ; Cyril
+  peut demander à renommer).
 
 ## Ce qu'on sait des FIT du BiNavi (sortie du 12 oct. 2026)
 
@@ -65,8 +80,50 @@ manifest.webmanifest        Installation + share target
 vendor/jszip.min.js         JSZip 3.10.1 (MIT)
 fonts/                      Barlow Condensed (OFL)
 tests/test-fit.mjs          Comparaison avec fitparse (node tests/test-fit.mjs)
-tests/donnees/              Sorties réelles, NON versionnées
+tests/test-navigateur.cjs   Appli complète dans Chromium à 390 px (Playwright) :
+                            import zip/fit, doublons, faux dossier, détail,
+                            mois, hors ligne, partage Android. Captures dans
+                            tests/captures/ (non versionné)
+tests/donnees/              Sorties réelles, NON versionnées : sans elles les
+                            deux tests ne vérifient rien. Fichiers attendus :
+                            sortie-2026-10-12.fit (+ .ref.json pour test-fit)
 ```
+
+## Prochaines étapes et demandes en attente
+
+Étapes prévues (README) : 2 détail d'une sortie (carte Leaflet/OSM,
+courbes, zones, **FTP réglable**), 3 historique et charge (CTL/ATL/TSB),
+4 générateur de traces GPX (routage type BRouter) envoyées au BiNavi via
+Gadgetbridge, 5 montre Amazfit.
+
+Demandes posées le 3 nov. 2026, **Cyril a dit « ne fais rien pour
+l'instant »** — à proposer quand il voudra :
+
+- **Récupérer toutes les anciennes sorties Strava** : archive Strava
+  (strava.com → Paramètres → Mon compte → Télécharger votre compte →
+  Demander le téléchargement ; arrive par mail en quelques heures).
+  Contenu : `activities/` (FIT, souvent `.fit.gz`, parfois GPX) +
+  `activities.csv` (noms des sorties…). À ajouter : décompression gzip
+  (`DecompressionStream`), lecture GPX, noms depuis le CSV. Les doublons
+  avec Gadgetbridge sont déjà évités (même départ à 1 min près).
+  Cyril a été invité à demander l'archive : lui demander s'il l'a reçue.
+- **Lire les sorties directement sur le BiNavi** (sans Gadgetbridge ni
+  zip) : possible via Web Bluetooth (Chrome Android), en transposant le
+  protocole iGPSport décodé par Gadgetbridge (code libre, AGPL ; dépôt
+  sur codeberg.org, inaccessible depuis l'environnement de Claude).
+  Limites : une seule appli connectée au compteur à la fois, choix du
+  compteur dans une liste à chaque synchro (reconnexion auto seulement
+  via `chrome://flags`), tests uniquement avec le compteur de Cyril.
+  Conseillé comme « étape 6 », après les étapes 2 à 4.
+- **FTP** : 236 W dans le compteur, 225 W dans une note plus ancienne.
+  Demander à Cyril laquelle utiliser avant l'étape 2.
+
+Montre **Amazfit Active 3 Premium** (étape 5) : « Highly supported » par
+Gadgetbridge, mais l'appairage demande une clé d'authentification
+récupérée via l'appli Zepp (procédure « Huami/Xiaomi server pairing »).
+
+Projet voisin : **Suivi-direct** (suivi en direct pour la femme de
+Cyril, appli Flutter + page web), dépôt séparé.
 
 ## Méthode de travail (demandée par Cyril)
 
@@ -84,5 +141,8 @@ a déjà relevé des erreurs de ce type.
   bibliothèques sont copiées dans `vendor/`.
 - À chaque mise en ligne : changer `VERSION` dans `sw.js` (sinon le
   téléphone garde l'ancienne version) et `VERSION_APPLI` dans `js/app.js`.
-- Avant de dire que c'est fait : `node tests/test-fit.mjs`, et vérifier
-  l'appli dans un navigateur à la taille d'un téléphone.
+- Avant de dire que c'est fait : `node tests/test-fit.mjs` et
+  `node tests/test-navigateur.cjs`, puis regarder les captures.
+- Depuis l'environnement de Claude, seuls npm, pip et GitHub sont
+  joignables : pas de tuiles OSM, pas de github.io, pas de codeberg. L'API
+  GitHub publique répond (sans connexion, 60 requêtes/heure).

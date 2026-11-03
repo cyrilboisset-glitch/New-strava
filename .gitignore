@@ -1,3 +1,4 @@
 # Sorties réelles utilisées pour les tests : jamais publiées (GPS, profil)
 tests/donnees/
 node_modules/
+tests/captures/
