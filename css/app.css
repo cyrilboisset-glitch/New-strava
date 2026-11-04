@@ -139,6 +139,47 @@ button { font: inherit; color: inherit; }
   color: var(--texte-2); font-size: 14px; text-decoration: underline; cursor: pointer;
 }
 
+/* ---- Accueil : menus Activité et Synchro ---- */
+.outils { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 6px; }
+.menu { position: relative; min-width: 0; }
+.menu-bouton {
+  position: relative; display: flex; flex-direction: column; justify-content: center; width: 100%; min-height: 56px;
+  padding: 6px 36px 6px 14px; border-radius: 14px; border: 1px solid var(--ligne); background: var(--surface);
+  box-shadow: var(--ombre); color: var(--texte); text-align: left; cursor: pointer; font: inherit;
+}
+.menu-bouton .chevron { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--texte-2); pointer-events: none; }
+.menu-bouton[aria-expanded="true"] .chevron { transform: translateY(-50%) rotate(180deg); }
+.menu-libelle { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--texte-3); }
+.menu-valeur { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-valeur .pastille { margin-top: 0; width: 9px; height: 9px; }
+.menu-bouton.occupe .pastille { animation: clignote 1s ease-in-out infinite; background: var(--accent-trait); }
+@keyframes clignote { 50% { opacity: 0.25; } }
+/* le menu natif couvre tout le bouton : un toucher ouvre le choix d'Android */
+.choix-activite select {
+  appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: var(--texte);
+  font: inherit; font-weight: 700; font-size: 15px; padding: 0; margin: 0; width: 100%; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.choix-activite select::after { content: none; }
+.choix-activite select:focus { outline: none; }
+.choix-activite:focus-within { outline: 2px solid var(--accent-trait); outline-offset: 2px; }
+.choix-activite select:disabled { opacity: 1; cursor: default; }
+.menu-panneau {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 8; width: min(330px, calc(100vw - 32px));
+  background: var(--surface); border: 1px solid var(--ligne); border-radius: 16px; padding: 6px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 28%);
+}
+.menu-etat { padding: 8px 10px 10px; border-bottom: 1px solid var(--ligne); margin-bottom: 4px; }
+.menu-item {
+  display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 10px; border: 0; border-radius: 10px;
+  background: none; color: var(--texte); text-align: left; font: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
+}
+.menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); outline: none; }
+.menu-item:disabled { opacity: 0.5; cursor: default; }
+.menu-item small { display: block; font-weight: 400; font-size: 12px; color: var(--texte-3); margin-top: 1px; }
+.menu-icone { width: 24px; flex: none; text-align: center; font-size: 17px; line-height: 1.3; }
+.progression.bandeau { margin: 10px 2px 0; }
+
 /* ---- Tri par activité ---- */
 .filtres {
   display: flex; gap: 8px; margin: 18px -16px 0; padding: 2px 16px 4px;

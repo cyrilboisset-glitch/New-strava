@@ -112,6 +112,7 @@ async function texteToast(page) {
   verif('toujours 1 sortie', (await page.$$('.sortie')).length === 1);
 
   // 3. Dossier : choix, synchro forcée (le zip contient 2 copies déjà connues)
+  await page.click('#btn-menu-synchro');
   await page.click('#btn-dossier');
   const t3 = await texteToast(page);
   verif('synchro du dossier', t3.includes('Aucune nouvelle sortie') && t3.includes('2 déjà connues'), t3);

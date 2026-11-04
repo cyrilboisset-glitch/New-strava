@@ -15,14 +15,15 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.8.0 · segments';
+export const VERSION_APPLI = '0.9.0 · nouvel accueil';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   titre: $('synchro-titre'), detail: $('synchro-detail'), pastille: $('pastille'),
   progression: $('progression'), btnDossier: $('btn-dossier'), btnSynchro: $('btn-synchro'),
   btnHaut: $('btn-synchro-haut'), btnImporter: $('btn-importer'), champ: $('champ-fichier'),
-  btnChanger: $('btn-changer-dossier'), liste: $('liste'), filtres: $('filtres'), vide: $('vide'), toast: $('toast'),
+  btnChanger: $('btn-changer-dossier'), liste: $('liste'), choixActivite: $('choix-activite'), vide: $('vide'), toast: $('toast'),
+  btnMenuSynchro: $('btn-menu-synchro'), menuSynchro: $('menu-synchro'), synchroCourt: $('synchro-court'),
   accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'), pageProgres: $('page-progres'),
   pageSegment: $('page-segment'),
   titrePage: $('titre-page'), btnRetour: $('btn-retour'),
@@ -89,14 +90,13 @@ function carteSortie(s, profil) {
 }
 
 // Boutons de tri : « Tout » + chaque famille présente, la plus fréquente d'abord
+// Menu déroulant du type d'activité : « Tout » + chaque famille présente, la plus fréquente d'abord
 function afficherFiltres(toutes) {
-  const { familles, html } = htmlFiltres(toutes, filtre);
+  const { familles, choix } = htmlFiltres(toutes, filtre);
   if (filtre !== 'tout' && !familles.has(filtre)) { filtre = 'tout'; return afficherFiltres(toutes); }
-  el.filtres.hidden = familles.size < 2;
-  el.filtres.innerHTML = html;
-  // Bouton choisi visible même s'il est loin à droite dans la rangée
-  const actif = el.filtres.querySelector('[aria-pressed="true"]');
-  if (actif && filtre !== 'tout') el.filtres.scrollLeft = actif.offsetLeft - 16;
+  el.choixActivite.innerHTML = choix.map((f) =>
+    `<option value="${echapper(f.cle)}"${f.cle === filtre ? ' selected' : ''}>${echapper(f.nom)} (${nombre(f.n)})</option>`).join('');
+  el.choixActivite.disabled = familles.size < 2;
 }
 
 async function changerFiltre(cle) {
@@ -104,10 +104,9 @@ async function changerFiltre(cle) {
   try { await ecrireReglage('filtre', filtre); } catch { /* sans importance */ }
 }
 
-el.filtres.addEventListener('click', async (e) => {
-  const b = e.target.closest('.filtre');
-  if (!b || b.dataset.cle === filtre) return;
-  await changerFiltre(b.dataset.cle);
+el.choixActivite.addEventListener('change', async () => {
+  if (el.choixActivite.value === filtre) return;
+  await changerFiltre(el.choixActivite.value);
   await afficherListe();
 });
 
@@ -151,11 +150,24 @@ async function afficherListe() {
 
 // ---- Carte de synchronisation ----------------------------------------------
 
-function etat(titre, detail, pastille = '') {
+// court : texte du bouton « Synchro » (ex. « il y a 2 h »)
+function etat(titre, detail, pastille = '', court = '') {
   el.titre.textContent = titre;
   el.detail.textContent = detail;
   el.pastille.className = `pastille ${pastille}`;
+  el.synchroCourt.textContent = court || titre;
 }
+
+// ---- Menu « Synchro » (ouvert / fermé ; se ferme au choix, en dehors, ou par Échap)
+function ouvrirMenu(oui) {
+  el.menuSynchro.hidden = !oui;
+  el.btnMenuSynchro.setAttribute('aria-expanded', String(oui));
+}
+el.btnMenuSynchro.addEventListener('click', (e) => { e.stopPropagation(); ouvrirMenu(el.menuSynchro.hidden); });
+el.menuSynchro.addEventListener('click', (e) => { if (e.target.closest('.menu-item')) ouvrirMenu(false); });
+document.addEventListener('click', (e) => { if (!el.menuSynchro.hidden && !e.target.closest('.menu')) ouvrirMenu(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.menuSynchro.hidden) { ouvrirMenu(false); el.btnMenuSynchro.focus(); } });
+$('btn-restaurer-menu').addEventListener('click', () => el.champ.click());
 
 function progression(texte) {
   el.progression.hidden = !texte;
@@ -173,7 +185,8 @@ function toast(texte) {
 function occuper(oui) {
   occupe = oui;
   if (!oui && rechargerApres) { location.reload(); return; }
-  for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnHaut]) b.disabled = oui;
+  for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnHaut, el.btnChanger, $('btn-restaurer-menu')]) b.disabled = oui;
+  el.btnMenuSynchro.classList.toggle('occupe', oui);
   el.btnHaut.classList.toggle('tourne', oui);
 }
 
@@ -191,23 +204,24 @@ async function afficherEtatDossier() {
   el.btnChanger.hidden = true;
 
   if (!dossierPossible) {
-    etat('Import manuel', "Ce navigateur ne permet pas de lire un dossier : importez le zip de Gadgetbridge, l'archive Strava ou un fichier .fit.");
+    etat('Import manuel', "Ce navigateur ne permet pas de lire un dossier : importez le zip de Gadgetbridge, l'archive Strava ou un fichier .fit.", '', 'Import');
     return;
   }
   if (!dossier) {
-    etat('Aucun dossier relié', "Choisissez le dossier où Gadgetbridge dépose son zip d'export automatique.");
+    etat('Aucun dossier relié', "Choisissez le dossier où Gadgetbridge dépose son zip d'export automatique.", '', 'À régler');
     el.btnDossier.hidden = false;
     return;
   }
   el.btnChanger.hidden = false;
   el.btnHaut.hidden = false;
+  el.btnSynchro.hidden = false;
   const derniere = await lireReglage('derniereSynchro');
   const autorisation = await etatAutorisation(dossier);
   if (autorisation === 'granted') {
-    etat(`Dossier « ${dossier.name} »`, derniere ? `Dernière synchro ${ilYA(derniere)}` : 'Pas encore synchronisé', 'ok');
+    etat(`Dossier « ${dossier.name} »`, derniere ? `Dernière synchro ${ilYA(derniere)}` : 'Pas encore synchronisé', 'ok',
+      derniere ? ilYA(derniere) : 'À faire');
   } else {
-    etat(`Dossier « ${dossier.name} »`, "Touchez Synchroniser pour autoriser la lecture du dossier.", 'attente');
-    el.btnSynchro.hidden = false;
+    etat(`Dossier « ${dossier.name} »`, "Touchez Synchroniser maintenant pour autoriser la lecture du dossier.", 'attente', 'À autoriser');
   }
 }
 
