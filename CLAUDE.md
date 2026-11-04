@@ -234,6 +234,15 @@ Réponses directes et pratiques. **Vérifier les chiffres** (watts,
 temps, distances) et les termes techniques avant de les affirmer : Cyril
 a déjà relevé des erreurs de ce type.
 
+## Mise en ligne : en cas de souci
+
+Si le téléphone ne se met pas à jour après une fusion, vérifier la mise en
+ligne : `https://api.github.com/repos/cyrilboisset-glitch/New-strava/actions/runs?per_page=3`
+(« pages build and deployment »). Le 4 nov. 2026, l'étape « Deploy to
+GitHub Pages » a échoué côté GitHub (« Failed to get ID Token », Request
+timeout) et la relance est restée bloquée en file d'attente : une nouvelle
+fusion dans `main` relance une mise en ligne complète.
+
 ## Règles du code
 
 - Identifiants et commentaires en français, sans accents dans les
