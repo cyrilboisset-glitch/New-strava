@@ -84,7 +84,7 @@ async function texteToast(page) {
   }, { zip: [...zipBytes] });
 
   const page = await ctx.newPage();
-  page.on('console', (m) => { if (m.type() === 'error') erreursConsole.push(m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED/.test(m.text())) erreursConsole.push(m.text()); });
   page.on('pageerror', (e) => erreursConsole.push(e.message));
 
   await page.goto(URL_APPLI);
@@ -122,13 +122,19 @@ async function texteToast(page) {
   await page.click('#btn-synchro-haut');
   verif('zip déjà lu', (await texteToast(page)).includes('Rien de nouveau'));
 
-  // 5. Détails déroulés
-  await page.click('.sortie summary');
-  const details = (await page.textContent('.sortie-details')).replace(/\s+/g, ' ');
-  for (const attendu of ['16,1 km/h', '136 W', '446 W', '0,70', '157 bpm', '61 tr/min', '550 kcal', 'FTP de 236 W', '645 points', 'Tours3']) {
-    verif(`détail « ${attendu} »`, details.includes(attendu));
+  // 5. Page de détail (pas de fond de carte ici : tuiles coupées)
+  await ctx.route(/tile\.openstreetmap\.org/, (r) => r.abort());
+  await page.click('a.sortie');
+  await page.waitForSelector('#page-detail .courbe');
+  const details = (await page.textContent('#page-detail')).replace(/\s+/g, ' ');
+  for (const attendu of ['16,1 km/h', '136 W', '446 W', '0,70', '157 bpm', '61 tr/min', '550 kcal', 'FTP de 236 W', '645 points']) {
+    verif(`détail « ${attendu} »`, details.includes(attendu), attendu);
   }
+  verif('détail : 3 tours', (await page.$$('.tours tbody tr')).length === 3);
+  verif('détail : carte', !!(await page.$('#carte-parcours path.leaflet-interactive')));
   await page.screenshot({ path: path.join(CAPTURES, '2-sortie-sombre.png'), fullPage: true });
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
 
   // 6. Plusieurs mois (résumés fictifs injectés, pour vérifier le regroupement)
   await page.evaluate(async () => {

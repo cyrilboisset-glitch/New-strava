@@ -4,6 +4,7 @@
 import { lireFit, TYPE_FICHIER_ACTIVITE } from './fit.js';
 import { resumerSortie, identifiantSortie, nomSport } from './sortie.js';
 import { lireGpx, lireTcx, resumerTrace } from './trace.js';
+import { degzip } from './fichier.js';
 import { lireActivitesCsv, typeStrava, resumerSansTrace } from './strava.js';
 import { toutesLesSorties, sortieExiste, enregistrerSortie, completerSortie, lireReglage, ecrireReglage } from './db.js';
 
@@ -13,11 +14,6 @@ const ORDRE_FORMATS = { fit: 0, tcx: 1, gpx: 2 }; // le FIT d'abord : c'est le p
 
 function compteur() {
   return { nouvelles: 0, dejaLa: 0, ignores: 0, erreurs: [] };
-}
-
-async function degzip(octets) {
-  const flux = new Blob([octets]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return new Response(flux).arrayBuffer();
 }
 
 const nomCourt = (chemin) => chemin.split('/').pop();

@@ -76,7 +76,14 @@ js/import.js                Import zip / FIT / GPX / TCX / dossier, anti-doublon
 js/strava.js                Archive Strava : activities.csv, types, saisies à la main
 js/trace.js                 Lecture GPX/TCX, résumé calculé depuis les points
 js/db.js                    IndexedDB : sorties, fichiers FIT, réglages
-js/app.js                   Carte de synchro + liste par mois
+js/app.js                   Carte de synchro, liste par mois, navigation (#sortie=…, #reglages)
+js/detail.js                Page de détail : carte Leaflet, courbes + curseur, efforts, zones, tours
+js/analyse.js               Calculs (sans navigateur) : points, NP, efforts, zones, IF/TSS, FTP estimée
+js/profil.js                FTP / FC max (réglages), efforts gardés par sortie, estimation de FTP
+js/reglages.js              Page Réglages
+js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
+js/format.js                Mise en forme (nombres, durées, dates)
+vendor/leaflet/             Leaflet 1.9.4 (BSD-2) ; fond OSM chargé en ligne
 sw.js                       Hors ligne + réception des partages
 manifest.webmanifest        Installation + share target
 vendor/jszip.min.js         JSZip 3.10.1 (MIT)
@@ -87,6 +94,7 @@ tests/test-navigateur.cjs   Appli complète dans Chromium à 390 px (Playwright)
                             mois, hors ligne, partage Android. Captures dans
                             tests/captures/ (non versionné)
 tests/test-strava.mjs       CSV, dates, GPX/TCX, calculs (données fabriquées)
+tests/test-analyse.mjs      Efforts, zones, IF/TSS, FTP estimée (valeurs connues)
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
 tests/fausse-archive.mjs    Fabrique GPX, TCX, FIT et CSV aux valeurs connues
 tests/donnees/              Sorties réelles, NON versionnées : sans elles les
@@ -120,6 +128,14 @@ l'instant »** — à proposer quand il voudra :
 - **Sauvegarde / export des sorties** : proposée, Cyril a répondu « la
   sauvegarde est déjà sur l'appli » (les données ne sont pourtant que
   dans Chrome du téléphone). Ne pas insister, en reparler à l'étape 3.
+- **Étape 2 (détail) : FAITE le 4 nov. 2026** (v0.4.0). Toucher une sortie
+  ouvre sa page (#sortie=id). Courbes : altitude, vitesse, puissance, FC,
+  cadence (moyenne par colonne, 300 colonnes) ; curseur commun + point sur
+  la carte. Zones Coggan (7) avec la FTP de l'appli ; zones FC (5) en % de
+  FC max (par défaut la plus haute relevée). IF/TSS : ceux du compteur si
+  même FTP, sinon TSS = durée × IF² / 36. FTP par défaut 236 W (choisie
+  faute de réponse de Cyril ; réglable). Estimation : 95 % du meilleur
+  20 min sur 42 jours. Testé sur données fabriquées seulement.
 - **Lire les sorties directement sur le BiNavi** (sans Gadgetbridge ni
   zip) : possible via Web Bluetooth (Chrome Android), en transposant le
   protocole iGPSport décodé par Gadgetbridge (code libre, AGPL ; dépôt
@@ -128,8 +144,8 @@ l'instant »** — à proposer quand il voudra :
   compteur dans une liste à chaque synchro (reconnexion auto seulement
   via `chrome://flags`), tests uniquement avec le compteur de Cyril.
   Conseillé comme « étape 6 », après les étapes 2 à 4.
-- **FTP** : 236 W dans le compteur, 225 W dans une note plus ancienne.
-  Demander à Cyril laquelle utiliser avant l'étape 2.
+- **FTP** : 236 W par défaut dans l'appli (valeur du compteur) ; Cyril
+  peut la changer ou l'estimer dans Réglages.
 
 Montre **Amazfit Active 3 Premium** (étape 5) : « Highly supported » par
 Gadgetbridge, mais l'appairage demande une clé d'authentification
