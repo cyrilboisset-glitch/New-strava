@@ -31,6 +31,28 @@ function serveur() {
   });
 }
 
+// PNG 256 × 256 beige quadrillé (fausse tuile de carte)
+function fausseTuile() {
+  const L = 256;
+  const brut = Buffer.alloc((L * 3 + 1) * L);
+  for (let y = 0; y < L; y++) {
+    brut[y * (L * 3 + 1)] = 0;
+    for (let x = 0; x < L; x++) {
+      const ligne = x % 64 === 0 || y % 64 === 0;
+      const o = y * (L * 3 + 1) + 1 + x * 3;
+      brut[o] = ligne ? 200 : 242; brut[o + 1] = ligne ? 196 : 239; brut[o + 2] = ligne ? 186 : 233;
+    }
+  }
+  const bloc = (type, data) => {
+    const t = Buffer.from(type);
+    const lg = Buffer.alloc(4); lg.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(zlib.crc32(Buffer.concat([t, data])) >>> 0);
+    return Buffer.concat([lg, t, data, crc]);
+  };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(L, 0); ihdr.writeUInt32BE(L, 4); ihdr[8] = 8; ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), bloc('IHDR', ihdr), bloc('IDAT', zlib.deflateSync(brut)), bloc('IEND', Buffer.alloc(0))]);
+}
+
 let echecs = 0;
 const verif = (nom, ok, info = '') => { console.log(`${ok ? '✓' : '✗'} ${nom}${!ok && info ? ' — ' + info : ''}`); if (!ok) echecs++; };
 
@@ -59,7 +81,9 @@ async function texteToast(page) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark', timezoneId: 'Europe/Paris', locale: 'fr-FR' });
   const erreursConsole = [];
-  await ctx.route(/tile\.openstreetmap\.org/, (r) => r.abort());
+  // Tuiles OpenStreetMap injoignables ici : le test sert une fausse tuile (beige quadrillé)
+  const tuilesDemandees = [];
+  await ctx.route(/tile\.openstreetmap\.org/, (r) => { tuilesDemandees.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', body: fausseTuile() }); });
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|tile\.openstreetmap/.test(m.text() + (m.location()?.url ?? ''))) erreursConsole.push(m.text()); });
   page.on('pageerror', (e) => erreursConsole.push(e.message));
@@ -510,9 +534,69 @@ async function texteToast(page) {
   verif('hors ligne : détail avec trace et courbes', !!(await page.$('#carte-parcours path.leaflet-interactive')) && (await page.$$('.courbe')).length === 5);
   await ctx.setOffline(false);
 
-  // Transitions natives (View Transitions) : sens « avant », « retour », « onglet »
+  // Petites cartes : tuiles OpenStreetMap sous le tracé des cartes de la liste
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
+  await page.waitForSelector('a.sortie .carte-fond img.tuile', { state: 'attached' });
+  const srcTuiles = await page.$$eval('a.sortie .carte-fond img.tuile', (els) => els.map((e) => e.getAttribute('src')));
+  verif('aperçu sur fond de carte (tuiles OSM)', srcTuiles.length >= 1 && srcTuiles.every((u) => /^https:\/\/tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/.test(u)), JSON.stringify(srcTuiles));
+  verif('mention © OpenStreetMap', (await page.textContent('a.sortie .attribution')) === '© OpenStreetMap');
+
+  // Puissance estimée : même route sans capteur, une semaine plus tard
+  await page.setInputFiles('#champ-fichier', { name: 'sans-capteur.gpx', mimeType: 'application/gpx+xml',
+    buffer: Buffer.from(fauxGpx({ puissance: false, debutMs: Date.UTC(2025, 4, 17, 7), nom: 'Sans capteur' })) });
+  verif('sortie sans capteur importée', (await texteToast(page)).includes('1 nouvelle sortie'));
+  await page.waitForFunction(async () => {
+    const s = (await (await import('./js/db.js')).toutesLesSorties()).find((x) => x.nom === 'Sans capteur');
+    return s?.puissanceEstimee?.normW > 0;
+  }, null, { timeout: 15000 });
+  await page.waitForFunction(() => /≈ \d+ W NP estimée/.test(document.querySelector('a.sortie[href*="gpx-"]')?.textContent ?? document.getElementById('liste').textContent), null, { timeout: 5000 }).catch(() => {});
+  const carteSansCapteur = (await page.textContent('a.sortie:has-text("Sans capteur")')).replace(/\s+/g, ' ');
+  // moitié à 1,2 % (≈ 257 W), moitié à plat (≈ 150 W) : NP estimée autour de 215 W
+  const npEst = Number(carteSansCapteur.match(/≈ (\d+) W NP estimée/)?.[1]);
+  verif('liste : NP estimée affichée (≈ 215 W)', npEst >= 195 && npEst <= 235, carteSansCapteur);
+  verif('liste : TSS avec la puissance estimée', /TSS \d+/.test(carteSansCapteur), carteSansCapteur);
+  await page.click('a.sortie:has-text("Sans capteur")');
+  await page.waitForSelector('#page-detail .courbe');
+  const titresCourbes = await page.$$eval('.courbe-titre', (els) => els.map((e) => e.textContent.trim()));
+  verif('détail : courbe « Puissance estimée »', titresCourbes.includes('Puissance estimée') && !titresCourbes.includes('Puissance'), JSON.stringify(titresCourbes));
+  const detailEst = (await page.textContent('#page-detail')).replace(/\s+/g, ' ');
+  verif('détail : NP estimée et avertissement', detailEst.includes('NP estimée≈') && detailEst.includes('Pas de capteur de puissance : puissance estimée') && detailEst.includes('Zones de puissance (estimée)'), detailEst.slice(0, 400));
+  verif('détail : pas de meilleurs efforts pour une estimation', !detailEst.includes('Meilleurs efforts'));
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(CAPTURES, 'detail-estimee.png'), fullPage: true });
+
+  // Même parcours : 3 sorties sur la même route (avec capteur, sans capteur, avec une pause)
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.setInputFiles('#champ-fichier', { name: 'avec-pause.gpx', mimeType: 'application/gpx+xml',
+    buffer: Buffer.from(fauxGpx({ pauseS: 600, debutMs: Date.UTC(2025, 4, 24, 7), nom: 'Avec pause' })) });
+  await texteToast(page);
+  await page.click('a.sortie:has-text("Sans capteur")');
+  await page.waitForSelector('#bloc-meme-parcours:not([hidden])', { timeout: 10000 });
+  const memeTxt = (await page.textContent('#bloc-meme-parcours')).replace(/\s+/g, ' ');
+  // temps en mouvement : avec pause 3 599 s (1er), les deux autres 3 600 s
+  verif('même parcours : fait 3 fois', memeTxt.includes('Fait 3 fois'), memeTxt);
+  verif('même parcours : classement, cette sortie mise en avant', /Meilleur temps/.test(memeTxt) && (await page.$$('#bloc-meme-parcours .passage')).length === 3 && !!(await page.$('#bloc-meme-parcours .passage.actuelle')), memeTxt);
+  verif('même parcours : 1er = la sortie avec pause (temps en mouvement 59:59)', (await page.textContent('#bloc-meme-parcours .passage')).includes('24 mai 2025'), await page.textContent('#bloc-meme-parcours .passage'));
+  await page.evaluate(() => document.getElementById('bloc-meme-parcours').scrollIntoView());
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(CAPTURES, 'meme-parcours.png') });
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.click('#onglet-progres');
+  await page.waitForSelector('#bloc-parcours');
+  const mesParcours = (await page.textContent('#bloc-parcours')).replace(/\s+/g, ' ');
+  verif('Progrès : mes parcours (fait 3 fois)', mesParcours.includes('fait 3 fois'), mesParcours);
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(CAPTURES, 'liste-cartes.png') });
+
+  // Transitions natives (View Transitions) : sens « avant », « retour », « onglet »
   await page.evaluate(() => {
     window.__sens = [];
     new MutationObserver(() => window.__sens.push(document.documentElement.dataset.sens))

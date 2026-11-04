@@ -89,6 +89,9 @@ js/vue3d.js                 Vue 3D (repris de Parcours-3d) : trace 5 m, altitude
 js/velos.js                 Vélos (Profil) : liste, km, attribution en lot, choix dans le détail
 js/segments-calc.js         Segments (sans navigateur) : découpe, passages interpolés, montées, sprints
 js/segments.js              Segments : stockage (réglages segments / passages), recherche, écrans
+js/carte-statique.js        Petites cartes : tuiles OSM (Web Mercator) sous le tracé, sans Leaflet
+js/parcours.js              Même parcours (trace simplifiée) : comparaison, groupes, classement
+js/puissance-estimee.js     Puissance estimée sans capteur (vitesse, pente, masse ; modèle Parcours 3D)
 js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
 js/format.js                Mise en forme (nombres, durées, dates)
 vendor/leaflet/             Leaflet 1.9.4 (BSD-2) ; fond OSM chargé en ligne
@@ -106,6 +109,7 @@ tests/test-analyse.mjs      Efforts, zones, IF/TSS, FTP estimée (valeurs connue
 tests/test-stats.mjs        Bilans, forme / fatigue, records (TZ=Europe/Paris)
 tests/test-vue3d.mjs        Trace 3D : longueur, pentes, curseur, boucle
 tests/test-segments.mjs     Segments : temps (aussi à 8 s), sens, écart, détour, tours, montées, sprints
+tests/test-estimation.mjs   Puissance estimée (150 W à plat / 257 W à 1,2 %), même parcours, tuiles
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
 tests/fausse-archive.mjs    Fabrique GPX, TCX, FIT et CSV aux valeurs connues
 tests/donnees/              Sorties réelles, NON versionnées : sans elles les
@@ -201,6 +205,20 @@ l'instant »** — à proposer quand il voudra :
   glissement ; onglets nommés pour rester fixes, la barre du haut glisse
   avec sa page) ; menu et cartes en cascade ; ruban 3D opaque (Cyril :
   la transparence était illisible).
+- **v0.10.0 (4 nov. 2026)**, demandes de Cyril : 1) aperçus des sorties et
+  segments sur fond OpenStreetMap (`htmlCarteStatique`, tuiles assombries en
+  thème sombre, comme la carte Leaflet du détail) ; 2) sorties identiques
+  comparées automatiquement (`memeParcours` : départs et arrivées ≤ 200 m,
+  distance ±6 %, 90 % des points à ≤ 150 m dans les deux sens, même
+  famille), classement au temps en mouvement : bloc « Même parcours » du
+  détail, « Mes parcours » dans Progrès ; 3) puissance estimée pour les
+  sorties vélo dehors sans capteur (98 kg + 8 kg, CdA 0,32, Crr 0,004,
+  rendement 0,97, ρ 1,2, sans vent), champ `puissanceEstimee` {moyW, normW,
+  v, poidsKg} calculé en arrière-plan (recalcul si le poids change), utilisé
+  pour IF / TSS / forme (source 'estimee'), affiché « ≈ … estimée », jamais
+  dans les records. Sanity check : sortie du 12 oct. (15,6 km, 58 min,
+  323 m D+, 98 kg) donne ≈ 136 W de moyenne au calcul à la main, comme le
+  capteur (136 W) — à confirmer sur le vrai fichier.
 - **Suite demandée le 4 nov. 2026 (dans cet ordre)** : 2) vue 3D dans le
   détail, reprise de l'appli de Cyril `cyrilboisset-glitch/Parcours-3d`
   (index.html, ruban sur toile 2D, profil, vue de dessus, curseur, survol ;

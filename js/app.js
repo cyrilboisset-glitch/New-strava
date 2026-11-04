@@ -3,7 +3,8 @@
 import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages } from './db.js';
 import { familleSortie } from './sortie.js';
 import { chargeSortie } from './analyse.js';
-import { lireProfil } from './profil.js';
+import { lireProfil, calculerEstimationsManquantes } from './profil.js';
+import { htmlCarteStatique } from './carte-statique.js';
 import { afficherDetail, fermerDetail } from './detail.js';
 import { afficherReglages } from './reglages.js';
 import { afficherProgres, htmlFiltres } from './progres.js';
@@ -15,7 +16,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.9.2 · transitions fluides';
+export const VERSION_APPLI = '0.10.0 · cartes, parcours, puissance estimée';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -37,26 +38,7 @@ let filtre = 'tout'; // famille d'activités affichée (clé de familleSortie)
 // ---- Aperçu du parcours (dessiné depuis la trace simplifiée) ----------------
 
 function apercu(trace) {
-  if (!trace || trace.length < 2) return '';
-  const L = 320;
-  const H = 150;
-  const marge = 16;
-  const latMoy = trace.reduce((a, p) => a + p[0], 0) / trace.length;
-  const kx = Math.cos((latMoy * Math.PI) / 180);
-  const xs = trace.map((p) => p[1] * kx);
-  const ys = trace.map((p) => -p[0]);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const ech = Math.min((L - 2 * marge) / (maxX - minX || 1e-9), (H - 2 * marge) / (maxY - minY || 1e-9));
-  const dx = (L - (maxX - minX) * ech) / 2;
-  const dy = (H - (maxY - minY) * ech) / 2;
-  const pts = xs.map((x, i) => [dx + (x - minX) * ech, dy + (ys[i] - minY) * ech]);
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('');
-  const [x0, y0] = pts[0];
-  const [x1, y1] = pts[pts.length - 1];
-  return `<div class="apercu"><svg viewBox="0 0 ${L} ${H}" aria-hidden="true">
-    <path class="apercu-trace" d="${d}"/>
-    <circle class="apercu-depart" cx="${x0.toFixed(1)}" cy="${y0.toFixed(1)}" r="4.5"/>
-    <circle class="apercu-arrivee" cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="4.5"/></svg></div>`;
+  return htmlCarteStatique(trace);
 }
 
 // ---- Liste -----------------------------------------------------------------
@@ -71,6 +53,7 @@ function carteSortie(s, profil) {
   const effort = [];
   if (s.puissanceNormW) effort.push(`<span><span class="p">${s.puissanceNormW} W</span> NP</span>`);
   else if (s.puissanceMoyW) effort.push(`<span><span class="p">${s.puissanceMoyW} W</span> moy.</span>`);
+  else if (s.puissanceEstimee?.normW) effort.push(`<span title="Puissance estimée (pas de capteur)"><span class="p">≈ ${s.puissanceEstimee.normW} W</span> NP estimée</span>`);
   if (tss != null) effort.push(`<span>TSS ${nombre(tss)}</span>`);
   if (s.fcMoy) effort.push(`<span><span class="c">${s.fcMoy}</span> bpm</span>`);
 
@@ -333,6 +316,9 @@ el.champ.addEventListener('change', async () => {
 // Passages sur les segments : nouvelles sorties, ou recherche interrompue (en arrière-plan)
 function chercherSegments() {
   mettreAJourPassages().catch((e) => console.warn('Segments', e));
+  // puissance estimée des sorties sans capteur, puis liste à jour (TSS)
+  calculerEstimationsManquantes().then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
+    .catch((e) => console.warn('Estimations', e));
 }
 
 // ---- Navigation : accueil, détail d'une sortie, réglages -------------------
