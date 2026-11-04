@@ -314,12 +314,14 @@ export function creerVue3d(conteneur, pts, options = {}) {
       segs.push([TP[j][2] + TP[j + 1][2], TP[j], TP[j + 1], BT[j + 1], BT[j], T.G[IX[j]]]);
     }
     segs.sort((u, v) => v[0] - u[0]);
-    g.globalAlpha = 0.88;
+    // ruban opaque (plus lisible qu'en transparence), peint du plus loin au plus proche
+    g.lineWidth = f;
+    g.lineJoin = 'round';
     for (const [, a, b, b0, a0, gr] of segs) {
       g.fillStyle = GCOL(gr);
-      g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(b0[0], b0[1]); g.lineTo(a0[0], a0[1]); g.closePath(); g.fill();
+      g.strokeStyle = g.fillStyle; // bord de même couleur : pas de fines raies entre les morceaux
+      g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(b0[0], b0[1]); g.lineTo(a0[0], a0[1]); g.closePath(); g.fill(); g.stroke();
     }
-    g.globalAlpha = 1;
     g.strokeStyle = '#fff';
     g.lineWidth = 2 * f;
     g.beginPath();

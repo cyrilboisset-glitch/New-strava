@@ -328,6 +328,8 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
     if (p) p.textContent = calcul;
     else if (fait === 0) rendre();
   });
-  const n = await calculEnCours.finally(() => { calculEnCours = null; });
-  if (n && !page.hidden) { calcul = ''; rendre(); }
+  // calcul en arrière-plan : la page est déjà affichée (transition de page immédiate)
+  calculEnCours.finally(() => { calculEnCours = null; }).then((n) => {
+    if (n && !page.hidden) { calcul = ''; rendre(); }
+  });
 }

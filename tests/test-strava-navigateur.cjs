@@ -148,6 +148,7 @@ async function texteToast(page) {
   const valeurs = await page.$$eval('.courbe-valeur', (els) => els.map((e) => e.textContent));
   verif('moyennes par défaut', JSON.stringify(valeurs) === JSON.stringify(['', 'moy. 30,0 km/h', 'moy. 200 W', 'moy. 140 bpm', 'moy. 90 tr/min']), JSON.stringify(valeurs));
   // Doigt posé au milieu de la courbe de puissance
+  await page.waitForFunction(() => !document.documentElement.dataset.transition); // fin du glissement
   const zone = await page.$('.courbe[data-champ="puissanceW"] .courbe-zone');
   await zone.scrollIntoViewIfNeeded();
   const r = await zone.boundingBox();
@@ -509,25 +510,24 @@ async function texteToast(page) {
   verif('hors ligne : détail avec trace et courbes', !!(await page.$('#carte-parcours path.leaflet-interactive')) && (await page.$$('.courbe')).length === 5);
   await ctx.setOffline(false);
 
-  // Transitions : la page suivante glisse depuis la droite, le retour depuis la gauche
+  // Transitions natives (View Transitions) : sens « avant », « retour », « onglet »
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
   await page.evaluate(() => {
-    window.__animations = [];
-    new MutationObserver((ms) => ms.forEach((m) => {
-      const c = [...m.target.classList].find((x) => x.startsWith('entree-'));
-      if (c) window.__animations.push(`${m.target.id}:${c}`);
-    })).observe(document.querySelector('main'), { attributes: true, attributeFilter: ['class'], subtree: true });
+    window.__sens = [];
+    new MutationObserver(() => window.__sens.push(document.documentElement.dataset.sens))
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-sens'] });
   });
+  verif('Chrome gère les transitions natives', await page.evaluate(() => typeof document.startViewTransition === 'function'));
   await page.click('a.sortie');
   await page.waitForSelector('#page-detail .courbe');
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
   await page.click('#onglet-progres');
   await page.waitForSelector('#bloc-bilans');
-  const anims = await page.evaluate(() => window.__animations);
-  verif('transitions : détail depuis la droite, retour depuis la gauche, onglet en fondu',
-    anims.includes('page-detail:entree-droite') && anims.includes('accueil:entree-gauche') && anims.includes('page-progres:entree-fondu'), JSON.stringify(anims));
+  const sensVus = await page.evaluate(() => window.__sens);
+  verif('transitions : avant, retour, onglet', JSON.stringify(sensVus) === JSON.stringify(['avant', 'retour', 'onglet']), JSON.stringify(sensVus));
+  verif('onglets fixes pendant la transition', await page.evaluate(() => getComputedStyle(document.querySelector('.onglets')).viewTransitionName === 'onglets'));
   verif('barres du bilan animées', (await page.$eval('.bilan-barre', (b) => getComputedStyle(b).animationName)) === 'pousse');
   // Android réglé sur « réduire les animations » : quasi instantané
   const sobre = await browser.newPage({ reducedMotion: 'reduce' });
