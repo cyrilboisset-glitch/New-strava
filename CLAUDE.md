@@ -182,6 +182,13 @@ l'instant »** — à proposer quand il voudra :
   `segmentsVerifies`, segment.analyseFaite) ; reprise si l'appli est fermée.
   Page #segment=id : record, historique par date / par temps, rang.
   Progrès : « Mes segments ». Inclus dans la sauvegarde.
+- **Nouvel accueil : FAIT le 4 nov. 2026** (v0.9.0). Deux menus en haut de
+  la liste : « Activité » (select natif `#choix-activite`, nombre de
+  sorties par famille) et « Synchro » (bouton `#btn-menu-synchro`, panneau
+  `#menu-synchro` : état, Synchroniser maintenant, Choisir / Changer de
+  dossier, Importer un fichier, Restaurer une sauvegarde). La carte de
+  synchro et la rangée de boutons de tri de l'accueil n'existent plus
+  (les boutons de tri restent dans Progrès).
 - **Suite demandée le 4 nov. 2026 (dans cet ordre)** : 2) vue 3D dans le
   détail, reprise de l'appli de Cyril `cyrilboisset-glitch/Parcours-3d`
   (index.html, ruban sur toile 2D, profil, vue de dessus, curseur, survol ;

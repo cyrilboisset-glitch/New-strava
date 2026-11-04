@@ -52,6 +52,7 @@ export function htmlFiltres(toutes, filtre) {
     ...[...familles.values()].sort((a, b) => b.n - a.n || a.nom.localeCompare(b.nom, 'fr'))];
   return {
     familles,
+    choix: boutons,
     html: boutons.map((f) => `
     <button type="button" class="filtre" data-cle="${echapper(f.cle)}" aria-pressed="${f.cle === filtre}">
       ${echapper(f.nom)} <span class="filtre-n">${nombre(f.n)}</span>

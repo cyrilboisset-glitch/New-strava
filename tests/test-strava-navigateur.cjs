@@ -67,6 +67,24 @@ async function texteToast(page) {
   await page.waitForFunction(() => document.getElementById('synchro-titre').textContent !== 'Chargement…');
   verif("l'écran vide parle de l'archive Strava", (await page.textContent('#vide')).includes('archive Strava'));
 
+  // Menu « Synchro » : fermé au départ, s'ouvre, propose les actions, se ferme
+  verif('menu Synchro fermé', !(await page.isVisible('#menu-synchro')) && (await page.getAttribute('#btn-menu-synchro', 'aria-expanded')) === 'false');
+  verif('bouton Synchro : « À régler » sans dossier', (await page.textContent('#synchro-court')) === 'À régler', await page.textContent('#synchro-court'));
+  await page.click('#btn-menu-synchro');
+  const actions = await page.$$eval('#menu-synchro .menu-item:not([hidden])', (els) => els.map((e) => e.firstElementChild.nextElementSibling.firstChild.textContent.trim()));
+  verif('actions du menu sans dossier', JSON.stringify(actions) === JSON.stringify(['Choisir le dossier Gadgetbridge', 'Importer un fichier', 'Restaurer une sauvegarde']), JSON.stringify(actions));
+  verif('état dans le menu', (await page.textContent('#menu-synchro .menu-etat')).includes('Aucun dossier relié'));
+  await page.screenshot({ path: path.join(CAPTURES, 'accueil-menu-synchro.png') });
+  await page.keyboard.press('Escape');
+  verif('Échap ferme le menu', !(await page.isVisible('#menu-synchro')));
+  await page.click('#btn-menu-synchro');
+  await page.mouse.click(20, 600);
+  verif('toucher ailleurs ferme le menu', !(await page.isVisible('#menu-synchro')));
+  await page.click('#btn-menu-synchro');
+  const [choixFichier] = await Promise.all([page.waitForEvent('filechooser'), page.click('#btn-importer')]);
+  verif('« Importer un fichier » ouvre le choix de fichier, menu refermé', choixFichier.isMultiple() && !(await page.isVisible('#menu-synchro')));
+  verif('menu Activité inactif sans sortie', await page.$eval('#choix-activite', (s) => s.disabled));
+
   // 1. La sortie du 1er juin arrive d'abord par Gadgetbridge (FIT seul)
   await page.setInputFiles('#champ-fichier', { name: 'gadgetbridge.fit', mimeType: 'application/octet-stream', buffer: fit });
   verif('FIT seul importé', (await texteToast(page)).includes('1 nouvelle sortie'));
@@ -412,10 +430,15 @@ async function texteToast(page) {
   verif('réimport : aucune nouvelle, 7 déjà connues', t2.includes('Aucune nouvelle sortie') && t2.includes('7 déjà connues'), t2);
 
   // 4. Tri par activité
-  const filtres = async () => page.$$eval('#filtres .filtre', (els) => els.map((e) => `${e.textContent.replace(/\s+/g, ' ').trim()}${e.getAttribute('aria-pressed') === 'true' ? '*' : ''}`));
+  // Menu déroulant « Activité » : « Vélo (4) » -> « Vélo 4 », choisi marqué d'une étoile
+  const filtres = async () => page.$$eval('#choix-activite option', (els) => els.map((e) => `${e.textContent.replace(/ \((\d+)\)$/, ' $1')}${e.selected ? '*' : ''}`));
+  const choisirActivite = async (nom) => {
+    const valeur = await page.$$eval('#choix-activite option', (els, n) => els.find((e) => e.textContent.startsWith(`${n} (`)).value, nom);
+    await page.selectOption('#choix-activite', valeur);
+  };
   const f1 = await filtres();
   verif('boutons de tri', JSON.stringify(f1) === JSON.stringify(['Tout 7*', 'Vélo 4', 'Course à pied 1', 'Marche 1', 'Musculation 1']), JSON.stringify(f1));
-  await page.click('#filtres .filtre:has-text("Vélo")');
+  await choisirActivite('Vélo');
   await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
   const noms = await page.$$eval('.sortie-nom', (els) => els.map((e) => e.textContent));
   verif('Vélo : 4 sorties', JSON.stringify(noms) === JSON.stringify(['Sortie du matin', 'Col du test', 'Home trainer sans capteur', 'Fichier vide']), JSON.stringify(noms));
@@ -424,9 +447,9 @@ async function texteToast(page) {
   verif('totaux de février sans la marche', cumuls[3] === '1 sortie · 0,1 km · 1 min · 0 m D+', JSON.stringify(cumuls));
   await page.screenshot({ path: path.join(CAPTURES, 'strava-2-tri-velo.png') });
   await page.reload();
-  await page.waitForSelector('.filtre');
+  await page.waitForSelector('#choix-activite option:nth-child(2)', { state: 'attached' });
   verif('tri gardé après réouverture', (await filtres())[1] === 'Vélo 4*' && (await page.$$('.sortie')).length === 4, JSON.stringify(await filtres()));
-  await page.click('#filtres .filtre:has-text("Musculation")');
+  await choisirActivite('Musculation');
   await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 1);
   verif('Musculation : la séance', (await page.textContent('.sortie-nom')) === 'Séance haut du corps');
   await page.screenshot({ path: path.join(CAPTURES, 'strava-3-tri-musculation.png') });
@@ -443,13 +466,13 @@ async function texteToast(page) {
     await new Promise((r) => { tx.oncomplete = r; });
   });
   await page.reload();
-  await page.waitForSelector('.filtre');
+  await page.waitForSelector('#choix-activite option:nth-child(2)', { state: 'attached' });
   verif('ancienne version : rangée dans Entraînement', (await filtres()).includes('Entraînement 1'), JSON.stringify(await filtres()));
   await page.setInputFiles('#champ-fichier', { name: 'export_12345678.zip', mimeType: 'application/zip', buffer: zipBytes });
   verif('réimport sans doublon', (await texteToast(page)).includes('Aucune nouvelle sortie'));
   const f2 = await filtres();
   verif('réimport : remise dans Musculation', f2.includes('Musculation 1') && !f2.some((f) => f.startsWith('Entraînement')), JSON.stringify(f2));
-  await page.click('#filtres .filtre:has-text("Tout")');
+  await choisirActivite('Tout');
 
   // 6. Un .gpx seul (hors archive) : nom pris dans le fichier
   await page.evaluate(async () => {

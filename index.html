@@ -31,36 +31,51 @@
 
   <main>
    <div id="accueil">
-    <section id="carte-synchro" class="carte synchro" aria-live="polite">
-      <div class="synchro-etat">
-        <span id="pastille" class="pastille" aria-hidden="true"></span>
-        <div>
-          <p id="synchro-titre" class="synchro-titre">Chargement…</p>
-          <p id="synchro-detail" class="synchro-detail"></p>
+    <!-- Barre d'outils : type d'activité (menu natif) et synchro (menu d'actions) -->
+    <div class="outils">
+      <label class="menu-bouton choix-activite">
+        <span class="menu-libelle">Activité</span>
+        <select id="choix-activite" aria-label="Type d'activité"><option value="tout">Tout</option></select>
+        <svg class="chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </label>
+      <div class="menu">
+        <button id="btn-menu-synchro" class="menu-bouton" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menu-synchro">
+          <span class="menu-libelle">Synchro</span>
+          <span class="menu-valeur"><span id="pastille" class="pastille" aria-hidden="true"></span><span id="synchro-court">…</span></span>
+          <svg class="chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div id="menu-synchro" class="menu-panneau" role="menu" hidden>
+          <div class="menu-etat" aria-live="polite">
+            <p id="synchro-titre" class="synchro-titre">Chargement…</p>
+            <p id="synchro-detail" class="synchro-detail"></p>
+          </div>
+          <button id="btn-synchro" class="menu-item" type="button" role="menuitem" hidden>
+            <span class="menu-icone" aria-hidden="true">⟳</span><span>Synchroniser maintenant<small>Lit le dernier zip de Gadgetbridge</small></span></button>
+          <button id="btn-dossier" class="menu-item" type="button" role="menuitem" hidden>
+            <span class="menu-icone" aria-hidden="true">📁</span><span>Choisir le dossier Gadgetbridge<small>Là où l'export automatique dépose son zip</small></span></button>
+          <button id="btn-changer-dossier" class="menu-item" type="button" role="menuitem" hidden>
+            <span class="menu-icone" aria-hidden="true">📁</span><span>Changer de dossier</span></button>
+          <button id="btn-importer" class="menu-item" type="button" role="menuitem">
+            <span class="menu-icone" aria-hidden="true">⬆</span><span>Importer un fichier<small>.fit, .gpx, .tcx, zip Gadgetbridge, archive Strava</small></span></button>
+          <button id="btn-restaurer-menu" class="menu-item" type="button" role="menuitem">
+            <span class="menu-icone" aria-hidden="true">↺</span><span>Restaurer une sauvegarde<small>Le zip exporté depuis Profil</small></span></button>
         </div>
       </div>
-      <p id="progression" class="progression" hidden></p>
-      <div class="synchro-actions">
-        <button id="btn-dossier" class="btn principal" type="button" hidden>Choisir le dossier Gadgetbridge</button>
-        <button id="btn-synchro" class="btn principal" type="button" hidden>Synchroniser</button>
-        <button id="btn-importer" class="btn secondaire" type="button">Importer un fichier</button>
-        <input id="champ-fichier" type="file" accept=".zip,.fit,.gpx,.tcx,.gz,application/zip,application/gzip,application/octet-stream,application/gpx+xml" multiple hidden>
-      </div>
-      <button id="btn-changer-dossier" class="lien" type="button" hidden>Changer de dossier</button>
-    </section>
+      <input id="champ-fichier" type="file" accept=".zip,.fit,.gpx,.tcx,.gz,application/zip,application/gzip,application/octet-stream,application/gpx+xml" multiple hidden>
+    </div>
+    <p id="progression" class="progression bandeau" hidden></p>
 
     <section id="vide" class="carte vide" hidden>
       <h2>Aucune sortie pour l'instant</h2>
       <ol>
         <li>Dans Gadgetbridge, l'export automatique du zip dépose une sauvegarde dans un dossier (par exemple <b>Documents/Gadgetbridge</b>).</li>
-        <li>Touchez <b>Choisir le dossier Gadgetbridge</b> et sélectionnez ce dossier.</li>
+        <li>Ouvrez le menu <b>Synchro</b>, puis <b>Choisir le dossier Gadgetbridge</b>, et sélectionnez ce dossier.</li>
         <li>L'appli lit le zip le plus récent et importe les sorties qu'elle ne connaît pas encore.</li>
       </ol>
-      <p class="note">Vous pouvez aussi importer un zip ou un fichier .fit à la main, ou partager un .fit depuis Gadgetbridge vers cette appli une fois installée.</p>
-      <p class="note"><b>Anciennes sorties Strava :</b> touchez <b>Importer un fichier</b> et choisissez le zip de l'archive Strava (export du compte), tel quel, sans le décompresser.</p>
+      <p class="note">Vous pouvez aussi importer un zip ou un fichier .fit à la main (menu Synchro → Importer un fichier), ou partager un .fit depuis Gadgetbridge vers cette appli une fois installée.</p>
+      <p class="note"><b>Anciennes sorties Strava :</b> menu <b>Synchro</b> → <b>Importer un fichier</b>, puis le zip de l'archive Strava (export du compte), tel quel, sans le décompresser.</p>
     </section>
 
-    <nav id="filtres" class="filtres" aria-label="Type d'activité" hidden></nav>
     <div id="liste"></div>
    </div>
     <div id="page-progres" class="page" hidden></div>
