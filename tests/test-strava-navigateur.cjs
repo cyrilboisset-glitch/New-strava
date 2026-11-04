@@ -147,6 +147,33 @@ async function texteToast(page) {
   const efforts = await page.evaluate(async () => (await (await import('./js/db.js')).lireSortie('strava-222')).effortsW);
   verif('efforts gardés', efforts?.[1200] === 200, JSON.stringify(efforts));
 
+  // Vue 3D : bascule Carte / 3D, dessin, relief, survol relié aux courbes
+  verif('carte par défaut, 3D cachée', await page.isVisible('#carte-parcours') && !(await page.isVisible('#vue3d')));
+  await page.click('[data-segments="vue"] button[data-valeur="3d"]');
+  await page.waitForTimeout(400);
+  verif('3D affichée, carte cachée', await page.isVisible('#vue3d') && !(await page.isVisible('#carte-parcours')));
+  const pixels = await page.$eval('#vue3d canvas', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+    return n;
+  });
+  verif('ruban 3D dessiné', pixels > 5000, String(pixels));
+  verif('légende des pentes', (await page.textContent('.v3d-legende')).includes('> 10 %'));
+  await page.click('[data-v3d="relief"]');
+  verif('relief ×1', (await page.textContent('[data-v3d="relief"] span')) === '×1');
+  await page.click('[data-v3d="survol"]');
+  verif('survol lancé', (await page.textContent('[data-v3d="survol"]')).includes('Arrêter'));
+  await page.waitForTimeout(1500);
+  const pendantSurvol = (await page.textContent('.courbes-position')).replace(/\s+/g, ' ');
+  verif('survol : les courbes suivent', /^\d+,\d km · \d+:\d\d$/.test(pendantSurvol), pendantSurvol);
+  await page.screenshot({ path: path.join(CAPTURES, 'detail-3d.png') });
+  await page.click('[data-v3d="survol"]');
+  verif('survol arrêté', (await page.textContent('[data-v3d="survol"]')).includes('Survol'));
+  // Altitude colorée selon la pente
+  verif('altitude colorée selon la pente', (await page.$$('.courbe[data-champ="altitudeM"] .courbe-pentes rect')).length > 250);
+  await page.click('[data-segments="vue"] button[data-valeur="carte"]');
+
   // Retour : la liste revient à la même place
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');

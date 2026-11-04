@@ -85,6 +85,8 @@ js/progres.js               Onglet Progrès : bilans, forme / fatigue, records, 
 js/stats.js                 Calculs de Progrès (sans navigateur) : périodes, CTL/ATL/TSB, records
 js/sauvegarde.js            Export zip (index JSON + fichiers d'origine) et restauration
 js/icones.js                Icônes de sport
+js/vue3d.js                 Vue 3D (repris de Parcours-3d) : trace 5 m, altitude nettoyée, ruban, survol
+js/velos.js                 Vélos (Profil) : liste, km, attribution en lot, choix dans le détail
 js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
 js/format.js                Mise en forme (nombres, durées, dates)
 vendor/leaflet/             Leaflet 1.9.4 (BSD-2) ; fond OSM chargé en ligne
@@ -100,6 +102,7 @@ tests/test-navigateur.cjs   Appli complète dans Chromium à 390 px (Playwright)
 tests/test-strava.mjs       CSV, dates, GPX/TCX, calculs (données fabriquées)
 tests/test-analyse.mjs      Efforts, zones, IF/TSS, FTP estimée (valeurs connues)
 tests/test-stats.mjs        Bilans, forme / fatigue, records (TZ=Europe/Paris)
+tests/test-vue3d.mjs        Trace 3D : longueur, pentes, curseur, boucle
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
 tests/fausse-archive.mjs    Fabrique GPX, TCX, FIT et CSV aux valeurs connues
 tests/donnees/              Sorties réelles, NON versionnées : sans elles les
@@ -157,6 +160,13 @@ l'instant »** — à proposer quand il voudra :
   attribution en lot du matériel Strava (colonne « Activity Gear »,
   champ `materielStrava` ; réimporter l'archive pour les sorties déjà
   importées) et des sorties vélo sans vélo.
+- **Vue 3D : FAITE le 4 nov. 2026** (v0.7.0). Bascule Carte / 3D dans le
+  détail ; ruban coloré selon la pente, gestes, ◎, rotation auto, relief
+  (auto, ×1 à ×3), survol, plein écran ; curseur relié aux courbes dans les
+  deux sens ; altitude des courbes colorée selon la pente. Différence avec
+  Parcours-3d : 111 195 m par degré (au lieu de 110 574) pour que les km de
+  la 3D collent aux distances de l'appli. Pas de vue de dessus séparée (la
+  carte Leaflet la remplace) ni de secteurs (étape suivante).
 - **Suite demandée le 4 nov. 2026 (dans cet ordre)** : 2) vue 3D dans le
   détail, reprise de l'appli de Cyril `cyrilboisset-glitch/Parcours-3d`
   (index.html, ruban sur toile 2D, profil, vue de dessus, curseur, survol ;

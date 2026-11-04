@@ -14,7 +14,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.6.0 · vélos et poids';
+export const VERSION_APPLI = '0.7.0 · vue 3D';
 
 const $ = (id) => document.getElementById(id);
 const el = {

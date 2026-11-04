@@ -393,6 +393,27 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .axe-log span:last-child { transform: translateX(-100%); }
 .sauvegarde-date { margin: 0 0 4px; font-size: 14px; }
 
+/* ---- Vue 3D (fond sombre dans les deux thèmes, comme Parcours 3D) ---- */
+.segments.vues { margin: 14px 0 0; }
+.segments.vues + .carte-parcours { margin-top: 8px; }
+.vue3d {
+  position: relative; height: 380px; margin-top: 8px; border-radius: var(--rayon); overflow: hidden;
+  background: radial-gradient(ellipse at 50% 30%, #1d2533, #0d1118 75%); border: 1px solid var(--ligne);
+}
+.vue3d:fullscreen { height: 100%; border-radius: 0; border: 0; }
+.v3d-toile { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; display: block; }
+.v3d-boutons { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.v3d-boutons button {
+  min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid rgb(255 255 255 / 18%);
+  background: rgb(14 19 27 / 78%); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.v3d-boutons button[aria-pressed="true"] { background: #c8f031; color: #12140c; border-color: #c8f031; }
+.v3d-legende { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; gap: 3px; flex-wrap: wrap; pointer-events: none; }
+.v3d-legende span { padding: 1px 6px; border-radius: 5px; font-size: 10.5px; font-weight: 700; color: #13202b; }
+.v3d-legende span:first-child, .v3d-legende span:nth-child(n+6) { color: #fff; }
+.v3d-note { position: absolute; left: 10px; top: 10px; margin: 0; max-width: 60%; font-size: 12px; color: #cfd6e0; }
+.courbe-pentes { opacity: 0.9; }
+
 /* ---- Vélos ---- */
 .velo { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--ligne); }
 .velos > :first-child { border-top: 0; }
