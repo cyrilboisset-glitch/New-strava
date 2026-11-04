@@ -426,6 +426,11 @@ export async function afficherDetail(page, id, toast = () => {}) {
       for (const b of boutons.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.valeur === mode));
       vue3d?.afficher(mode === '3d');
       if (mode === 'carte') carte?.invalidateSize();
+      // fondu de la vue qui apparaît
+      const vue = page.querySelector(mode === 'carte' ? '#carte-parcours' : '#vue3d');
+      vue.classList.remove('entree-fondu');
+      void vue.offsetWidth;
+      vue.classList.add('entree-fondu');
     };
     boutons.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) montrer(b.dataset.valeur); });
     montrer(vue3d ? modeVue : 'carte');

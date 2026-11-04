@@ -71,17 +71,22 @@ async function texteToast(page) {
   verif('menu Synchro fermé', !(await page.isVisible('#menu-synchro')) && (await page.getAttribute('#btn-menu-synchro', 'aria-expanded')) === 'false');
   verif('bouton Synchro : « À régler » sans dossier', (await page.textContent('#synchro-court')) === 'À régler', await page.textContent('#synchro-court'));
   await page.click('#btn-menu-synchro');
+  await page.waitForFunction(() => document.getElementById('menu-synchro').classList.contains('ouvert'));
+  await page.waitForTimeout(250); // fin du fondu d'ouverture (capture)
   const actions = await page.$$eval('#menu-synchro .menu-item:not([hidden])', (els) => els.map((e) => e.firstElementChild.nextElementSibling.firstChild.textContent.trim()));
   verif('actions du menu sans dossier', JSON.stringify(actions) === JSON.stringify(['Choisir le dossier Gadgetbridge', 'Importer un fichier', 'Restaurer une sauvegarde']), JSON.stringify(actions));
   verif('état dans le menu', (await page.textContent('#menu-synchro .menu-etat')).includes('Aucun dossier relié'));
   await page.screenshot({ path: path.join(CAPTURES, 'accueil-menu-synchro.png') });
   await page.keyboard.press('Escape');
-  verif('Échap ferme le menu', !(await page.isVisible('#menu-synchro')));
+  await page.waitForSelector('#menu-synchro', { state: 'hidden', timeout: 2000 }).catch(() => {});
+  verif('Échap ferme le menu (en fondu)', !(await page.isVisible('#menu-synchro')));
   await page.click('#btn-menu-synchro');
   await page.mouse.click(20, 600);
+  await page.waitForSelector('#menu-synchro', { state: 'hidden', timeout: 2000 }).catch(() => {});
   verif('toucher ailleurs ferme le menu', !(await page.isVisible('#menu-synchro')));
   await page.click('#btn-menu-synchro');
   const [choixFichier] = await Promise.all([page.waitForEvent('filechooser'), page.click('#btn-importer')]);
+  await page.waitForSelector('#menu-synchro', { state: 'hidden', timeout: 2000 }).catch(() => {});
   verif('« Importer un fichier » ouvre le choix de fichier, menu refermé', choixFichier.isMultiple() && !(await page.isVisible('#menu-synchro')));
   verif('menu Activité inactif sans sortie', await page.$eval('#choix-activite', (s) => s.disabled));
 
@@ -503,6 +508,38 @@ async function texteToast(page) {
   await page.waitForSelector('#page-detail .courbe', { timeout: 10000 });
   verif('hors ligne : détail avec trace et courbes', !!(await page.$('#carte-parcours path.leaflet-interactive')) && (await page.$$('.courbe')).length === 5);
   await ctx.setOffline(false);
+
+  // Transitions : la page suivante glisse depuis la droite, le retour depuis la gauche
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.evaluate(() => {
+    window.__animations = [];
+    new MutationObserver((ms) => ms.forEach((m) => {
+      const c = [...m.target.classList].find((x) => x.startsWith('entree-'));
+      if (c) window.__animations.push(`${m.target.id}:${c}`);
+    })).observe(document.querySelector('main'), { attributes: true, attributeFilter: ['class'], subtree: true });
+  });
+  await page.click('a.sortie');
+  await page.waitForSelector('#page-detail .courbe');
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.click('#onglet-progres');
+  await page.waitForSelector('#bloc-bilans');
+  const anims = await page.evaluate(() => window.__animations);
+  verif('transitions : détail depuis la droite, retour depuis la gauche, onglet en fondu',
+    anims.includes('page-detail:entree-droite') && anims.includes('accueil:entree-gauche') && anims.includes('page-progres:entree-fondu'), JSON.stringify(anims));
+  verif('barres du bilan animées', (await page.$eval('.bilan-barre', (b) => getComputedStyle(b).animationName)) === 'pousse');
+  // Android réglé sur « réduire les animations » : quasi instantané
+  const sobre = await browser.newPage({ reducedMotion: 'reduce' });
+  await sobre.goto(URL_APPLI);
+  const duree = await sobre.evaluate(() => {
+    const d = document.createElement('div');
+    d.className = 'entree-droite';
+    document.body.append(d);
+    return getComputedStyle(d).animationDuration;
+  });
+  verif('animations coupées si l\'on demande moins d\'animations', duree === '0.001s', duree);
+  await sobre.close();
 
   verif('aucune erreur dans la console', erreursConsole.length === 0, erreursConsole.join(' | '));
   await browser.close();
