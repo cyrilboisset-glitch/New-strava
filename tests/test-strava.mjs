@@ -37,6 +37,7 @@ const csv = lireActivitesCsv(CSV_STRAVA);
 egal('lignes avec fichier', [...csv.parFichier.keys()].sort(), ['activities/111.fit.gz', 'activities/222.gpx', 'activities/333.tcx.gz', 'activities/444.gpx']);
 const gpx = csv.parFichier.get('activities/222.gpx');
 egal('nom et type de la sortie GPX', [gpx.idStrava, gpx.nom, gpx.type], ['222', 'Col du test', 'Ride']);
+egal('matériel Strava (vélo)', [gpx.materiel, csv.parFichier.get('activities/333.tcx.gz').materiel, csv.sansFichier[0].materiel], ['Canyon', 'Chaussures', 'Home trainer']);
 egal('trois saisies à la main', csv.sansFichier.length, 3);
 const manuelle = csv.sansFichier[0];
 egal('saisie à la main : chiffres', [manuelle.debut, manuelle.tempsEcouleS, manuelle.tempsMouvementS, manuelle.distanceM, manuelle.denivelePosM],

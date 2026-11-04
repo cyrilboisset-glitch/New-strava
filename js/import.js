@@ -2,7 +2,8 @@
 // (export du compte), un fichier seul (.fit, .gpx, .tcx, compressés .gz
 // ou non), ou le dossier d'export choisi sur le téléphone.
 import { lireFit, TYPE_FICHIER_ACTIVITE } from './fit.js';
-import { resumerSortie, identifiantSortie, nomSport } from './sortie.js';
+import { resumerSortie, identifiantSortie, nomSport, familleSortie } from './sortie.js';
+import { lireVelos } from './profil.js';
 import { lireGpx, lireTcx, resumerTrace } from './trace.js';
 import { degzip } from './fichier.js';
 import { NOM_INDEX, restaurerSauvegarde } from './sauvegarde.js';
@@ -10,6 +11,7 @@ import { lireActivitesCsv, typeStrava, resumerSansTrace } from './strava.js';
 import { toutesLesSorties, sortieExiste, enregistrerSortie, completerSortie, lireReglage, ecrireReglage } from './db.js';
 
 const ECART_DOUBLON_MS = 60 * 1000; // même départ à 1 min près = même sortie
+let veloParDefaut = null; // id du vélo mis d'office sur les nouvelles sorties vélo
 const EXTENSIONS = /\.(fit|gpx|tcx)(\.gz)?$/i;
 const ORDRE_FORMATS = { fit: 0, tcx: 1, gpx: 2 }; // le FIT d'abord : c'est le plus complet
 
@@ -29,6 +31,7 @@ async function doublon(bilan, idExistant, infos) {
   await completerSortie(idExistant, (s) => {
     const champs = {};
     if (infos.nom && !s.nom) champs.nom = infos.nom;
+    if (infos.materiel && !s.materielStrava) champs.materielStrava = infos.materiel;
     if (infos.type && s.typeStrava !== infos.type) {
       champs.typeStrava = infos.type;
       const typeFitVague = s.format !== 'fit' || s.sport === 0 || (s.sport === 10 && !s.sousSport);
@@ -47,6 +50,9 @@ async function enregistrer(resume, octets, fichier, bilan, connues, infos) {
   // Même sortie déjà présente sous un autre fichier (copie, Gadgetbridge + Strava…)
   const meme = memeDepart(connues, resume.debut);
   if (meme) return doublon(bilan, meme.id, infos);
+  if (infos?.materiel) resume.materielStrava = infos.materiel;
+  // Nouvelle sortie vélo (hors archive Strava) : vélo par défaut
+  if (!infos && veloParDefaut && familleSortie(resume).cle === 'sport-2') resume.veloId = veloParDefaut;
   if (infos) {
     resume.source = 'strava';
     resume.idStrava = infos.idStrava;
@@ -122,6 +128,7 @@ export async function importerFichiers(fichiers, progression = () => {}) {
   try { await navigator.storage?.persist?.(); } catch { /* sans importance */ }
   const bilan = compteur();
   const connues = await sortiesConnues();
+  veloParDefaut = (await lireVelos()).find((v) => v.parDefaut && !v.retire)?.id ?? null;
   for (const f of fichiers) {
     if (/\.zip$/i.test(f.nom)) {
       await importerZip(await f.lire(), f.nom, bilan, connues, progression);

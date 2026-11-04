@@ -2,7 +2,7 @@
 // records de puissance (avec courbe de puissance).
 import { toutesLesSorties } from './db.js';
 import { familleSortie } from './sortie.js';
-import { lireProfil, calculerEffortsManquants } from './profil.js';
+import { lireProfil, calculerEffortsManquants, wKg } from './profil.js';
 import { bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J } from './stats.js';
 import { DUREES_EFFORTS_S, JOURS_ESTIMATION_FTP } from './analyse.js';
 import { nombre, km, duree, echapper, majuscule, fmtDate } from './format.js';
@@ -14,14 +14,28 @@ const METRIQUES = {
   temps: { nom: 'Temps', valeur: (p) => p.dureeS / 3600, texte: (p) => duree(p.dureeS) },
   denivele: { nom: 'Dénivelé', valeur: (p) => p.denivelePosM, texte: (p) => `${nombre(p.denivelePosM)} m` },
 };
-const PLAGES_FORME = [[90, '3 mois'], [365, '1 an'], [0, 'Tout']]; // dans cet ordre
+// Plages de la courbe de forme : 'j90', 'j365', 'a2025' (année civile), 'tout'
+function plagesForme(tout) {
+  const annees = [...new Set(tout.map((j) => new Date(j.jour).getFullYear()))].sort((a, b) => b - a);
+  return [['j90', '3 mois'], ['j365', '1 an'], ...annees.map((a) => [`a${a}`, String(a)]), ['tout', 'Tout']];
+}
+
+function joursPlage(tout) {
+  const p = etat.plage;
+  if (p.startsWith('a')) {
+    const an = Number(p.slice(1));
+    const jours = tout.filter((j) => new Date(j.jour).getFullYear() === an);
+    return jours.length ? jours : tout.slice(-90);
+  }
+  return p === 'tout' ? tout : tout.slice(-Number(p.slice(1)));
+}
 const RECORDS_AFFICHES = { 5: '5 s', 60: '1 min', 300: '5 min', 1200: '20 min', 3600: '1 h' };
 
 const fmtSemaine = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
 const fmtMoisCourt = new Intl.DateTimeFormat('fr-FR', { month: 'short' });
 const fmtMoisLong = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' });
 
-const etat = { type: 'semaine', metrique: 'distance', choix: null, plage: 90 };
+const etat = { type: 'semaine', metrique: 'distance', choix: null, plage: 'j90' };
 let calculEnCours = null;
 
 /** Rangée des boutons de tri par activité (partagée avec la liste) */
@@ -43,9 +57,9 @@ export function htmlFiltres(toutes, filtre) {
   };
 }
 
-function segments(nom, options, actif) {
+function segments(nom, options, actif, classe = '') {
   const liste = Array.isArray(options) ? options : Object.entries(options);
-  return `<div class="segments" role="group" data-segments="${nom}">${liste.map(([cle, texte]) =>
+  return `<div class="segments ${classe}" role="group" data-segments="${nom}">${liste.map(([cle, texte]) =>
     `<button type="button" data-valeur="${cle}" aria-pressed="${String(cle) === String(actif)}">${texte}</button>`).join('')}</div>`;
 }
 
@@ -113,8 +127,11 @@ function blocForme(sorties, profil, maintenantMs) {
     return `<section class="carte bloc"><h2 class="bloc-titre">Forme et fatigue</h2>
       <p class="bloc-note">Il faut des sorties avec capteur de puissance pour calculer la charge d'entraînement.</p></section>`;
   }
-  const jours = etat.plage ? tout.slice(-etat.plage) : tout;
+  const jours = joursPlage(tout);
   const auj = tout[tout.length - 1];
+  // Pic de forme et creux de fraîcheur sur la plage affichée
+  const pic = jours.reduce((m, j) => (j.ctl > m.ctl ? j : m), jours[0]);
+  const creux = jours.reduce((m, j) => (j.tsb < m.tsb ? j : m), jours[0]);
   const tsbMatin = auj.tsb;
   // Courbes forme (CTL) et fatigue (ATL) : même unité, même axe
   const haut = Math.max(...jours.map((j) => Math.max(j.ctl, j.atl)), 1) * 1.1;
@@ -141,6 +158,7 @@ function blocForme(sorties, profil, maintenantMs) {
     hautFatigue = Math.min(100, Math.max(0, milieu + (formeEnHaut ? 1 : -1) * ECART_MIN / 2));
   }
   const debutTxt = fmtDate.format(jours[0].jour);
+  const finTxt = dernier.jour === auj.jour ? "aujourd'hui" : fmtDate.format(dernier.jour);
   return `
   <section class="carte bloc" id="bloc-forme">
     <h2 class="bloc-titre">Forme et fatigue</h2>
@@ -150,7 +168,8 @@ function blocForme(sorties, profil, maintenantMs) {
       <div><span class="stat-label">Fraîcheur</span><span class="stat-val">${signe(tsbMatin)}</span></div>
     </div>
     <p class="etat-forme">${etatFraicheur(tsbMatin)}</p>
-    ${segments('plage', PLAGES_FORME, etat.plage)}
+    ${segments('plage', plagesForme(tout), etat.plage, 'defile')}
+    <p class="bloc-note pic-forme">Sur cette période : forme maxi <b>${nombre(pic.ctl)}</b> le ${fmtDate.format(pic.jour)}, fraîcheur la plus basse <b>${signe(creux.tsb)}</b> le ${fmtDate.format(creux.jour)}.</p>
     <p class="courbes-position" id="forme-position">Touchez la courbe pour lire un jour</p>
     <div class="forme-graph" id="forme-graph" data-n="${jours.length}">
       <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
@@ -166,7 +185,7 @@ function blocForme(sorties, profil, maintenantMs) {
       <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="300" y1="50" y2="50" class="tsb-zero"/>${barresTsb}</svg>
       <span class="curseur" hidden></span>
     </div>
-    <div class="courbes-x"><span>${debutTxt}</span><span>aujourd'hui</span></div>
+    <div class="courbes-x"><span>${debutTxt}</span><span>${finTxt}</span></div>
     <p class="bloc-note">Charge de chaque jour = TSS des sorties avec puissance, calculé avec ta FTP actuelle (${profil.ftpW} W) ; les sorties sans capteur comptent pour 0.
     Forme = moyenne sur ${CONSTANTE_FORME_J} jours, fatigue = moyenne sur ${CONSTANTE_FATIGUE_J} jours, fraîcheur = forme − fatigue de la veille.</p>
   </section>`;
@@ -176,7 +195,7 @@ function installerCurseurForme(page, sorties, profil, maintenantMs) {
   const graph = page.querySelector('#forme-graph');
   if (!graph) return;
   const tout = formeFatigue(sorties, profil.ftpW, maintenantMs);
-  const jours = etat.plage ? tout.slice(-etat.plage) : tout;
+  const jours = joursPlage(tout);
   const position = page.querySelector('#forme-position');
   const curseurs = [...page.querySelectorAll('#bloc-forme .curseur')];
   const zones = [graph, page.querySelector('.tsb-graph')];
@@ -196,7 +215,7 @@ function installerCurseurForme(page, sorties, profil, maintenantMs) {
 
 // ---- Records -------------------------------------------------------------------------
 
-function blocRecords(sorties, maintenantMs, enCours) {
+function blocRecords(sorties, maintenantMs, enCours, poidsKg) {
   const avecPuissance = sorties.filter((s) => s.puissanceMoyW);
   if (!avecPuissance.length) return '';
   const depuis = maintenantMs - JOURS_ESTIMATION_FTP * 86400000;
@@ -206,7 +225,7 @@ function blocRecords(sorties, maintenantMs, enCours) {
     const r = tousTemps[d];
     const rec = recents[d];
     return `<tr><th scope="row">${nom}</th>
-      <td><a href="#sortie=${encodeURIComponent(r.sortie.id)}"><b>${nombre(r.w)} W</b><small>${fmtDate.format(r.sortie.debut)}</small></a></td>
+      <td><a href="#sortie=${encodeURIComponent(r.sortie.id)}"><b>${nombre(r.w)} W</b><small>${wKg(r.w, poidsKg) ? `${wKg(r.w, poidsKg)} W/kg · ` : ''}${fmtDate.format(r.sortie.debut)}</small></a></td>
       <td>${rec ? `${nombre(rec.w)} W` : '–'}</td></tr>`;
   }).join('');
   // Courbe de puissance : durée en échelle logarithmique
@@ -264,7 +283,7 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
     ${familles.size > 1 ? `<nav class="filtres" aria-label="Type d'activité">${filtresHtml}</nav>` : ''}
     ${blocBilans(sorties, maintenantMs)}
     ${blocForme(toutes, profil, maintenantMs)}
-    ${blocRecords(sorties, maintenantMs, calcul)}`;
+    ${blocRecords(sorties, maintenantMs, calcul, profil.poidsKg)}`;
     installerCurseurForme(page, toutes, profil, maintenantMs);
   };
   rendre();
@@ -278,7 +297,7 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
       const v = seg.dataset.valeur;
       if (nom === 'type') { etat.type = v; etat.choix = null; }
       else if (nom === 'metrique') etat.metrique = v;
-      else if (nom === 'plage') etat.plage = Number(v);
+      else if (nom === 'plage') etat.plage = v;
       rendre();
       return;
     }

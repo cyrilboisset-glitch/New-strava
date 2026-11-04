@@ -1,12 +1,14 @@
 // Page de détail d'une sortie : carte, chiffres, courbes (curseur commun
 // avec la carte), meilleurs efforts, zones de puissance et de FC, tours.
-import { lireSortie, lireFichier } from './db.js';
+import { lireSortie, lireFichier, completerSortie } from './db.js';
 import { decoderFichier } from './fichier.js';
 import {
   pointsDetail, parSeconde, meilleursEfforts, intervalleTypiqueS, tempsParZone, chargeSortie,
   ZONES_PUISSANCE, ZONES_FC, PART_FTP_20_MIN,
 } from './analyse.js';
-import { lireProfil, enregistrerEfforts } from './profil.js';
+import { lireProfil, enregistrerEfforts, lireVelos, wKg } from './profil.js';
+import { htmlChoixVelo } from './velos.js';
+import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure } from './format.js';
 
 const COLONNES_COURBE = 300; // points dessinés par courbe (moyenne par colonne)
@@ -228,7 +230,7 @@ function creerCarte(div, pts) {
 
 // ---- Efforts et zones ---------------------------------------------------------------
 
-function blocEfforts(efforts, intervalleS) {
+function blocEfforts(efforts, intervalleS, poidsKg) {
   const lignes = Object.entries(NOMS_EFFORTS).filter(([d]) => efforts[d]);
   if (!lignes.length) return '';
   const p20 = efforts[1200];
@@ -240,7 +242,7 @@ function blocEfforts(efforts, intervalleS) {
   <section class="carte bloc">
     <h2 class="bloc-titre">Meilleurs efforts</h2>
     <div class="efforts">
-      ${lignes.map(([d, nomDuree]) => `<div class="effort-case"><span class="effort-duree">${nomDuree}</span><span class="effort-w">${nombre(efforts[d])}<small>W</small></span></div>`).join('')}
+      ${lignes.map(([d, nomDuree]) => `<div class="effort-case"><span class="effort-duree">${nomDuree}</span><span class="effort-w">${nombre(efforts[d])}<small>W</small></span>${poidsKg ? `<span class="effort-wkg">${wKg(efforts[d], poidsKg)} W/kg</span>` : ''}</div>`).join('')}
     </div>
     ${note ? `<p class="bloc-note">${note}</p>` : ''}
   </section>`;
@@ -296,6 +298,7 @@ export async function afficherDetail(page, id) {
     return null;
   }
   const profil = await lireProfil();
+  const velos = await lireVelos();
   const fichier = await lireFichier(id);
   let pts = [];
   let tours = [];
@@ -349,11 +352,12 @@ export async function afficherDetail(page, id) {
       ${s.dureeChronoS != null ? `<span class="chiffre">${duree(s.dureeChronoS)}</span>` : ''}
       ${s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM) ? `<span class="chiffre">${nombre(s.denivelePosM)}<small>m D+</small></span>` : ''}
     </div>
+    ${familleSortie(s).cle === 'sport-2' || s.veloId ? htmlChoixVelo(velos, s) : ''}
   </section>
   ${avecGps ? '<div class="carte-parcours" id="carte-parcours" role="img" aria-label="Carte du parcours"></div>' : ''}
   ${grilleChiffres(s, charge, pts)}
   ${courbes.html}
-  ${blocEfforts(efforts, intervalleS)}
+  ${blocEfforts(efforts, intervalleS, profil.poidsKg)}
   ${zonesP}
   ${zonesFc}
   ${blocTours(tours)}
@@ -364,6 +368,9 @@ export async function afficherDetail(page, id) {
     try { marqueur = creerCarte(page.querySelector('#carte-parcours'), pts); } catch (e) { console.warn('Carte', e); }
   }
   installerCurseur(page, pts, axe, courbes.series, marqueur);
+  page.querySelector('#choix-velo')?.addEventListener('change', async (e) => {
+    await completerSortie(s.id, () => ({ veloId: e.target.value || null }));
+  });
   if (puissance.length) await enregistrerEfforts(s, pts).catch(() => {});
   return s;
 }

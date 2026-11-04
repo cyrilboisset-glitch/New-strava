@@ -14,7 +14,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.5.0 · progrès et sauvegarde';
+export const VERSION_APPLI = '0.6.0 · vélos et poids';
 
 const $ = (id) => document.getElementById(id);
 const el = {

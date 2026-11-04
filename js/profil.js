@@ -4,20 +4,63 @@ import { decoderFichier } from './fichier.js';
 import { pointsDetail, parSeconde, meilleursEfforts, estimerFtp, JOURS_ESTIMATION_FTP, VERSION_EFFORTS } from './analyse.js';
 
 export const FTP_DEFAUT_W = 236; // valeur du BiNavi (zones_target) au 12 oct. 2026
+export const POIDS_DEFAUT_KG = 98; // donné par Cyril le 4 nov. 2026
 
-/** { ftpW, fcMaxBpm, fcMaxReglee } ; FC max par défaut : la plus haute relevée */
+/** { ftpW, poidsKg, fcMaxBpm, fcMaxReglee } ; FC max par défaut : la plus haute relevée */
 export async function lireProfil(sorties = null) {
   const ftpW = (await lireReglage('ftpW')) ?? FTP_DEFAUT_W;
+  const poidsKg = (await lireReglage('poidsKg')) ?? POIDS_DEFAUT_KG;
   const fcReglee = await lireReglage('fcMaxBpm');
-  if (fcReglee) return { ftpW, fcMaxBpm: fcReglee, fcMaxReglee: true };
+  if (fcReglee) return { ftpW, poidsKg, fcMaxBpm: fcReglee, fcMaxReglee: true };
   const toutes = sorties ?? await toutesLesSorties();
   const fcMaxBpm = toutes.reduce((m, s) => Math.max(m, s.fcMax ?? 0), 0) || null;
-  return { ftpW, fcMaxBpm, fcMaxReglee: false };
+  return { ftpW, poidsKg, fcMaxBpm, fcMaxReglee: false };
 }
 
-export async function ecrireProfil({ ftpW, fcMaxBpm }) {
+export async function ecrireProfil({ ftpW, fcMaxBpm, poidsKg }) {
   if (ftpW !== undefined) await ecrireReglage('ftpW', ftpW);
   if (fcMaxBpm !== undefined) await ecrireReglage('fcMaxBpm', fcMaxBpm);
+  if (poidsKg !== undefined) await ecrireReglage('poidsKg', poidsKg);
+}
+
+/** « 2,4 W/kg » */
+export const wKg = (w, poidsKg) => (w && poidsKg ? (w / poidsKg).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : null);
+
+// ---- Vélos (saisis à la main dans Profil) ---------------------------------------
+// { id, nom, kmAvantM : distance déjà faite avant l'appli (m), parDefaut : mis
+//   d'office sur les nouvelles sorties vélo, retire : vélo vendu / rangé }
+
+export async function lireVelos() {
+  return (await lireReglage('velos')) ?? [];
+}
+
+export async function ecrireVelos(velos) {
+  // un seul vélo par défaut au plus
+  let defaut = false;
+  for (const v of velos) {
+    if (v.parDefaut && !defaut && !v.retire) defaut = true;
+    else v.parDefaut = false;
+  }
+  await ecrireReglage('velos', velos);
+}
+
+export function nouvelIdVelo() {
+  return `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Kilométrage de chaque vélo : { [id]: { distanceM, n, derniere } } (sorties + km d'avant) */
+export function bilanVelos(velos, sorties) {
+  const res = {};
+  for (const v of velos) res[v.id] = { distanceM: v.kmAvantM ?? 0, n: 0, derniere: null, dureeS: 0 };
+  for (const s of sorties) {
+    const b = s.veloId && res[s.veloId];
+    if (!b) continue;
+    b.distanceM += s.distanceM ?? 0;
+    b.dureeS += s.dureeChronoS ?? 0;
+    b.n++;
+    if (!b.derniere || s.debut > b.derniere) b.derniere = s.debut;
+  }
+  return res;
 }
 
 export const effortsAJour = (s) => s.effortsV === VERSION_EFFORTS;

@@ -150,6 +150,21 @@ l'instant »** — à proposer quand il voudra :
   même FTP, sinon TSS = durée × IF² / 36. FTP par défaut 236 W (choisie
   faute de réponse de Cyril ; réglable). Estimation : 95 % du meilleur
   20 min sur 42 jours. Testé sur données fabriquées seulement.
+- **4 nov. 2026, v0.6.0** : Forme/fatigue par année civile ; poids (98 kg
+  par défaut, réglable) et W/kg ; vélos saisis dans Profil (`js/velos.js`,
+  réglage `velos`, champ `veloId` des sorties), km d'avant l'appli, vélo
+  par défaut sur les nouvelles sorties vélo (pas sur l'archive Strava),
+  attribution en lot du matériel Strava (colonne « Activity Gear »,
+  champ `materielStrava` ; réimporter l'archive pour les sorties déjà
+  importées) et des sorties vélo sans vélo.
+- **Suite demandée le 4 nov. 2026 (dans cet ordre)** : 2) vue 3D dans le
+  détail, reprise de l'appli de Cyril `cyrilboisset-glitch/Parcours-3d`
+  (index.html, ruban sur toile 2D, profil, vue de dessus, curseur, survol ;
+  ne pas modifier ce dépôt) ; 3) secteurs auto (montée / plat / descente
+  comme `sectorize` de Parcours-3d, + sprints sur pics de puissance,
+  seuil ~150 % FTP, réglable) et manuels (début / fin choisis, nommés),
+  avec les vraies données (temps, W, NP, FC, VAM, W/kg). Noms des cols :
+  pas de requête réseau sans accord de Cyril (« Montée du km X »).
 - **Lire les sorties directement sur le BiNavi** (sans Gadgetbridge ni
   zip) : possible via Web Bluetooth (Chrome Android), en transposant le
   protocole iGPSport décodé par Gadgetbridge (code libre, AGPL ; dépôt

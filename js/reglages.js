@@ -1,6 +1,7 @@
 // Page Profil : FTP (avec estimation depuis les sorties), FC max,
 // sauvegarde des sorties et place utilisée.
-import { lireProfil, ecrireProfil, estimerMaFtp } from './profil.js';
+import { lireProfil, ecrireProfil, estimerMaFtp, wKg } from './profil.js';
+import { afficherVelos } from './velos.js';
 import { creerSauvegarde, telecharger } from './sauvegarde.js';
 import { toutesLesSorties, lireReglage } from './db.js';
 import { ZONES_PUISSANCE, JOURS_ESTIMATION_FTP } from './analyse.js';
@@ -32,7 +33,12 @@ export async function afficherReglages(page, toast) {
       <span>FTP (puissance au seuil)</span>
       <span class="champ-saisie"><input id="champ-ftp" type="number" inputmode="numeric" min="50" max="600" step="1" value="${profil.ftpW ?? ''}"> W</span>
     </label>
-    <p class="aide">Sert aux zones de puissance, au facteur d'intensité et au TSS de toutes les sorties.</p>
+    <p class="aide">Sert aux zones de puissance, au facteur d'intensité et au TSS de toutes les sorties. <span id="ftp-wkg">${wKg(profil.ftpW, profil.poidsKg) ? `Soit ${wKg(profil.ftpW, profil.poidsKg)} W/kg.` : ''}</span></p>
+    <label class="champ">
+      <span>Poids</span>
+      <span class="champ-saisie"><input id="champ-poids" type="number" inputmode="decimal" min="30" max="250" step="0.1" value="${profil.poidsKg ?? ''}"> kg</span>
+    </label>
+    <p class="aide">Sert aux W/kg (records, meilleurs efforts).</p>
     <button id="btn-estimer" class="btn secondaire" type="button">Estimer ma FTP depuis mes sorties</button>
     <div id="estimation" class="estimation" hidden></div>
     <dl class="sortie-details zones-reglages" id="zones-reglages">${tableauZones(profil.ftpW)}</dl>
@@ -48,6 +54,8 @@ export async function afficherReglages(page, toast) {
   </section>
 
   <button id="btn-enregistrer" class="btn principal large" type="button">Enregistrer les réglages</button>
+
+  <section class="carte reglages" id="bloc-velos"></section>
 
   <section class="carte reglages" id="bloc-sauvegarde">
     <h2 class="bloc-titre">Sauvegarde</h2>
@@ -68,10 +76,18 @@ export async function afficherReglages(page, toast) {
 
   const champFtp = page.querySelector('#champ-ftp');
   const champFc = page.querySelector('#champ-fcmax');
+  const champPoids = page.querySelector('#champ-poids');
+  const majWkg = () => {
+    const t = wKg(Number(champFtp.value), Number(String(champPoids.value).replace(',', '.')));
+    page.querySelector('#ftp-wkg').textContent = t ? `Soit ${t} W/kg.` : '';
+  };
+  champPoids.addEventListener('input', majWkg);
+  afficherVelos(page.querySelector('#bloc-velos'), toast);
   const estimation = page.querySelector('#estimation');
   champFtp.addEventListener('input', () => {
     const v = Number(champFtp.value);
     page.querySelector('#zones-reglages').innerHTML = v >= 50 ? tableauZones(Math.round(v)) : '';
+    majWkg();
   });
 
   page.querySelector('#btn-estimer').addEventListener('click', async (e) => {
@@ -136,7 +152,9 @@ export async function afficherReglages(page, toast) {
     const fcTexte = champFc.value.trim();
     const fc = fcTexte ? Math.round(Number(fcTexte)) : null;
     if (fc !== null && !(fc >= 100 && fc <= 230)) { toast('FC max à vérifier : entre 100 et 230 bpm.'); champFc.focus(); return; }
-    await ecrireProfil({ ftpW: ftp, fcMaxBpm: fc });
-    toast(`Réglages enregistrés : FTP ${ftp} W${fc ? `, FC max ${fc} bpm` : ''}.`);
+    const poids = Math.round(Number(String(champPoids.value).replace(',', '.')) * 10) / 10;
+    if (!(poids >= 30 && poids <= 250)) { toast('Poids à vérifier : entre 30 et 250 kg.'); champPoids.focus(); return; }
+    await ecrireProfil({ ftpW: ftp, fcMaxBpm: fc, poidsKg: poids });
+    toast(`Réglages enregistrés : FTP ${ftp} W, ${nombre(poids, poids % 1 ? 1 : 0)} kg${fc ? `, FC max ${fc} bpm` : ''}.`);
   });
 }

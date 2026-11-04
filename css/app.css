@@ -334,6 +334,10 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
   flex: 1; min-height: 36px; border: 0; border-radius: 999px; background: transparent;
   color: var(--texte-2); font-weight: 600; font-size: 14px; cursor: pointer;
 }
+.segments.defile { overflow-x: auto; scrollbar-width: none; }
+.segments.defile::-webkit-scrollbar { display: none; }
+.segments.defile button { flex: none; padding: 0 14px; }
+.pic-forme { margin: -4px 0 10px; }
 .segments button[aria-pressed="true"] { background: var(--surface); color: var(--texte); box-shadow: 0 1px 3px rgb(0 0 0 / 15%); }
 .periode-titre { margin: 2px 0 0; font-size: 17px; }
 #bloc-bilans .stats { margin-bottom: 14px; }
@@ -388,6 +392,31 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .axe-log span:first-child { transform: none; }
 .axe-log span:last-child { transform: translateX(-100%); }
 .sauvegarde-date { margin: 0 0 4px; font-size: 14px; }
+
+/* ---- Vélos ---- */
+.velo { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--ligne); }
+.velos > :first-child { border-top: 0; }
+.velo.retire { opacity: 0.6; }
+.velo-texte { flex: 1; min-width: 0; }
+.velo-nom { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.velo-km { margin: 2px 0 0; font-size: 13px; color: var(--texte-2); }
+.badge { display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); font-size: 11px; font-weight: 600; color: var(--texte-2); vertical-align: 2px; }
+.btn.petit { min-height: 38px; padding: 0 14px; font-size: 14px; }
+.btn.danger { color: var(--danger); }
+.velo-form { padding: 12px; margin: 8px 0; border-radius: 12px; background: var(--surface-2); }
+.champ-ligne { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--texte-2); }
+.champ-ligne input, .lot select, .velo-sortie select {
+  min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--ligne);
+  background: var(--surface); color: var(--texte); font: inherit; font-size: 16px;
+}
+.case { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; font-size: 14px; }
+.case input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--accent-trait); }
+.lot { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--ligne); }
+.lot-texte { grid-column: 1 / -1; font-size: 14px; overflow-wrap: anywhere; }
+.lot select { min-width: 0; }
+.velo-sortie { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; font-size: 14px; color: var(--texte-2); }
+.velo-sortie select { flex: 1; min-width: 0; }
+.effort-wkg { display: block; font-size: 12px; color: var(--texte-3); font-variant-numeric: tabular-nums; }
 
 /* ---- Pied, toast ---- */
 .pied { max-width: 640px; margin: 0 auto; padding: 8px 16px 28px; color: var(--texte-3); font-size: 12px; text-align: center; }
