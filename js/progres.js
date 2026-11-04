@@ -3,6 +3,7 @@
 import { toutesLesSorties } from './db.js';
 import { familleSortie } from './sortie.js';
 import { lireProfil, calculerEffortsManquants, wKg } from './profil.js';
+import { htmlListeSegments, suivreRecherche } from './segments.js';
 import { bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J } from './stats.js';
 import { DUREES_EFFORTS_S, JOURS_ESTIMATION_FTP } from './analyse.js';
 import { nombre, km, duree, echapper, majuscule, fmtDate } from './format.js';
@@ -37,6 +38,7 @@ const fmtMoisLong = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'num
 
 const etat = { type: 'semaine', metrique: 'distance', choix: null, plage: 'j90' };
 let calculEnCours = null;
+let desabonnerSegments = null;
 
 /** Rangée des boutons de tri par activité (partagée avec la liste) */
 export function htmlFiltres(toutes, filtre) {
@@ -278,15 +280,25 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
   const sorties = toutes.filter((s) => filtre === 'tout' || familleSortie(s).cle === filtre);
 
   let calcul = '';
+  const segmentsHtml = await htmlListeSegments();
   const rendre = () => {
     page.innerHTML = `
     ${familles.size > 1 ? `<nav class="filtres" aria-label="Type d'activité">${filtresHtml}</nav>` : ''}
     ${blocBilans(sorties, maintenantMs)}
     ${blocForme(toutes, profil, maintenantMs)}
-    ${blocRecords(sorties, maintenantMs, calcul, profil.poidsKg)}`;
+    ${blocRecords(sorties, maintenantMs, calcul, profil.poidsKg)}
+    ${segmentsHtml}`;
     installerCurseurForme(page, toutes, profil, maintenantMs);
   };
   rendre();
+
+  // Recherche des passages sur les segments en cours : avancement, puis liste à jour
+  desabonnerSegments?.();
+  desabonnerSegments = suivreRecherche(async (t) => {
+    const p = page.querySelector('#segments-recherche');
+    if (p) { p.hidden = !t; p.textContent = t; }
+    if (!t && page.querySelector('#bloc-segments')) page.querySelector('#bloc-segments').outerHTML = await htmlListeSegments();
+  });
 
   page.onclick = async (e) => {
     const f = e.target.closest('.filtre');

@@ -174,6 +174,69 @@ async function texteToast(page) {
   verif('altitude colorée selon la pente', (await page.$$('.courbe[data-champ="altitudeM"] .courbe-pentes rect')).length > 250);
   await page.click('[data-segments="vue"] button[data-valeur="carte"]');
 
+  // Segments : création à la main sur « Col du test » (du km 10 au km 20 environ)
+  await page.waitForSelector('#bloc-segments-sortie .bloc-titre');
+  verif('segments : aucun au départ', (await page.textContent('#bloc-segments-sortie')).includes('Aucun segment sur cette sortie'));
+  verif('pas de montée ni de sprint détectés (1,2 %, 200 W)', !(await page.$('#bloc-segments-sortie .proposition')));
+  await page.click('#bloc-segments-sortie .creation summary');
+  const zoneP = await page.$('.courbe[data-champ="puissanceW"] .courbe-zone');
+  await zoneP.scrollIntoViewIfNeeded();
+  const rz = await zoneP.boundingBox();
+  await page.mouse.click(rz.x + rz.width / 3, rz.y + 40);
+  await page.click('[data-choix="debut"]');
+  await zoneP.scrollIntoViewIfNeeded();
+  const rz2 = await zoneP.boundingBox();
+  await page.mouse.click(rz2.x + (rz2.width * 2) / 3, rz2.y + 40);
+  await page.click('[data-choix="fin"]');
+  const choixTxt = (await page.textContent('#bloc-segments-sortie .creation')).replace(/\s+/g, ' ');
+  verif('départ et arrivée choisis (km 10 et km 20)', /Départ : km 10,0\d · Arrivée : km 20,0\d · 10,0 km/.test(choixTxt), choixTxt);
+  await page.fill('#nom-segment', 'Faux plat du test');
+  await page.click('[data-creer]');
+  verif('segment créé, 1 passage', (await texteToast(page)).includes('1 passage trouvé'));
+  await page.waitForSelector('#bloc-segments-sortie .passage');
+  const passageTxt = (await page.textContent('#bloc-segments-sortie .passage')).replace(/\s+/g, ' ');
+  // 10 km à 30 km/h = 20 min
+  verif('passage : 20:00, record perso, 200 W', /Faux plat du test.*20:0\d.*Record perso.*30,0 km\/h.*200 W/.test(passageTxt), passageTxt);
+
+  // Nouvelle sortie sur la même route, une semaine après, avec une pause de 10 min au km 15
+  await page.setInputFiles('#champ-fichier', { name: 'col-bis.gpx', mimeType: 'application/gpx+xml',
+    buffer: Buffer.from(fauxGpx({ pauseS: 600, debutMs: Date.UTC(2025, 4, 17, 7), nom: 'Col du test bis' })) });
+  verif('sortie bis importée', (await texteToast(page)).includes('1 nouvelle sortie'));
+  await page.waitForFunction(async () => (await (await import('./js/segments.js')).lirePassages()).length === 2, null, { timeout: 20000 });
+  await page.click('#bloc-segments-sortie .passage');
+  await page.waitForSelector('#page-segment .passage');
+  verif('page du segment', (await page.textContent('#titre-page')) === 'Segment' && (await page.textContent('#page-segment .detail-nom')) === 'Faux plat du test');
+  const statsSeg = (await page.textContent('#page-segment .stats')).replace(/\s+/g, '');
+  verif('2 passages, record 20:00', /^Passages2Record20:0\d/.test(statsSeg), statsSeg);
+  const parDate = await page.$$eval('#page-segment .passage', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+  verif('par date : le plus récent d\'abord (17 mai, 30:00 avec la pause, 2e temps)', parDate[0].includes('17 mai 2025') && /30:0\d/.test(parDate[0]) && parDate[0].includes('2e temps'), JSON.stringify(parDate));
+  await page.click('[data-segments="tri"] button[data-valeur="temps"]');
+  verif('par temps : le record d\'abord', (await page.textContent('#page-segment .passage')).includes('Record perso'));
+  await page.screenshot({ path: path.join(CAPTURES, 'segment.png'), fullPage: true });
+  // Retour au détail de la sortie, puis Progrès : liste des segments
+  await page.click('#btn-retour');
+  await page.waitForSelector('#page-detail .detail-nom');
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.click('#onglet-progres');
+  await page.waitForSelector('#bloc-segments .passage');
+  verif('Progrès : mes segments', (await page.textContent('#bloc-segments')).replace(/\s+/g, ' ').includes('2 passages'));
+  // On retire la sortie « bis » (et son passage) : la suite du test compte les sorties de l'archive
+  await page.evaluate(async () => {
+    const db = await (await import('./js/db.js')).ouvrirBase();
+    const tous = await new Promise((r) => { const q = db.transaction('sorties').objectStore('sorties').getAll(); q.onsuccess = () => r(q.result); });
+    const bis = tous.find((s) => s.nom === 'Col du test bis');
+    const tx = db.transaction(['sorties', 'fichiers', 'reglages'], 'readwrite');
+    tx.objectStore('sorties').delete(bis.id);
+    tx.objectStore('fichiers').delete(bis.id);
+    const r = tx.objectStore('reglages').get('passages');
+    r.onsuccess = () => tx.objectStore('reglages').put(r.result.filter((p) => p.sortieId !== bis.id), 'passages');
+    await new Promise((ok) => { tx.oncomplete = ok; });
+  });
+  await page.click('#onglet-sorties');
+  await page.click('a.sortie:has-text("Col du test")');
+  await page.waitForSelector('#page-detail .courbe');
+
   // Retour : la liste revient à la même place
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
