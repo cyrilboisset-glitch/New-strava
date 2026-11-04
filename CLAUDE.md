@@ -189,6 +189,12 @@ l'instant »** — à proposer quand il voudra :
   dossier, Importer un fichier, Restaurer une sauvegarde). La carte de
   synchro et la rangée de boutons de tri de l'accueil n'existent plus
   (les boutons de tri restent dans Progrès).
+- **Transitions : FAITES le 4 nov. 2026** (v0.9.1). `animer(element,
+  classe)` dans app.js : entree-droite (page suivante), entree-gauche
+  (retour, repéré par un numéro dans history.state), entree-fondu (onglets,
+  liste filtrée, Carte/3D) ; menu Synchro en fondu + zoom (classe `ouvert`,
+  caché 200 ms après la fermeture) ; barres du bilan qui poussent ; toast
+  qui glisse. Tout est coupé avec prefers-reduced-motion.
 - **Suite demandée le 4 nov. 2026 (dans cet ordre)** : 2) vue 3D dans le
   détail, reprise de l'appli de Cyril `cyrilboisset-glitch/Parcours-3d`
   (index.html, ruban sur toile 2D, profil, vue de dessus, curseur, survol ;

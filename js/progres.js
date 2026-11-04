@@ -95,7 +95,7 @@ function blocBilans(sorties, maintenantMs) {
     const etiquette = (periodes.length - 1 - i) % pas === 0 ? libellePeriode(x, etat.type, maintenantMs, false) : '';
     return `<button type="button" class="barre-col" data-i="${i}" aria-pressed="${i === etat.choix}"
       aria-label="${libellePeriode(x, etat.type, maintenantMs, true)} : ${m.texte(x)}">
-      <span class="barre-zone"><span class="bilan-barre" style="height:${h.toFixed(1)}%"></span></span>
+      <span class="barre-zone"><span class="bilan-barre" style="height:${h.toFixed(1)}%;--i:${i}"></span></span>
       <span class="barre-etiquette">${etiquette}</span></button>`;
   }).join('');
   const moyenne = periodes.length ? periodes.reduce((a, x) => a + m.valeur(x), 0) / periodes.length : 0;

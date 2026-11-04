@@ -139,6 +139,29 @@ button { font: inherit; color: inherit; }
   color: var(--texte-2); font-size: 14px; text-decoration: underline; cursor: pointer;
 }
 
+/* ---- Animations douces ---- */
+:root { --anim: 220ms; --courbe: cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes entree-droite { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: none; } }
+@keyframes entree-gauche { from { opacity: 0; transform: translateX(-32px); } to { opacity: 1; transform: none; } }
+@keyframes entree-fondu { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.entree-droite { animation: entree-droite var(--anim) var(--courbe); }
+.entree-gauche { animation: entree-gauche var(--anim) var(--courbe); }
+.entree-fondu { animation: entree-fondu var(--anim) var(--courbe); }
+@keyframes pousse { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.bilan-barre { transform-origin: bottom; animation: pousse 420ms var(--courbe) both; animation-delay: calc(var(--i, 0) * 22ms); }
+@keyframes toast-entree { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.toast.apparait { animation: toast-entree 240ms var(--courbe); }
+.onglet, .onglet svg { transition: color 180ms ease; }
+.onglet:active svg { transform: scale(0.9); }
+.onglet svg { transition: color 180ms ease, transform 120ms ease; }
+.segments button, .filtre, .btn, .menu-item, .menu-bouton, .barre-col .bilan-barre { transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
+a.sortie, .passage { transition: transform 120ms ease, background-color 160ms ease; }
+a.sortie:active { transform: scale(0.985); }
+.menu-bouton .chevron { transition: transform 200ms var(--courbe); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+}
+
 /* ---- Accueil : menus Activité et Synchro ---- */
 .outils { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 6px; }
 .menu { position: relative; min-width: 0; }
@@ -165,10 +188,13 @@ button { font: inherit; color: inherit; }
 .choix-activite:focus-within { outline: 2px solid var(--accent-trait); outline-offset: 2px; }
 .choix-activite select:disabled { opacity: 1; cursor: default; }
 .menu-panneau {
+  transform-origin: top right; opacity: 0; transform: translateY(-6px) scale(0.96); pointer-events: none;
+  transition: opacity 170ms ease, transform 200ms var(--courbe);
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 8; width: min(330px, calc(100vw - 32px));
   background: var(--surface); border: 1px solid var(--ligne); border-radius: 16px; padding: 6px;
   box-shadow: 0 12px 32px rgb(0 0 0 / 28%);
 }
+.menu-panneau.ouvert { opacity: 1; transform: none; pointer-events: auto; }
 .menu-etat { padding: 8px 10px 10px; border-bottom: 1px solid var(--ligne); margin-bottom: 4px; }
 .menu-item {
   display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 10px; border: 0; border-radius: 10px;

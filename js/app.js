@@ -15,7 +15,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.9.0 · nouvel accueil';
+export const VERSION_APPLI = '0.9.1 · transitions';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -108,6 +108,7 @@ el.choixActivite.addEventListener('change', async () => {
   if (el.choixActivite.value === filtre) return;
   await changerFiltre(el.choixActivite.value);
   await afficherListe();
+  animer(el.liste, 'entree-fondu');
 });
 
 async function afficherListe() {
@@ -150,6 +151,16 @@ async function afficherListe() {
 
 // ---- Carte de synchronisation ----------------------------------------------
 
+// ---- Animations douces (coupées si Android demande moins d'animations) ----------
+// classes : entree-droite (page suivante), entree-gauche (retour), entree-fondu
+export function animer(element, classe) {
+  if (!element) return;
+  element.classList.remove('entree-droite', 'entree-gauche', 'entree-fondu');
+  void element.offsetWidth; // relance l'animation même si la classe était déjà là
+  element.classList.add(classe);
+  element.addEventListener('animationend', () => element.classList.remove(classe), { once: true });
+}
+
 // court : texte du bouton « Synchro » (ex. « il y a 2 h »)
 function etat(titre, detail, pastille = '', court = '') {
   el.titre.textContent = titre;
@@ -159,14 +170,23 @@ function etat(titre, detail, pastille = '', court = '') {
 }
 
 // ---- Menu « Synchro » (ouvert / fermé ; se ferme au choix, en dehors, ou par Échap)
+let minuterieMenu;
 function ouvrirMenu(oui) {
-  el.menuSynchro.hidden = !oui;
+  clearTimeout(minuterieMenu);
   el.btnMenuSynchro.setAttribute('aria-expanded', String(oui));
+  if (oui) {
+    el.menuSynchro.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => el.menuSynchro.classList.add('ouvert')));
+  } else {
+    el.menuSynchro.classList.remove('ouvert');
+    minuterieMenu = setTimeout(() => { el.menuSynchro.hidden = true; }, 200);
+  }
 }
-el.btnMenuSynchro.addEventListener('click', (e) => { e.stopPropagation(); ouvrirMenu(el.menuSynchro.hidden); });
+const menuOuvert = () => el.btnMenuSynchro.getAttribute('aria-expanded') === 'true';
+el.btnMenuSynchro.addEventListener('click', (e) => { e.stopPropagation(); ouvrirMenu(!menuOuvert()); });
 el.menuSynchro.addEventListener('click', (e) => { if (e.target.closest('.menu-item')) ouvrirMenu(false); });
-document.addEventListener('click', (e) => { if (!el.menuSynchro.hidden && !e.target.closest('.menu')) ouvrirMenu(false); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.menuSynchro.hidden) { ouvrirMenu(false); el.btnMenuSynchro.focus(); } });
+document.addEventListener('click', (e) => { if (menuOuvert() && !e.target.closest('.menu')) ouvrirMenu(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOuvert()) { ouvrirMenu(false); el.btnMenuSynchro.focus(); } });
 $('btn-restaurer-menu').addEventListener('click', () => el.champ.click());
 
 function progression(texte) {
@@ -178,6 +198,9 @@ let minuterieToast;
 function toast(texte) {
   el.toast.textContent = texte;
   el.toast.hidden = false;
+  el.toast.classList.remove('apparait');
+  void el.toast.offsetWidth;
+  el.toast.classList.add('apparait');
   clearTimeout(minuterieToast);
   minuterieToast = setTimeout(() => { el.toast.hidden = true; }, 4500);
 }
@@ -309,7 +332,7 @@ const TITRES = { sorties: 'Mes sorties', progres: 'Progrès', profil: 'Profil', 
 document.addEventListener('click', (e) => { if (e.target.closest('a[href^="#sortie="], a[href^="#segment="]')) navigationInterne = true; });
 el.btnRetour.addEventListener('click', () => {
   if (navigationInterne) history.back();
-  else { history.replaceState(null, '', location.pathname + location.search); router(); }
+  else { history.replaceState(null, '', location.pathname + location.search); router({ retour: true }); }
 });
 
 function pageDepuisAdresse() {
@@ -321,9 +344,32 @@ function pageDepuisAdresse() {
   return { page: 'sorties' };
 }
 
-async function router() {
+// Sens de la navigation : chaque entrée de l'historique reçoit un numéro ;
+// revenir à un numéro plus petit = retour (glisse depuis la gauche)
+let dernierN = history.state?.n ?? 0;
+let compteurN = dernierN;
+function sensNavigation(page, avant, retourForce) {
+  let n = history.state?.n;
+  let retour = !!retourForce;
+  if (n == null) {
+    n = ++compteurN;
+    history.replaceState({ ...(history.state || {}), n }, '');
+  } else {
+    retour = retour || n < dernierN;
+    compteurN = Math.max(compteurN, n);
+  }
+  dernierN = n;
+  const sous = (p) => p === 'detail' || p === 'segment';
+  if (retour) return 'entree-gauche';
+  if (sous(page)) return 'entree-droite';
+  if (sous(avant)) return 'entree-gauche';
+  return 'entree-fondu';
+}
+
+async function router(options = {}) {
   const { page, id } = pageDepuisAdresse();
   const avant = pageActuelle;
+  const sens = sensNavigation(page, avant, options.retour === true);
   if (avant === 'sorties' && page !== 'sorties') defilementListe = window.scrollY;
   // en revenant d'une sous-page vers une autre sous-page (segment -> sortie), on garde le lien de retour
   pageActuelle = page;
@@ -347,6 +393,7 @@ async function router() {
       console.error(e);
       el.pageDetail.innerHTML = `<section class="carte"><p>Détail impossible : ${echapper(e.message)}</p></section>`;
     }
+    animer(el.pageDetail, sens);
     return;
   }
   if (page === 'segment') {
@@ -356,6 +403,7 @@ async function router() {
       console.error(e);
       el.pageSegment.innerHTML = `<section class="carte"><p>Segment impossible : ${echapper(e.message)}</p></section>`;
     }
+    animer(el.pageSegment, sens);
     return;
   }
   navigationInterne = false;
@@ -365,16 +413,19 @@ async function router() {
       filtre,
       changerFiltre: async (cle) => { await changerFiltre(cle); options.filtre = filtre; await afficherProgres(el.pageProgres, options); },
     };
+    animer(el.pageProgres, sens);
     await afficherProgres(el.pageProgres, options);
   } else if (page === 'profil') {
     window.scrollTo(0, 0);
+    animer(el.pageReglages, sens);
     await afficherReglages(el.pageReglages, toast);
   } else if (avant !== 'sorties') {
     await afficherListe(); // FTP, tri ou sorties ont pu changer ailleurs
     window.scrollTo(0, avant === 'detail' ? defilementListe : 0);
+    animer(el.accueil, sens);
   }
 }
-window.addEventListener('hashchange', router);
+window.addEventListener('hashchange', () => router());
 
 // Mise à jour : à chaque ouverture ou retour dans l'appli, on demande au
 // navigateur de vérifier sw.js ; si une nouvelle version prend la main,
