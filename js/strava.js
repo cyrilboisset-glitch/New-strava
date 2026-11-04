@@ -116,6 +116,9 @@ export function lireActivitesCsv(texte) {
   const iDistances = indices('distance');
   const iDistanceM = iDistances.length >= 2 ? iDistances[iDistances.length - 1] : null;
   const iDplus = premier(['elevation gain', 'denivele positif', 'gain d\'altitude']);
+  // Vélo / chaussures choisis sur Strava (colonne 12 dans l'export anglais)
+  const iMateriel = premier(['activity gear', "materiel de l'activite", "equipement de l'activite", 'materiel'],
+    noms[11] === undefined ? undefined : 11);
 
   const parFichier = new Map();
   const sansFichier = [];
@@ -130,6 +133,7 @@ export function lireActivitesCsv(texte) {
       tempsMouvementS: iMouvement !== undefined ? nombre(l[iMouvement]) : null,
       distanceM: iDistanceM !== null ? nombre(l[iDistanceM]) : null,
       denivelePosM: iDplus !== undefined ? nombre(l[iDplus]) : null,
+      materiel: (iMateriel !== undefined && l[iMateriel]?.trim()) || null,
       fichier,
     };
     if (fichier) parFichier.set(fichier.toLowerCase(), infos);

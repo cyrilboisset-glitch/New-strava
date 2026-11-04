@@ -147,6 +147,33 @@ async function texteToast(page) {
   const efforts = await page.evaluate(async () => (await (await import('./js/db.js')).lireSortie('strava-222')).effortsW);
   verif('efforts gardés', efforts?.[1200] === 200, JSON.stringify(efforts));
 
+  // Vue 3D : bascule Carte / 3D, dessin, relief, survol relié aux courbes
+  verif('carte par défaut, 3D cachée', await page.isVisible('#carte-parcours') && !(await page.isVisible('#vue3d')));
+  await page.click('[data-segments="vue"] button[data-valeur="3d"]');
+  await page.waitForTimeout(400);
+  verif('3D affichée, carte cachée', await page.isVisible('#vue3d') && !(await page.isVisible('#carte-parcours')));
+  const pixels = await page.$eval('#vue3d canvas', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+    return n;
+  });
+  verif('ruban 3D dessiné', pixels > 5000, String(pixels));
+  verif('légende des pentes', (await page.textContent('.v3d-legende')).includes('> 10 %'));
+  await page.click('[data-v3d="relief"]');
+  verif('relief ×1', (await page.textContent('[data-v3d="relief"] span')) === '×1');
+  await page.click('[data-v3d="survol"]');
+  verif('survol lancé', (await page.textContent('[data-v3d="survol"]')).includes('Arrêter'));
+  await page.waitForTimeout(1500);
+  const pendantSurvol = (await page.textContent('.courbes-position')).replace(/\s+/g, ' ');
+  verif('survol : les courbes suivent', /^\d+,\d km · \d+:\d\d$/.test(pendantSurvol), pendantSurvol);
+  await page.screenshot({ path: path.join(CAPTURES, 'detail-3d.png') });
+  await page.click('[data-v3d="survol"]');
+  verif('survol arrêté', (await page.textContent('[data-v3d="survol"]')).includes('Survol'));
+  // Altitude colorée selon la pente
+  verif('altitude colorée selon la pente', (await page.$$('.courbe[data-champ="altitudeM"] .courbe-pentes rect')).length > 250);
+  await page.click('[data-segments="vue"] button[data-valeur="carte"]');
+
   // Retour : la liste revient à la même place
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
@@ -194,7 +221,7 @@ async function texteToast(page) {
   verif('forme et fatigue affichées', !!(await page.$('#forme-graph .ligne-forme')) && (await page.textContent('#bloc-forme')).includes('Fraîcheur'));
   await page.waitForFunction(() => !document.getElementById('records-progression'), null, { timeout: 30000 });
   const recordsTxt = (await page.textContent('#bloc-records table')).replace(/\s+/g, ' ');
-  for (const m of ['5 s 250 W20 avr. 2025', '20 min 200 W10 mai 2025', '1 h 200 W10 mai 2025']) verif(`record « ${m} »`, recordsTxt.includes(m), recordsTxt);
+  for (const m of ['5 s 250 W2,6 W/kg · 20 avr. 2025', '20 min 200 W2,0 W/kg · 10 mai 2025', '1 h 200 W2,0 W/kg · 10 mai 2025']) verif(`record « ${m} »`, recordsTxt.includes(m), recordsTxt);
   verif('courbe de puissance', !!(await page.$('.ligne-record')));
   await page.click('[data-segments="type"] button[data-valeur="semaine"]');
   await page.screenshot({ path: path.join(CAPTURES, 'progres-sombre.png'), fullPage: true });
@@ -205,6 +232,67 @@ async function texteToast(page) {
   await page.click('#btn-retour');
   await page.waitForSelector('#bloc-bilans');
   verif('retour du détail vers Progrès', page.url().endsWith('#progres'), page.url());
+
+  // Forme et fatigue sur une année civile
+  const plages = await page.$$eval('[data-segments="plage"] button', (els) => els.map((e) => e.textContent));
+  verif('choix des plages : 3 mois, 1 an, années, Tout', JSON.stringify(plages) === JSON.stringify(['3 mois', '1 an', '2026', '2025', 'Tout']), JSON.stringify(plages));
+  await page.click('[data-segments="plage"] button[data-valeur="a2025"]');
+  const axeForme = (await page.$$eval('#bloc-forme .courbes-x span', (els) => els.map((e) => e.textContent).join(' '))).replace(/\s+/g, ' ');
+  verif('année 2025 : du 2 févr. (1re sortie) au 31 déc.', axeForme === '2 févr. 2025 31 déc. 2025', axeForme);
+  verif('pic de forme de la période', (await page.textContent('.pic-forme')).includes('forme maxi'));
+  await page.screenshot({ path: path.join(CAPTURES, 'forme-2025.png') });
+
+  // Poids et W/kg
+  await page.click('#onglet-profil');
+  await page.waitForSelector('#champ-poids');
+  verif('poids par défaut 98 kg, FTP 2,4 W/kg', (await page.inputValue('#champ-poids')) === '98' && (await page.textContent('#ftp-wkg')) === 'Soit 2,4 W/kg.', await page.textContent('#ftp-wkg'));
+  await page.fill('#champ-poids', '95');
+  verif('W/kg recalculé en direct (236 / 95)', (await page.textContent('#ftp-wkg')) === 'Soit 2,5 W/kg.', await page.textContent('#ftp-wkg'));
+  await page.click('#btn-enregistrer');
+  verif('poids enregistré', (await texteToast(page)).includes('95 kg'));
+  await page.evaluate(async () => (await import('./js/profil.js')).ecrireProfil({ poidsKg: 98 }));
+
+  // Vélos : ajout, vélo par défaut, attribution du matériel Strava
+  await page.click('#onglet-sorties');
+  await page.click('#onglet-profil');
+  await page.waitForSelector('#bloc-velos [data-action="ajouter"]');
+  await page.click('#bloc-velos [data-action="ajouter"]');
+  await page.fill('.velo-form input[name="nom"]', 'Canyon Endurace');
+  await page.fill('.velo-form input[name="kmAvant"]', '1000');
+  await page.check('.velo-form input[name="parDefaut"]');
+  await page.click('.velo-form button[type="submit"]');
+  verif('vélo ajouté', (await texteToast(page)).includes('Canyon Endurace'));
+  await page.click('#bloc-velos [data-action="ajouter"]');
+  await page.fill('.velo-form input[name="nom"]', 'Home trainer');
+  await page.click('.velo-form button[type="submit"]');
+  await texteToast(page);
+  const lots = await page.$$eval('#bloc-velos .lot-texte', (els) => els.map((e) => e.textContent.trim()));
+  verif('matériel Strava des sorties vélo proposé (pas les chaussures)', JSON.stringify(lots.slice(0, 2)) === JSON.stringify(['« Canyon » : 2 sorties', '« Home trainer » : 1 sortie']) && !lots.some((l) => l.includes('Chaussures')), JSON.stringify(lots));
+  const choisir = async (materiel, nomVelo) => {
+    const lot = page.locator(`#bloc-velos .lot[data-materiel="${materiel}"]`);
+    await lot.locator('select').selectOption({ label: nomVelo });
+    await lot.locator('[data-action="lot-materiel"]').click();
+    return texteToast(page);
+  };
+  verif('Canyon : 2 sorties attribuées', (await choisir('Canyon', 'Canyon Endurace')).includes('2 sorties attribuées'));
+  await choisir('Home trainer', 'Home trainer');
+  const kmVelos = await page.$$eval('#bloc-velos .velo', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+  // 1000 km d'avant + 30 + 30 km ; home trainer : 25 km
+  verif('kilométrage du Canyon : 1 060 km, 2 sorties, par défaut', kmVelos[0].includes('Canyon Endurace par défaut') && kmVelos[0].includes('1 060 km · 2 sorties') && kmVelos[0].includes("dont 1 000 km avant l'appli"), kmVelos[0]);
+  verif('kilométrage du home trainer : 25 km', kmVelos[1].includes('25 km · 1 sortie'), kmVelos[1]);
+  await page.screenshot({ path: path.join(CAPTURES, 'velos.png'), fullPage: true });
+  // Changement de vélo dans le détail d'une sortie
+  await page.click('#onglet-sorties');
+  await page.click('a.sortie:has-text("Col du test")');
+  await page.waitForSelector('#choix-velo');
+  verif('détail : vélo de la sortie', (await page.$eval('#choix-velo', (s) => s.selectedOptions[0].textContent)) === 'Canyon Endurace');
+  await page.selectOption('#choix-velo', { label: 'Home trainer' });
+  await page.waitForTimeout(200);
+  await page.click('#btn-retour');
+  await page.click('#onglet-profil');
+  await page.waitForSelector('#bloc-velos .velo');
+  const km2 = await page.$$eval('#bloc-velos .velo-km', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ')));
+  verif('après changement : Canyon 1 030 km, home trainer 55 km', km2[0].startsWith('1 030 km · 1 sortie') && km2[1].startsWith('55 km · 2 sorties'), JSON.stringify(km2));
 
   // 2 quinquies. Sauvegarde puis restauration sur un téléphone « vide »
   await page.click('#onglet-profil');
@@ -311,6 +399,12 @@ async function texteToast(page) {
   await page.setInputFiles('#champ-fichier', { name: 'sortie.gpx.gz', mimeType: 'application/gzip', buffer: zlib.gzipSync(Buffer.from(fauxGpx())) });
   verif('.gpx.gz seul importé', (await texteToast(page)).includes('1 nouvelle sortie'));
   verif('nom pris dans le GPX, type déduit', (await page.textContent('.sortie')).replace(/\s+/g, ' ').includes('Nom dans le GPX'));
+  const veloAuto = await page.evaluate(async () => {
+    const [s] = await (await import('./js/db.js')).toutesLesSorties();
+    const velos = await (await import('./js/profil.js')).lireVelos();
+    return velos.find((v) => v.id === s.veloId)?.nom ?? null;
+  });
+  verif('nouvelle sortie vélo : vélo par défaut', veloAuto === 'Canyon Endurace', String(veloAuto));
 
   // 7. Hors ligne : la liste et le détail (trace, courbes) restent disponibles
   await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active, null, { timeout: 15000 });

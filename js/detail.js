@@ -1,13 +1,16 @@
 // Page de détail d'une sortie : carte, chiffres, courbes (curseur commun
 // avec la carte), meilleurs efforts, zones de puissance et de FC, tours.
-import { lireSortie, lireFichier } from './db.js';
+import { lireSortie, lireFichier, completerSortie } from './db.js';
 import { decoderFichier } from './fichier.js';
 import {
   pointsDetail, parSeconde, meilleursEfforts, intervalleTypiqueS, tempsParZone, chargeSortie,
   ZONES_PUISSANCE, ZONES_FC, PART_FTP_20_MIN,
 } from './analyse.js';
-import { lireProfil, enregistrerEfforts } from './profil.js';
+import { lireProfil, enregistrerEfforts, lireVelos, wKg } from './profil.js';
+import { htmlChoixVelo } from './velos.js';
+import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure } from './format.js';
+import { creerVue3d, GCOL } from './vue3d.js';
 
 const COLONNES_COURBE = 300; // points dessinés par courbe (moyenne par colonne)
 
@@ -23,9 +26,12 @@ const SERIES = [
 const NOMS_EFFORTS = { 5: '5 s', 60: '1 min', 300: '5 min', 1200: '20 min', 3600: '1 h' };
 
 let carte = null; // carte Leaflet affichée (à libérer en quittant la page)
+let vue3d = null; // vue 3D (boucle d'affichage à arrêter en quittant la page)
+let modeVue = 'carte'; // 'carte' ou '3d', gardé d'une sortie à l'autre
 
 export function fermerDetail() {
   if (carte) { carte.remove(); carte = null; }
+  if (vue3d) { vue3d.detruire(); vue3d = null; }
 }
 
 const valeur = (v, unite, dec = 0) => (v == null ? null : `${nombre(v, dec)} ${unite}`);
@@ -58,8 +64,8 @@ function grilleChiffres(s, charge, pts) {
 // Axe horizontal : distance si la sortie a bougé, sinon temps
 function axeX(pts) {
   const distTotale = pts.length ? pts[pts.length - 1].distanceM : 0;
-  if (distTotale > 500) return { x: pts.map((p) => p.distanceM), texte: (v) => `${km(v)} km` };
-  return { x: pts.map((p) => p.tS), texte: (v) => chrono(v) };
+  if (distTotale > 500) return { x: pts.map((p) => p.distanceM), texte: (v) => `${km(v)} km`, enDistance: true };
+  return { x: pts.map((p) => p.tS), texte: (v) => chrono(v), enDistance: false };
 }
 
 function seriePresente(pts, serie) {
@@ -79,6 +85,17 @@ function courbeSvg(pts, xs, serie) {
     colonnes[c].n++;
   });
   const ys = colonnes.map((c) => (c.n ? c.somme / c.n : null));
+  // Colonnes vides entre deux points (enregistrement toutes les 8 s à vive
+  // allure) : valeur interpolée si le trou fait au plus 6 colonnes
+  for (let c = 1; c < ys.length; c++) {
+    if (ys[c] !== null || ys[c - 1] === null) continue;
+    let f = c;
+    while (f < ys.length && ys[f] === null) f++;
+    if (f < ys.length && f - c <= 6) {
+      for (let k = c; k < f; k++) ys[k] = ys[c - 1] + ((ys[f] - ys[c - 1]) * (k - c + 1)) / (f - c + 1);
+    }
+    c = f;
+  }
   const presents = ys.filter((v) => v !== null);
   let bas = serie.depuisZero ? 0 : Math.min(...presents);
   let haut = Math.max(...presents);
@@ -96,9 +113,22 @@ function courbeSvg(pts, xs, serie) {
   });
   const premier = ys.findIndex((v) => v !== null);
   const dernier = ys.length - 1 - [...ys].reverse().findIndex((v) => v !== null);
-  const aire = serie.aire && !ys.slice(premier, dernier + 1).includes(null)
+  let aire = serie.aire && !ys.slice(premier, dernier + 1).includes(null)
     ? `<path class="courbe-aire" d="${d} L${(dernier + 0.5).toFixed(1)} 100 L${(premier + 0.5).toFixed(1)} 100 Z" style="fill:${serie.couleur}"/>`
     : '';
+  if (serie.aire && serie.pentes && aire) {
+    // une colonne par point dessiné, couleur de la pente (sur ± 1 colonne)
+    const largeurM = etendue / COLONNES_COURBE;
+    aire = ys.map((v, c) => {
+      if (v === null) return '';
+      const a = ys[Math.max(premier, c - 1)] ?? v;
+      const b = ys[Math.min(dernier, c + 1)] ?? v;
+      const n = Math.min(dernier, c + 1) - Math.max(premier, c - 1);
+      const pente = n ? ((b - a) / (n * largeurM)) * 100 : 0;
+      return `<rect x="${c}" y="${y(v).toFixed(2)}" width="1.02" height="${(100 - y(v)).toFixed(2)}" fill="${GCOL(pente)}"/>`;
+    }).join('');
+    aire = `<g class="courbe-pentes">${aire}</g>`;
+  }
   return {
     svg: `<svg class="courbe-svg" viewBox="0 0 ${COLONNES_COURBE} 100" preserveAspectRatio="none" aria-hidden="true">${aire}<path class="courbe-trait" d="${d}" style="stroke:${serie.couleur}"/></svg>`,
     haut, bas,
@@ -114,7 +144,7 @@ function blocCourbes(pts, axe) {
   const series = SERIES.filter((s) => seriePresente(pts, s));
   if (!series.length || pts.length < 2) return { html: '', series };
   const html = series.map((serie) => {
-    const { svg, haut, bas } = courbeSvg(pts, axe.x, serie);
+    const { svg, haut, bas } = courbeSvg(pts, axe.x, { ...serie, pentes: axe.enDistance });
     const moy = serie.champ === 'altitudeM' ? null : moyenneSerie(pts, serie);
     const defaut = moy != null ? `moy. ${nombre(moy, serie.dec)} ${serie.unite}` : '';
     return `
@@ -156,9 +186,9 @@ function plusProche(xs, v) {
 
 // Curseur commun : le doigt (ou la souris) sur une courbe place un trait
 // sur toutes les courbes, affiche les valeurs et le point sur la carte.
-function installerCurseur(page, pts, axe, series, marqueur) {
+function installerCurseur(page, pts, axe, series, marqueur, vers3d) {
   const bloc = page.querySelector('.courbes');
-  if (!bloc) return;
+  if (!bloc) return null;
   const xs = axe.x;
   const x0 = xs[0];
   const etendue = xs[xs.length - 1] - x0 || 1;
@@ -169,6 +199,10 @@ function installerCurseur(page, pts, axe, series, marqueur) {
     const r = zone.getBoundingClientRect();
     const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
     const i = plusProche(xs, x0 + f * etendue);
+    placerIndex(i);
+    vers3d?.(i);
+  };
+  const placerIndex = (i) => {
     const p = pts[i];
     const gauche = `${(((xs[i] - x0) / etendue) * 100).toFixed(2)}%`;
     courbes.forEach((c, k) => {
@@ -198,8 +232,9 @@ function installerCurseur(page, pts, axe, series, marqueur) {
     const zone = c.querySelector('.courbe-zone');
     zone.addEventListener('pointerdown', (e) => placer(e.clientX, zone));
     zone.addEventListener('pointermove', (e) => placer(e.clientX, zone));
-    zone.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') effacer(); });
+    zone.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') { effacer(); vers3d?.(null); } });
   }
+  return { placerIndex };
 }
 
 // ---- Carte -----------------------------------------------------------------------
@@ -228,7 +263,7 @@ function creerCarte(div, pts) {
 
 // ---- Efforts et zones ---------------------------------------------------------------
 
-function blocEfforts(efforts, intervalleS) {
+function blocEfforts(efforts, intervalleS, poidsKg) {
   const lignes = Object.entries(NOMS_EFFORTS).filter(([d]) => efforts[d]);
   if (!lignes.length) return '';
   const p20 = efforts[1200];
@@ -240,7 +275,7 @@ function blocEfforts(efforts, intervalleS) {
   <section class="carte bloc">
     <h2 class="bloc-titre">Meilleurs efforts</h2>
     <div class="efforts">
-      ${lignes.map(([d, nomDuree]) => `<div class="effort-case"><span class="effort-duree">${nomDuree}</span><span class="effort-w">${nombre(efforts[d])}<small>W</small></span></div>`).join('')}
+      ${lignes.map(([d, nomDuree]) => `<div class="effort-case"><span class="effort-duree">${nomDuree}</span><span class="effort-w">${nombre(efforts[d])}<small>W</small></span>${poidsKg ? `<span class="effort-wkg">${wKg(efforts[d], poidsKg)} W/kg</span>` : ''}</div>`).join('')}
     </div>
     ${note ? `<p class="bloc-note">${note}</p>` : ''}
   </section>`;
@@ -296,6 +331,7 @@ export async function afficherDetail(page, id) {
     return null;
   }
   const profil = await lireProfil();
+  const velos = await lireVelos();
   const fichier = await lireFichier(id);
   let pts = [];
   let tours = [];
@@ -349,11 +385,18 @@ export async function afficherDetail(page, id) {
       ${s.dureeChronoS != null ? `<span class="chiffre">${duree(s.dureeChronoS)}</span>` : ''}
       ${s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM) ? `<span class="chiffre">${nombre(s.denivelePosM)}<small>m D+</small></span>` : ''}
     </div>
+    ${familleSortie(s).cle === 'sport-2' || s.veloId ? htmlChoixVelo(velos, s) : ''}
   </section>
-  ${avecGps ? '<div class="carte-parcours" id="carte-parcours" role="img" aria-label="Carte du parcours"></div>' : ''}
+  ${avecGps ? `
+  <div class="segments vues" role="group" data-segments="vue">
+    <button type="button" data-valeur="carte" aria-pressed="${modeVue === 'carte'}">Carte</button>
+    <button type="button" data-valeur="3d" aria-pressed="${modeVue === '3d'}">3D</button>
+  </div>
+  <div class="carte-parcours" id="carte-parcours" role="img" aria-label="Carte du parcours"${modeVue === '3d' ? ' hidden' : ''}></div>
+  <div class="vue3d" id="vue3d"${modeVue === '3d' ? '' : ' hidden'}></div>` : ''}
   ${grilleChiffres(s, charge, pts)}
   ${courbes.html}
-  ${blocEfforts(efforts, intervalleS)}
+  ${blocEfforts(efforts, intervalleS, profil.poidsKg)}
   ${zonesP}
   ${zonesFc}
   ${blocTours(tours)}
@@ -363,7 +406,29 @@ export async function afficherDetail(page, id) {
   if (avecGps) {
     try { marqueur = creerCarte(page.querySelector('#carte-parcours'), pts); } catch (e) { console.warn('Carte', e); }
   }
-  installerCurseur(page, pts, axe, courbes.series, marqueur);
+  // Vue 3D, reliée au curseur des courbes dans les deux sens
+  let curseur = null;
+  if (avecGps) {
+    try {
+      vue3d = creerVue3d(page.querySelector('#vue3d'), pts, { auCurseur: (i) => curseur?.placerIndex(i) });
+    } catch (e) { console.warn('Vue 3D', e); }
+    const boutons = page.querySelector('[data-segments="vue"]');
+    if (!vue3d) boutons.hidden = true;
+    const montrer = (mode) => {
+      modeVue = mode;
+      page.querySelector('#carte-parcours').hidden = mode !== 'carte';
+      page.querySelector('#vue3d').hidden = mode !== '3d';
+      for (const b of boutons.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.valeur === mode));
+      vue3d?.afficher(mode === '3d');
+      if (mode === 'carte') carte?.invalidateSize();
+    };
+    boutons.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) montrer(b.dataset.valeur); });
+    montrer(vue3d ? modeVue : 'carte');
+  }
+  curseur = installerCurseur(page, pts, axe, courbes.series, marqueur, (i) => vue3d?.placerCurseur(i));
+  page.querySelector('#choix-velo')?.addEventListener('change', async (e) => {
+    await completerSortie(s.id, () => ({ veloId: e.target.value || null }));
+  });
   if (puissance.length) await enregistrerEfforts(s, pts).catch(() => {});
   return s;
 }

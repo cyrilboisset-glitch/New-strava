@@ -14,7 +14,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.5.0 · progrès et sauvegarde';
+export const VERSION_APPLI = '0.7.0 · vue 3D';
 
 const $ = (id) => document.getElementById(id);
 const el = {

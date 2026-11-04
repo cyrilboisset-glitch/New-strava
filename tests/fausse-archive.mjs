@@ -109,11 +109,11 @@ export function fauxFit({ debutMs = DEBUT_FIT, serie = 1234 } = {}) {
 
 export const CSV_STRAVA = [
   'Activity ID,Activity Date,Activity Name,Activity Type,Activity Description,Elapsed Time,Distance,Max Heart Rate,Relative Effort,Commute,Activity Private Note,Activity Gear,Filename,Athlete Weight,Bike Weight,Elapsed Time,Moving Time,Distance,Max Speed,Average Speed,Elevation Gain',
-  '111,"Jun 1, 2025, 8:00:00 AM",Sortie du matin,Ride,,3600,30.00,,,false,,,activities/111.fit.gz,,,3600.0,3600.0,30000.0,,,400.0',
-  '222,"May 10, 2025, 7:00:00 AM",Col du test,Ride,"Belle montée, beau temps\nretour par la vallée",3600,30.00,,,false,,,activities/222.gpx,,,3600.0,3600.0,30000.0,,,180.0',
-  '333,"Apr 20, 2025, 9:00:00 AM",Footing,Run,,600,1.80,,,false,,,activities/333.tcx.gz,,,600.0,600.0,1800.0,,,0.0',
+  '111,"Jun 1, 2025, 8:00:00 AM",Sortie du matin,Ride,,3600,30.00,,,false,,Canyon,activities/111.fit.gz,,,3600.0,3600.0,30000.0,,,400.0',
+  '222,"May 10, 2025, 7:00:00 AM",Col du test,Ride,"Belle montée, beau temps\nretour par la vallée",3600,30.00,,,false,,Canyon,activities/222.gpx,,,3600.0,3600.0,30000.0,,,180.0',
+  '333,"Apr 20, 2025, 9:00:00 AM",Footing,Run,,600,1.80,,,false,,Chaussures,activities/333.tcx.gz,,,600.0,600.0,1800.0,,,0.0',
   '444,"Feb 2, 2025, 10:00:00 AM",Fichier vide,Ride,,60,0.10,,,false,,,activities/444.gpx,,,60.0,60.0,100.0,,,0.0',
-  '555,"Mar 3, 2025, 6:15:00 PM",Home trainer sans capteur,Virtual Ride,,3600,25.00,,,false,,,,,,3600.0,3540.0,25000.0,,,0.0',
+  '555,"Mar 3, 2025, 6:15:00 PM",Home trainer sans capteur,Virtual Ride,,3600,25.00,,,false,,Home trainer,,,,3600.0,3540.0,25000.0,,,0.0',
   '666,"Mar 5, 2025, 5:00:00 PM",Séance haut du corps,Weight Training,,2700,0.00,,,false,,,,,,2700.0,2700.0,0.0,,,0.0',
   '777,"Feb 8, 2025, 1:00:00 PM",Balade,Walk,,4500,5.20,,,false,,,,,,4500.0,4200.0,5200.0,,,40.0',
 ].join('\n') + '\n';

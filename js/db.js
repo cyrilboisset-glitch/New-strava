@@ -70,6 +70,23 @@ export async function completerSortie(id, maj) {
   if (champs && Object.keys(champs).length) await requete(store.put({ ...sortie, ...champs }));
 }
 
+// Mêmes champs changés sur plusieurs sorties, en une transaction
+export async function mettreAJourSorties(ids, champs) {
+  if (!ids.length) return;
+  const db = await ouvrirBase();
+  const tx = db.transaction('sorties', 'readwrite');
+  const store = tx.objectStore('sorties');
+  for (const id of ids) {
+    const r = store.get(id);
+    r.onsuccess = () => { if (r.result) store.put({ ...r.result, ...champs }); };
+  }
+  return new Promise((resoudre, rejeter) => {
+    tx.oncomplete = () => resoudre();
+    tx.onerror = () => rejeter(tx.error);
+    tx.onabort = () => rejeter(tx.error);
+  });
+}
+
 export async function lireSortie(id) {
   return requete((await magasin('sorties')).get(id));
 }
