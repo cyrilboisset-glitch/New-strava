@@ -195,6 +195,12 @@ l'instant »** — à proposer quand il voudra :
   liste filtrée, Carte/3D) ; menu Synchro en fondu + zoom (classe `ouvert`,
   caché 200 ms après la fermeture) ; barres du bilan qui poussent ; toast
   qui glisse. Tout est coupé avec prefers-reduced-motion.
+  v0.9.2 (Cyril : « ça merde un peu », « plus animé ») : pages avec les
+  View Transitions de Chrome (`document.startViewTransition`, data-sens
+  avant / retour / onglet sur <html>, `data-transition` pendant le
+  glissement ; onglets nommés pour rester fixes, la barre du haut glisse
+  avec sa page) ; menu et cartes en cascade ; ruban 3D opaque (Cyril :
+  la transparence était illisible).
 - **Suite demandée le 4 nov. 2026 (dans cet ordre)** : 2) vue 3D dans le
   détail, reprise de l'appli de Cyril `cyrilboisset-glitch/Parcours-3d`
   (index.html, ruban sur toile 2D, profil, vue de dessus, curseur, survol ;

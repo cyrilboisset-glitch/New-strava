@@ -15,7 +15,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.9.1 · transitions';
+export const VERSION_APPLI = '0.9.2 · transitions fluides';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -108,7 +108,8 @@ el.choixActivite.addEventListener('change', async () => {
   if (el.choixActivite.value === filtre) return;
   await changerFiltre(el.choixActivite.value);
   await afficherListe();
-  animer(el.liste, 'entree-fondu');
+  window.scrollTo({ top: 0, behavior: mouvementReduit() ? 'auto' : 'smooth' });
+  cascade(el.liste);
 });
 
 async function afficherListe() {
@@ -153,12 +154,25 @@ async function afficherListe() {
 
 // ---- Animations douces (coupées si Android demande moins d'animations) ----------
 // classes : entree-droite (page suivante), entree-gauche (retour), entree-fondu
+let transitionNative = false; // pendant une transition de Chrome (View Transitions) : rien d'autre
+const mouvementReduit = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export function animer(element, classe) {
-  if (!element) return;
+  if (!element || transitionNative) return;
   element.classList.remove('entree-droite', 'entree-gauche', 'entree-fondu');
   void element.offsetWidth; // relance l'animation même si la classe était déjà là
   element.classList.add(classe);
   element.addEventListener('animationend', () => element.classList.remove(classe), { once: true });
+}
+
+// Cartes de la liste qui arrivent en cascade (changement d'activité, ouverture)
+function cascade(conteneur) {
+  if (mouvementReduit()) return;
+  [...conteneur.querySelectorAll('.sortie')].slice(0, 12).forEach((c, k) => c.style.setProperty('--k', k));
+  conteneur.classList.remove('cascade');
+  void conteneur.offsetWidth;
+  conteneur.classList.add('cascade');
+  setTimeout(() => conteneur.classList.remove('cascade'), 1200);
 }
 
 // court : texte du bouton « Synchro » (ex. « il y a 2 h »)
@@ -370,6 +384,28 @@ async function router(options = {}) {
   const { page, id } = pageDepuisAdresse();
   const avant = pageActuelle;
   const sens = sensNavigation(page, avant, options.retour === true);
+  // Transition native de Chrome : l'ancienne page reste affichée jusqu'à ce que
+  // la nouvelle soit prête, puis les deux glissent (ou se fondent) ensemble
+  if (document.startViewTransition && !mouvementReduit()) {
+    document.documentElement.dataset.sens = { 'entree-droite': 'avant', 'entree-gauche': 'retour' }[sens] ?? 'onglet';
+    transitionNative = true;
+    try {
+      const t = document.startViewTransition(() => afficherPage(page, id, avant, sens));
+      // repère « transition en cours » (la page n'est touchable qu'à la fin du glissement)
+      document.documentElement.dataset.transition = 'oui';
+      t.finished.catch(() => {}).finally(() => { delete document.documentElement.dataset.transition; });
+      await t.updateCallbackDone;
+    } catch (e) {
+      console.warn('Transition', e);
+    } finally {
+      transitionNative = false;
+    }
+    return;
+  }
+  await afficherPage(page, id, avant, sens);
+}
+
+async function afficherPage(page, id, avant, sens) {
   if (avant === 'sorties' && page !== 'sorties') defilementListe = window.scrollY;
   // en revenant d'une sous-page vers une autre sous-page (segment -> sortie), on garde le lien de retour
   pageActuelle = page;
@@ -451,6 +487,7 @@ async function demarrer() {
   try { filtre = (await lireReglage('filtre')) ?? 'tout'; } catch { /* filtre par défaut */ }
   if ('serviceWorker' in navigator) miseAJourAuto();
   await afficherListe();
+  if (!location.hash) cascade(el.liste);
 
   // Fichiers reçus par le menu Partager d'Android
   if (new URLSearchParams(location.search).has('partage')) {
