@@ -87,6 +87,8 @@ js/sauvegarde.js            Export zip (index JSON + fichiers d'origine) et rest
 js/icones.js                Icônes de sport
 js/vue3d.js                 Vue 3D (repris de Parcours-3d) : trace 5 m, altitude nettoyée, ruban, survol
 js/velos.js                 Vélos (Profil) : liste, km, attribution en lot, choix dans le détail
+js/segments-calc.js         Segments (sans navigateur) : découpe, passages interpolés, montées, sprints
+js/segments.js              Segments : stockage (réglages segments / passages), recherche, écrans
 js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
 js/format.js                Mise en forme (nombres, durées, dates)
 vendor/leaflet/             Leaflet 1.9.4 (BSD-2) ; fond OSM chargé en ligne
@@ -103,6 +105,7 @@ tests/test-strava.mjs       CSV, dates, GPX/TCX, calculs (données fabriquées)
 tests/test-analyse.mjs      Efforts, zones, IF/TSS, FTP estimée (valeurs connues)
 tests/test-stats.mjs        Bilans, forme / fatigue, records (TZ=Europe/Paris)
 tests/test-vue3d.mjs        Trace 3D : longueur, pentes, curseur, boucle
+tests/test-segments.mjs     Segments : temps (aussi à 8 s), sens, écart, détour, tours, montées, sprints
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
 tests/fausse-archive.mjs    Fabrique GPX, TCX, FIT et CSV aux valeurs connues
 tests/donnees/              Sorties réelles, NON versionnées : sans elles les
@@ -167,6 +170,18 @@ l'instant »** — à proposer quand il voudra :
   Parcours-3d : 111 195 m par degré (au lieu de 110 574) pour que les km de
   la 3D collent aux distances de l'appli. Pas de vue de dessus séparée (la
   carte Leaflet la remplace) ni de secteurs (étape suivante).
+- **Segments : FAITS le 4 nov. 2026** (v0.8.0), « comme Strava » (demande
+  de Cyril, à la place des « secteurs » d'une seule sortie). Création :
+  « Suivre » une montée détectée (critères Parcours 3D) ou un sprint
+  (points ≥ 150 % FTP pendant ≥ 5 s), ou à la main (Départ ici / Arrivée
+  ici au curseur). Passage = trace à ≤ 30 m du départ puis de l'arrivée,
+  ≤ 40 m du tracé en chemin, longueur 0,8–1,3 × ; heures interpolées sur
+  la trace ; temps écoulé (pauses comprises, comme Strava). Recherche :
+  nouveaux segments dans toutes les sorties (pré-tri par la trace
+  simplifiée), nouvelles sorties contre tous les segments (champ
+  `segmentsVerifies`, segment.analyseFaite) ; reprise si l'appli est fermée.
+  Page #segment=id : record, historique par date / par temps, rang.
+  Progrès : « Mes segments ». Inclus dans la sauvegarde.
 - **Suite demandée le 4 nov. 2026 (dans cet ordre)** : 2) vue 3D dans le
   détail, reprise de l'appli de Cyril `cyrilboisset-glitch/Parcours-3d`
   (index.html, ruban sur toile 2D, profil, vue de dessus, curseur, survol ;

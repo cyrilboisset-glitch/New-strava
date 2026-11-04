@@ -26,6 +26,8 @@ export async function creerSauvegarde(progression = () => {}) {
       fcMaxBpm: await lireReglage('fcMaxBpm') ?? null,
       poidsKg: await lireReglage('poidsKg') ?? null,
       velos: await lireReglage('velos') ?? null,
+      segments: await lireReglage('segments') ?? null,
+      passages: await lireReglage('passages') ?? null,
     },
     sorties: [],
   };
@@ -69,7 +71,7 @@ export async function restaurerSauvegarde(zip, bilan, connues, progression = () 
   const index = JSON.parse(await zip.file(NOM_INDEX).async('string'));
   if (index.format !== FORMAT) throw new Error('sauvegarde inconnue');
   // Réglages repris seulement s'ils ne sont pas déjà faits sur ce téléphone
-  for (const cle of ['ftpW', 'fcMaxBpm', 'poidsKg', 'velos']) {
+  for (const cle of ['ftpW', 'fcMaxBpm', 'poidsKg', 'velos', 'segments', 'passages']) {
     if (index.reglages?.[cle] && (await lireReglage(cle)) == null) await ecrireReglage(cle, index.reglages[cle]);
   }
   let i = 0;

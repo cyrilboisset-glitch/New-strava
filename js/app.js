@@ -7,6 +7,7 @@ import { lireProfil } from './profil.js';
 import { afficherDetail, fermerDetail } from './detail.js';
 import { afficherReglages } from './reglages.js';
 import { afficherProgres, htmlFiltres } from './progres.js';
+import { afficherSegment, mettreAJourPassages } from './segments.js';
 import { iconeSport } from './icones.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
@@ -14,7 +15,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.7.0 · vue 3D';
+export const VERSION_APPLI = '0.8.0 · segments';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -23,6 +24,7 @@ const el = {
   btnHaut: $('btn-synchro-haut'), btnImporter: $('btn-importer'), champ: $('champ-fichier'),
   btnChanger: $('btn-changer-dossier'), liste: $('liste'), filtres: $('filtres'), vide: $('vide'), toast: $('toast'),
   accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'), pageProgres: $('page-progres'),
+  pageSegment: $('page-segment'),
   titrePage: $('titre-page'), btnRetour: $('btn-retour'),
 };
 
@@ -221,6 +223,7 @@ async function synchroniser({ forcer = false, auto = false } = {}) {
       }
     }
     const bilan = await synchroniserDossier(dossier, progression, forcer);
+    if (bilan.nouvelles) chercherSegments();
     await afficherListe();
     if (!bilan.zip) toast("Aucun zip trouvé dans ce dossier. Vérifiez l'export automatique de Gadgetbridge.");
     else if (bilan.zipDejaLu && !bilan.nouvelles) { if (!auto) toast('Rien de nouveau depuis la dernière synchro.'); }
@@ -241,6 +244,7 @@ async function importerDepuis(fichiers) {
   occuper(true);
   try {
     const bilan = await importerFichiers(fichiers, progression);
+    if (bilan.nouvelles) chercherSegments();
     await afficherListe();
     toast(phraseBilan(bilan) + (bilan.erreurs.length ? ` · ${bilan.erreurs.length} fichier(s) illisible(s)` : ''));
     if (bilan.erreurs.length) console.warn('Erreurs d\'import', bilan.erreurs);
@@ -275,15 +279,20 @@ el.champ.addEventListener('change', async () => {
   await importerDepuis(fichiers);
 });
 
+// Passages sur les segments : nouvelles sorties, ou recherche interrompue (en arrière-plan)
+function chercherSegments() {
+  mettreAJourPassages().catch((e) => console.warn('Segments', e));
+}
+
 // ---- Navigation : accueil, détail d'une sortie, réglages -------------------
 
 let navigationInterne = false; // arrivé sur le détail par un lien de l'appli
 let defilementListe = 0;
 let pageActuelle = 'sorties';
 
-const TITRES = { sorties: 'Mes sorties', progres: 'Progrès', profil: 'Profil', detail: 'Sortie' };
+const TITRES = { sorties: 'Mes sorties', progres: 'Progrès', profil: 'Profil', detail: 'Sortie', segment: 'Segment' };
 
-document.addEventListener('click', (e) => { if (e.target.closest('a[href^="#sortie="]')) navigationInterne = true; });
+document.addEventListener('click', (e) => { if (e.target.closest('a[href^="#sortie="], a[href^="#segment="]')) navigationInterne = true; });
 el.btnRetour.addEventListener('click', () => {
   if (navigationInterne) history.back();
   else { history.replaceState(null, '', location.pathname + location.search); router(); }
@@ -292,6 +301,7 @@ el.btnRetour.addEventListener('click', () => {
 function pageDepuisAdresse() {
   const h = location.hash;
   if (h.startsWith('#sortie=')) return { page: 'detail', id: decodeURIComponent(h.slice(8)) };
+  if (h.startsWith('#segment=')) return { page: 'segment', id: decodeURIComponent(h.slice(9)) };
   if (h === '#progres') return { page: 'progres' };
   if (h === '#profil' || h === '#reglages') return { page: 'profil' };
   return { page: 'sorties' };
@@ -301,13 +311,16 @@ async function router() {
   const { page, id } = pageDepuisAdresse();
   const avant = pageActuelle;
   if (avant === 'sorties' && page !== 'sorties') defilementListe = window.scrollY;
+  // en revenant d'une sous-page vers une autre sous-page (segment -> sortie), on garde le lien de retour
   pageActuelle = page;
   fermerDetail();
   el.accueil.hidden = page !== 'sorties';
   el.pageProgres.hidden = page !== 'progres';
   el.pageDetail.hidden = page !== 'detail';
   el.pageReglages.hidden = page !== 'profil';
-  document.body.classList.toggle('sous-page', page === 'detail');
+  el.pageSegment.hidden = page !== 'segment';
+  const sousPage = page === 'detail' || page === 'segment';
+  document.body.classList.toggle('sous-page', sousPage);
   el.titrePage.textContent = TITRES[page];
   for (const o of document.querySelectorAll('.onglet')) {
     if (o.dataset.onglet === page) o.setAttribute('aria-current', 'page'); else o.removeAttribute('aria-current');
@@ -316,9 +329,18 @@ async function router() {
   if (page === 'detail') {
     el.pageDetail.innerHTML = '<p class="chargement">Chargement…</p>';
     window.scrollTo(0, 0);
-    try { await afficherDetail(el.pageDetail, id); } catch (e) {
+    try { await afficherDetail(el.pageDetail, id, toast); } catch (e) {
       console.error(e);
       el.pageDetail.innerHTML = `<section class="carte"><p>Détail impossible : ${echapper(e.message)}</p></section>`;
+    }
+    return;
+  }
+  if (page === 'segment') {
+    el.pageSegment.innerHTML = '<p class="chargement">Chargement…</p>';
+    window.scrollTo(0, 0);
+    try { await afficherSegment(el.pageSegment, id, toast); } catch (e) {
+      console.error(e);
+      el.pageSegment.innerHTML = `<section class="carte"><p>Segment impossible : ${echapper(e.message)}</p></section>`;
     }
     return;
   }
@@ -376,6 +398,7 @@ async function demarrer() {
 
   if (dossierPossible) dossier = await dossierMemorise();
   await afficherEtatDossier();
+  chercherSegments();
   if (dossier) await synchroniser({ auto: true });
 }
 

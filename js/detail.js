@@ -10,7 +10,8 @@ import { lireProfil, enregistrerEfforts, lireVelos, wKg } from './profil.js';
 import { htmlChoixVelo } from './velos.js';
 import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure } from './format.js';
-import { creerVue3d, GCOL } from './vue3d.js';
+import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
+import { afficherSegmentsSortie } from './segments.js';
 
 const COLONNES_COURBE = 300; // points dessinés par courbe (moyenne par colonne)
 
@@ -28,10 +29,12 @@ const NOMS_EFFORTS = { 5: '5 s', 60: '1 min', 300: '5 min', 1200: '20 min', 3600
 let carte = null; // carte Leaflet affichée (à libérer en quittant la page)
 let vue3d = null; // vue 3D (boucle d'affichage à arrêter en quittant la page)
 let modeVue = 'carte'; // 'carte' ou '3d', gardé d'une sortie à l'autre
+let indexCurseur = null; // point de la sortie sous le curseur des courbes (création de segment)
 
 export function fermerDetail() {
   if (carte) { carte.remove(); carte = null; }
   if (vue3d) { vue3d.detruire(); vue3d = null; }
+  indexCurseur = null;
 }
 
 const valeur = (v, unite, dec = 0) => (v == null ? null : `${nombre(v, dec)} ${unite}`);
@@ -203,6 +206,7 @@ function installerCurseur(page, pts, axe, series, marqueur, vers3d) {
     vers3d?.(i);
   };
   const placerIndex = (i) => {
+    indexCurseur = i;
     const p = pts[i];
     const gauche = `${(((xs[i] - x0) / etendue) * 100).toFixed(2)}%`;
     courbes.forEach((c, k) => {
@@ -323,7 +327,7 @@ function blocTours(tours) {
 // ---- Page ----------------------------------------------------------------------------
 
 /** Remplit `page` avec le détail de la sortie `id`. */
-export async function afficherDetail(page, id) {
+export async function afficherDetail(page, id, toast = () => {}) {
   fermerDetail();
   const s = await lireSortie(id);
   if (!s) {
@@ -396,6 +400,7 @@ export async function afficherDetail(page, id) {
   <div class="vue3d" id="vue3d"${modeVue === '3d' ? '' : ' hidden'}></div>` : ''}
   ${grilleChiffres(s, charge, pts)}
   ${courbes.html}
+  ${avecGps ? '<section class="carte bloc" id="bloc-segments-sortie"></section>' : ''}
   ${blocEfforts(efforts, intervalleS, profil.poidsKg)}
   ${zonesP}
   ${zonesFc}
@@ -426,6 +431,12 @@ export async function afficherDetail(page, id) {
     montrer(vue3d ? modeVue : 'carte');
   }
   curseur = installerCurseur(page, pts, axe, courbes.series, marqueur, (i) => vue3d?.placerCurseur(i));
+  // Segments : passages de cette sortie, montées et sprints détectés, création
+  const blocSegments = page.querySelector('#bloc-segments-sortie');
+  if (blocSegments) {
+    const trace = vue3d?.trace ?? construireTrace(pts);
+    afficherSegmentsSortie(blocSegments, s, pts, trace, () => indexCurseur, toast).catch((e) => console.warn('Segments', e));
+  }
   page.querySelector('#choix-velo')?.addEventListener('change', async (e) => {
     await completerSortie(s.id, () => ({ veloId: e.target.value || null }));
   });
