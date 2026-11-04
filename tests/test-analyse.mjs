@@ -27,7 +27,9 @@ proche('points : vitesse calculée au milieu (km/h)', pts[1800].vitesseMs * 3.6,
 egal('points : intervalle typique', intervalleTypiqueS(pts), 1);
 const sec = parSeconde(pts, 'puissanceW');
 egal('puissance seconde par seconde : 3600 s', sec.length, 3600);
-egal('efforts à 200 W constants', meilleursEfforts(sec), { 5: 200, 60: 200, 300: 200, 1200: 200, 3600: 200 });
+const CINQ = [5, 60, 300, 1200, 3600];
+egal('efforts à 200 W constants', meilleursEfforts(sec, CINQ), { 5: 200, 60: 200, 300: 200, 1200: 200, 3600: 200 });
+egal('courbe de puissance : 2 h trop long pour 1 h', meilleursEfforts(sec)[7200], null);
 
 // Pause de 10 min : les secondes de la pause ne comptent pas
 const ptsPause = pointsDetail(lireGpx(fauxGpx({ pauseS: 600 })).records);
@@ -35,7 +37,7 @@ egal('pause : 3599 s de puissance', parSeconde(ptsPause, 'puissanceW').length, 3
 
 // Profil connu : 1000 s à 100 W, 1200 s à 300 W, 1400 s à 150 W
 const profil = [...Array(1000).fill(100), ...Array(1200).fill(300), ...Array(1400).fill(150)];
-egal('efforts du profil', meilleursEfforts(profil), { 5: 300, 60: 300, 300: 300, 1200: 300, 3600: 186 });
+egal('efforts du profil', meilleursEfforts(profil, CINQ), { 5: 300, 60: 300, 300: 300, 1200: 300, 3600: 186 });
 egal('effort trop long pour la sortie', meilleursEfforts([200, 200, 200], [5]), { 5: null });
 
 // Enregistrement toutes les 8 s (comme le BiNavi) : valeur tenue 8 s

@@ -364,6 +364,6 @@ export async function afficherDetail(page, id) {
     try { marqueur = creerCarte(page.querySelector('#carte-parcours'), pts); } catch (e) { console.warn('Carte', e); }
   }
   installerCurseur(page, pts, axe, courbes.series, marqueur);
-  if (puissance.length && !s.effortsW) await enregistrerEfforts(s, pts).catch(() => {});
+  if (puissance.length) await enregistrerEfforts(s, pts).catch(() => {});
   return s;
 }

@@ -6,13 +6,15 @@ import { chargeSortie } from './analyse.js';
 import { lireProfil } from './profil.js';
 import { afficherDetail, fermerDetail } from './detail.js';
 import { afficherReglages } from './reglages.js';
+import { afficherProgres, htmlFiltres } from './progres.js';
+import { iconeSport } from './icones.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
   importerFichiers, dossierPossible, choisirDossier, dossierMemorise,
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.4.0 · détail des sorties';
+export const VERSION_APPLI = '0.5.0 · progrès et sauvegarde';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -20,7 +22,7 @@ const el = {
   progression: $('progression'), btnDossier: $('btn-dossier'), btnSynchro: $('btn-synchro'),
   btnHaut: $('btn-synchro-haut'), btnImporter: $('btn-importer'), champ: $('champ-fichier'),
   btnChanger: $('btn-changer-dossier'), liste: $('liste'), filtres: $('filtres'), vide: $('vide'), toast: $('toast'),
-  accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'),
+  accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'), pageProgres: $('page-progres'),
   titrePage: $('titre-page'), btnRetour: $('btn-retour'),
 };
 
@@ -29,84 +31,81 @@ let occupe = false;
 let rechargerApres = false; // nouvelle version arrivée pendant un import
 let filtre = 'tout'; // famille d'activités affichée (clé de familleSortie)
 
-// ---- Vignette de trace ----------------------------------------------------
+// ---- Aperçu du parcours (dessiné depuis la trace simplifiée) ----------------
 
-function vignette(trace) {
-  const T = 60;
-  const marge = 8;
-  if (!trace || trace.length < 2) {
-    return `<svg width="${T}" height="${T}" viewBox="0 0 ${T} ${T}" aria-hidden="true"><path d="M18 40 L28 28 L36 34 L44 20"/></svg>`;
-  }
+function apercu(trace) {
+  if (!trace || trace.length < 2) return '';
+  const L = 320;
+  const H = 150;
+  const marge = 16;
   const latMoy = trace.reduce((a, p) => a + p[0], 0) / trace.length;
   const kx = Math.cos((latMoy * Math.PI) / 180);
   const xs = trace.map((p) => p[1] * kx);
   const ys = trace.map((p) => -p[0]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const etendue = Math.max(maxX - minX, maxY - minY) || 1;
-  const ech = (T - 2 * marge) / etendue;
-  const dx = (T - (maxX - minX) * ech) / 2;
-  const dy = (T - (maxY - minY) * ech) / 2;
+  const ech = Math.min((L - 2 * marge) / (maxX - minX || 1e-9), (H - 2 * marge) / (maxY - minY || 1e-9));
+  const dx = (L - (maxX - minX) * ech) / 2;
+  const dy = (H - (maxY - minY) * ech) / 2;
   const pts = xs.map((x, i) => [dx + (x - minX) * ech, dy + (ys[i] - minY) * ech]);
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('');
   const [x0, y0] = pts[0];
-  return `<svg width="${T}" height="${T}" viewBox="0 0 ${T} ${T}" aria-hidden="true"><path d="${d}"/><circle cx="${x0.toFixed(1)}" cy="${y0.toFixed(1)}" r="2.6"/></svg>`;
+  const [x1, y1] = pts[pts.length - 1];
+  return `<div class="apercu"><svg viewBox="0 0 ${L} ${H}" aria-hidden="true">
+    <path class="apercu-trace" d="${d}"/>
+    <circle class="apercu-depart" cx="${x0.toFixed(1)}" cy="${y0.toFixed(1)}" r="4.5"/>
+    <circle class="apercu-arrivee" cx="${x1.toFixed(1)}" cy="${y1.toFixed(1)}" r="4.5"/></svg></div>`;
 }
 
 // ---- Liste -----------------------------------------------------------------
 
 function carteSortie(s, profil) {
   const d = new Date(s.debut);
-  const effort = [];
   const { tss } = chargeSortie(s, profil.ftpW);
+  const stats = [];
+  if (s.distanceM) stats.push(['Distance', `${km(s.distanceM)}<small>km</small>`]);
+  if (s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM)) stats.push(['Dénivelé', `${nombre(s.denivelePosM)}<small>m</small>`]);
+  if (s.dureeChronoS != null) stats.push(['Temps', duree(s.dureeChronoS)]);
+  const effort = [];
   if (s.puissanceNormW) effort.push(`<span><span class="p">${s.puissanceNormW} W</span> NP</span>`);
   else if (s.puissanceMoyW) effort.push(`<span><span class="p">${s.puissanceMoyW} W</span> moy.</span>`);
   if (tss != null) effort.push(`<span>TSS ${nombre(tss)}</span>`);
   if (s.fcMoy) effort.push(`<span><span class="c">${s.fcMoy}</span> bpm</span>`);
 
   return `
-  <a class="sortie sortie-tete" href="#sortie=${encodeURIComponent(s.id)}">
-      <div class="vignette">${vignette(s.trace)}</div>
-      <div>
-        <div class="sortie-titre">
-          <p class="sortie-nom">${echapper(s.nom || s.nomSport)}</p>
-          <span class="sortie-date">${majuscule(fmtJour.format(d))} · ${fmtHeure.format(d)}</span>
-        </div>
-        <div class="chiffres">
-          ${s.distanceM != null ? `<span class="chiffre">${km(s.distanceM)}<small>km</small></span>` : ''}
-          ${s.dureeChronoS != null ? `<span class="chiffre">${duree(s.dureeChronoS)}</span>` : ''}
-          ${s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM) ? `<span class="chiffre">${nombre(s.denivelePosM)}<small>m D+</small></span>` : ''}
-        </div>
-        ${effort.length ? `<div class="effort">${effort.join('')}</div>` : ''}
+  <a class="sortie" href="#sortie=${encodeURIComponent(s.id)}">
+    <div class="sortie-entete">
+      <span class="pastille-sport">${iconeSport(s)}</span>
+      <div class="sortie-titres">
+        <p class="sortie-nom">${echapper(s.nom || s.nomSport)}</p>
+        <p class="sortie-date">${majuscule(fmtJour.format(d))} · ${fmtHeure.format(d)}${s.nom ? ` · ${echapper(s.nomSport)}` : ''}</p>
       </div>
+    </div>
+    ${stats.length ? `<div class="stats">${stats.map(([l, v]) => `<div><span class="stat-label">${l}</span><span class="stat-val">${v}</span></div>`).join('')}</div>` : ''}
+    ${effort.length ? `<div class="effort">${effort.join('')}</div>` : ''}
+    ${apercu(s.trace)}
   </a>`;
 }
 
 // Boutons de tri : « Tout » + chaque famille présente, la plus fréquente d'abord
 function afficherFiltres(toutes) {
-  const familles = new Map();
-  for (const s of toutes) {
-    const f = familleSortie(s);
-    if (!familles.has(f.cle)) familles.set(f.cle, { ...f, n: 0 });
-    familles.get(f.cle).n++;
-  }
-  if (filtre !== 'tout' && !familles.has(filtre)) filtre = 'tout';
+  const { familles, html } = htmlFiltres(toutes, filtre);
+  if (filtre !== 'tout' && !familles.has(filtre)) { filtre = 'tout'; return afficherFiltres(toutes); }
   el.filtres.hidden = familles.size < 2;
-  const boutons = [{ cle: 'tout', nom: 'Tout', n: toutes.length },
-    ...[...familles.values()].sort((a, b) => b.n - a.n || a.nom.localeCompare(b.nom, 'fr'))];
-  el.filtres.innerHTML = boutons.map((f) => `
-    <button type="button" class="filtre" data-cle="${echapper(f.cle)}" aria-pressed="${f.cle === filtre}">
-      ${echapper(f.nom)} <span class="filtre-n">${nombre(f.n)}</span>
-    </button>`).join('');
+  el.filtres.innerHTML = html;
   // Bouton choisi visible même s'il est loin à droite dans la rangée
   const actif = el.filtres.querySelector('[aria-pressed="true"]');
   if (actif && filtre !== 'tout') el.filtres.scrollLeft = actif.offsetLeft - 16;
 }
 
+async function changerFiltre(cle) {
+  filtre = cle;
+  try { await ecrireReglage('filtre', filtre); } catch { /* sans importance */ }
+}
+
 el.filtres.addEventListener('click', async (e) => {
   const b = e.target.closest('.filtre');
   if (!b || b.dataset.cle === filtre) return;
-  filtre = b.dataset.cle;
-  try { await ecrireReglage('filtre', filtre); } catch { /* sans importance */ }
+  await changerFiltre(b.dataset.cle);
   await afficherListe();
 });
 
@@ -278,45 +277,65 @@ el.champ.addEventListener('change', async () => {
 
 // ---- Navigation : accueil, détail d'une sortie, réglages -------------------
 
-let navigationInterne = false; // arrivé sur la page par un lien de l'appli
-let defilementAccueil = 0;
+let navigationInterne = false; // arrivé sur le détail par un lien de l'appli
+let defilementListe = 0;
+let pageActuelle = 'sorties';
 
-el.liste.addEventListener('click', (e) => { if (e.target.closest('a.sortie')) navigationInterne = true; });
-$('btn-reglages').addEventListener('click', () => { navigationInterne = true; });
+const TITRES = { sorties: 'Mes sorties', progres: 'Progrès', profil: 'Profil', detail: 'Sortie' };
+
+document.addEventListener('click', (e) => { if (e.target.closest('a[href^="#sortie="]')) navigationInterne = true; });
 el.btnRetour.addEventListener('click', () => {
   if (navigationInterne) history.back();
   else { history.replaceState(null, '', location.pathname + location.search); router(); }
 });
 
-async function router() {
+function pageDepuisAdresse() {
   const h = location.hash;
-  const idSortie = h.startsWith('#sortie=') ? decodeURIComponent(h.slice(8)) : null;
-  const page = idSortie ? 'detail' : h === '#reglages' ? 'reglages' : 'accueil';
-  const etaitAccueil = !el.accueil.hidden;
-  if (etaitAccueil && page !== 'accueil') defilementAccueil = window.scrollY;
+  if (h.startsWith('#sortie=')) return { page: 'detail', id: decodeURIComponent(h.slice(8)) };
+  if (h === '#progres') return { page: 'progres' };
+  if (h === '#profil' || h === '#reglages') return { page: 'profil' };
+  return { page: 'sorties' };
+}
+
+async function router() {
+  const { page, id } = pageDepuisAdresse();
+  const avant = pageActuelle;
+  if (avant === 'sorties' && page !== 'sorties') defilementListe = window.scrollY;
+  pageActuelle = page;
   fermerDetail();
-  el.accueil.hidden = page !== 'accueil';
+  el.accueil.hidden = page !== 'sorties';
+  el.pageProgres.hidden = page !== 'progres';
   el.pageDetail.hidden = page !== 'detail';
-  el.pageReglages.hidden = page !== 'reglages';
-  document.body.classList.toggle('sous-page', page !== 'accueil');
-  el.titrePage.textContent = page === 'detail' ? 'Sortie' : page === 'reglages' ? 'Réglages' : 'Mes sorties';
+  el.pageReglages.hidden = page !== 'profil';
+  document.body.classList.toggle('sous-page', page === 'detail');
+  el.titrePage.textContent = TITRES[page];
+  for (const o of document.querySelectorAll('.onglet')) {
+    if (o.dataset.onglet === page) o.setAttribute('aria-current', 'page'); else o.removeAttribute('aria-current');
+  }
 
   if (page === 'detail') {
     el.pageDetail.innerHTML = '<p class="chargement">Chargement…</p>';
     window.scrollTo(0, 0);
-    try { await afficherDetail(el.pageDetail, idSortie); } catch (e) {
+    try { await afficherDetail(el.pageDetail, id); } catch (e) {
       console.error(e);
       el.pageDetail.innerHTML = `<section class="carte"><p>Détail impossible : ${echapper(e.message)}</p></section>`;
     }
-  } else if (page === 'reglages') {
+    return;
+  }
+  navigationInterne = false;
+  if (page === 'progres') {
+    window.scrollTo(0, 0);
+    const options = {
+      filtre,
+      changerFiltre: async (cle) => { await changerFiltre(cle); options.filtre = filtre; await afficherProgres(el.pageProgres, options); },
+    };
+    await afficherProgres(el.pageProgres, options);
+  } else if (page === 'profil') {
     window.scrollTo(0, 0);
     await afficherReglages(el.pageReglages, toast);
-  } else {
-    navigationInterne = false;
-    if (!etaitAccueil) {
-      await afficherListe(); // la FTP a pu changer (TSS)
-      window.scrollTo(0, defilementAccueil);
-    }
+  } else if (avant !== 'sorties') {
+    await afficherListe(); // FTP, tri ou sorties ont pu changer ailleurs
+    window.scrollTo(0, avant === 'detail' ? defilementListe : 0);
   }
 }
 window.addEventListener('hashchange', router);

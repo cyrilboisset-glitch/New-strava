@@ -4,7 +4,10 @@
 import { distanceM } from './trace.js';
 
 export const TROU_MAX_S = 10; // au-delà : pause, les secondes du trou ne comptent pas
-export const DUREES_EFFORTS_S = [5, 60, 300, 1200, 3600];
+// Durées des meilleurs efforts (courbe de puissance) ; VERSION_EFFORTS à
+// augmenter si cette liste change (les efforts gardés sont alors recalculés)
+export const DUREES_EFFORTS_S = [1, 5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600, 5400, 7200];
+export const VERSION_EFFORTS = 2;
 export const JOURS_ESTIMATION_FTP = 42; // 6 semaines
 export const PART_FTP_20_MIN = 0.95; // FTP ≈ 95 % de la meilleure puissance sur 20 min
 

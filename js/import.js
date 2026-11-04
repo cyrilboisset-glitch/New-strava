@@ -5,6 +5,7 @@ import { lireFit, TYPE_FICHIER_ACTIVITE } from './fit.js';
 import { resumerSortie, identifiantSortie, nomSport } from './sortie.js';
 import { lireGpx, lireTcx, resumerTrace } from './trace.js';
 import { degzip } from './fichier.js';
+import { NOM_INDEX, restaurerSauvegarde } from './sauvegarde.js';
 import { lireActivitesCsv, typeStrava, resumerSansTrace } from './strava.js';
 import { toutesLesSorties, sortieExiste, enregistrerSortie, completerSortie, lireReglage, ecrireReglage } from './db.js';
 
@@ -154,6 +155,15 @@ async function importerZip(contenu, nomZip, bilan, connues, progression) {
     return;
   }
   const tout = Object.values(zip.files).filter((e) => !e.dir);
+  // Sauvegarde de cette appli : restauration directe
+  if (zip.file(NOM_INDEX)) {
+    try {
+      await restaurerSauvegarde(zip, bilan, connues, progression);
+    } catch (e) {
+      bilan.erreurs.push(`${nomZip} : sauvegarde illisible (${e.message})`);
+    }
+    return;
+  }
   const entreeCsv = tout.find((e) => /(^|\/)activities\.csv$/i.test(e.name));
   const csv = entreeCsv ? lireActivitesCsv(await entreeCsv.async('string')) : null;
   const libelle = csv ? 'Archive Strava' : 'Fichiers';

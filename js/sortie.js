@@ -41,7 +41,7 @@ export function identifiantSortie(fit) {
 }
 
 // Trace simplifiée (au plus `max` points) pour la vignette de la liste.
-export function traceSimplifiee(records, max = 80) {
+export function traceSimplifiee(records, max = 160) {
   const pts = records.filter((r) => typeof r.lat === 'number' && typeof r.lon === 'number');
   if (pts.length < 2) return [];
   const pas = Math.max(1, Math.ceil(pts.length / (max - 1)));

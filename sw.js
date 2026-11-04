@@ -3,13 +3,14 @@
 // Changer VERSION à chaque mise en ligne pour que le téléphone se mette à jour.
 import { deposerPartage } from './js/db.js';
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 const CACHE = `mes-sorties-${VERSION}`;
 const FICHIERS = [
   './', 'index.html', 'manifest.webmanifest',
   'css/app.css',
   'js/app.js', 'js/db.js', 'js/fit.js', 'js/import.js', 'js/sortie.js', 'js/strava.js', 'js/trace.js',
   'js/analyse.js', 'js/detail.js', 'js/fichier.js', 'js/format.js', 'js/profil.js', 'js/reglages.js',
+  'js/icones.js', 'js/progres.js', 'js/sauvegarde.js', 'js/stats.js',
   'vendor/jszip.min.js', 'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css',
   'fonts/barlow-condensed-latin-500-normal.woff2',
   'fonts/barlow-condensed-latin-600-normal.woff2',
