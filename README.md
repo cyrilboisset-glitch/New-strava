@@ -59,6 +59,7 @@ node tests/test-analyse.mjs
 TZ=Europe/Paris node tests/test-stats.mjs
 node tests/test-vue3d.mjs
 node tests/test-segments.mjs
+node tests/test-estimation.mjs
 node tests/test-strava-navigateur.cjs
 ```
 

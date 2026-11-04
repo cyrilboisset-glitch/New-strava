@@ -10,7 +10,7 @@ export const DEBUT_FIT = Date.UTC(2025, 5, 1, 8, 0, 0); // 1er juin 2025, 10 h �
 
 // 1 h à 30 km/h plein nord, 200 W, 140 bpm, 90 tr/min ; altitude +1 m
 // toutes les 10 s pendant 30 min (D+ 180 m). pauseS : arrêt au milieu.
-export function fauxGpx({ pauseS = 0, debutMs = DEBUT_GPX, nom = 'Nom dans le GPX' } = {}) {
+export function fauxGpx({ pauseS = 0, debutMs = DEBUT_GPX, nom = 'Nom dans le GPX', puissance = true } = {}) {
   const v = 30 / 3.6;
   let pts = '';
   for (let s = 0; s <= 3600; s++) {
@@ -18,7 +18,7 @@ export function fauxGpx({ pauseS = 0, debutMs = DEBUT_GPX, nom = 'Nom dans le GP
     const lat = 45 + s * v * DEG_PAR_M;
     const ele = 100 + Math.floor(Math.min(s, 1800) / 10);
     pts += `<trkpt lat="${lat.toFixed(9)}" lon="5.5"><ele>${ele}</ele><time>${new Date(t).toISOString().replace('.000', '')}</time>`
-      + '<extensions><power>200</power><gpxtpx:TrackPointExtension><gpxtpx:hr>140</gpxtpx:hr><gpxtpx:cad>90</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>\n';
+      + `<extensions>${puissance ? '<power>200</power>' : ''}<gpxtpx:TrackPointExtension><gpxtpx:hr>140</gpxtpx:hr><gpxtpx:cad>90</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>\n`;
   }
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx creator="StravaGPX" version="1.1" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">

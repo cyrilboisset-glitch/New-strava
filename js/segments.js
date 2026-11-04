@@ -7,6 +7,7 @@ import { pointsDetail } from './analyse.js';
 import { decouperSegment, trouverPassages, bboxCompatible, detecterMontees, detecterSprints, classer } from './segments-calc.js';
 import { lireProfil, wKg } from './profil.js';
 import { nombre, km, chrono, echapper, fmtDate } from './format.js';
+import { htmlCarteStatique } from './carte-statique.js';
 
 export const PART_FTP_SPRINT = 1.5; // sprint : au-dessus de 150 % de la FTP
 
@@ -154,21 +155,9 @@ function mesuresPassage(p, poidsKg) {
   ].filter(Boolean).join(' · ');
 }
 
-// Petit dessin du tracé du segment (vu de dessus, nord en haut)
+// Petite carte du segment (fond OpenStreetMap)
 function apercuSegment(seg) {
-  const L = 320; const H = 120; const m = 12;
-  const lat0 = seg.points[0][0];
-  const kx = Math.cos((lat0 * Math.PI) / 180);
-  const xs = seg.points.map((p) => p[1] * kx);
-  const ys = seg.points.map((p) => -p[0]);
-  const x0 = Math.min(...xs); const x1 = Math.max(...xs); const y0 = Math.min(...ys); const y1 = Math.max(...ys);
-  const e = Math.min((L - 2 * m) / (x1 - x0 || 1e-9), (H - 2 * m) / (y1 - y0 || 1e-9));
-  const dx = (L - (x1 - x0) * e) / 2; const dy = (H - (y1 - y0) * e) / 2;
-  const pts = xs.map((x, i) => [dx + (x - x0) * e, dy + (ys[i] - y0) * e]);
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('');
-  const [a, b] = [pts[0], pts[pts.length - 1]];
-  return `<div class="apercu segment-apercu"><svg viewBox="0 0 ${L} ${H}" aria-hidden="true"><path class="apercu-trace" d="${d}"/>
-    <circle class="apercu-depart" cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="4.5"/><circle class="apercu-arrivee" cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="4.5"/></svg></div>`;
+  return htmlCarteStatique(seg.points, { hauteur: 140, classe: 'segment-apercu' });
 }
 
 // ---- Bloc « Segments » du détail d'une sortie -------------------------------------------

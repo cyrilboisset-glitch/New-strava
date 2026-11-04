@@ -155,6 +155,12 @@ export function tempsParZone(secondes, zones, reference) {
  * TSS = durée (s) × IF² / 36  (= durée × NP × IF / (FTP × 3600) × 100)
  */
 export function chargeSortie(s, ftpW) {
+  if (!s.puissanceNormW && s.puissanceEstimee?.normW && ftpW) {
+    // pas de capteur : puissance estimée (vitesse, pente, poids)
+    const fi = s.puissanceEstimee.normW / ftpW;
+    const dureeS = s.dureeChronoS ?? s.dureeTotaleS;
+    return { tss: dureeS ? (dureeS * fi * fi) / 36 : null, facteurIntensite: fi, source: 'estimee' };
+  }
   if (!s.puissanceNormW || !ftpW) return { tss: null, facteurIntensite: null, source: null };
   if (s.tss != null && s.ftpCompteurW === ftpW) {
     return { tss: s.tss, facteurIntensite: s.facteurIntensite ?? s.puissanceNormW / ftpW, source: 'compteur' };

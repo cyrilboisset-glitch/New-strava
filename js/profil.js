@@ -1,7 +1,8 @@
 // Réglages du cycliste (FTP, FC max) et meilleurs efforts gardés par sortie.
 import { lireReglage, ecrireReglage, toutesLesSorties, lireFichier, completerSortie } from './db.js';
 import { decoderFichier } from './fichier.js';
-import { pointsDetail, parSeconde, meilleursEfforts, estimerFtp, JOURS_ESTIMATION_FTP, VERSION_EFFORTS } from './analyse.js';
+import { pointsDetail, parSeconde, meilleursEfforts, estimerFtp, JOURS_ESTIMATION_FTP, VERSION_EFFORTS, puissanceNormalisee } from './analyse.js';
+import { estimerPuissance, estimationPossible, VERSION_ESTIMATION } from './puissance-estimee.js';
 
 export const FTP_DEFAUT_W = 236; // valeur du BiNavi (zones_target) au 12 oct. 2026
 export const POIDS_DEFAUT_KG = 98; // donné par Cyril le 4 nov. 2026
@@ -81,6 +82,46 @@ export async function enregistrerEfforts(s, pts) {
  * @param {object[]} sorties  modifiées en place (effortsW, effortsV)
  * @param {(fait: number, total: number) => void} progression
  */
+/** Puissance estimée d'une sortie sans capteur, à partir de ses points ; gardée dans la sortie */
+export function resumerEstimation(pts, poidsKg) {
+  const w = estimerPuissance(pts, poidsKg);
+  pts.forEach((p, i) => { if (w[i] !== null) p.puissanceEstimeeW = w[i]; });
+  const sec = parSeconde(pts, 'puissanceEstimeeW');
+  if (sec.length < 60) return null;
+  return {
+    moyW: Math.round(sec.reduce((a, v) => a + v, 0) / sec.length),
+    normW: Math.round(puissanceNormalisee(sec)),
+    v: VERSION_ESTIMATION,
+    poidsKg,
+  };
+}
+
+export const estimationAJour = (s, poidsKg) => s.puissanceEstimee?.v === VERSION_ESTIMATION && s.puissanceEstimee.poidsKg === poidsKg;
+
+let estimationsEnCours = null;
+/**
+ * Estime la puissance des sorties vélo sans capteur qui ne l'ont pas encore
+ * (ou avec un ancien poids). En arrière-plan ; un seul calcul à la fois.
+ */
+export function calculerEstimationsManquantes() {
+  if (!estimationsEnCours) {
+    estimationsEnCours = (async () => {
+      const { poidsKg } = await lireProfil();
+      const aFaire = (await toutesLesSorties()).filter((s) => estimationPossible(s) && !estimationAJour(s, poidsKg));
+      for (const s of aFaire) {
+        const f = await lireFichier(s.id);
+        let est = null;
+        try {
+          if (f) est = resumerEstimation(pointsDetail((await decoderFichier(f)).records), poidsKg);
+        } catch (e) { console.warn('Estimation impossible', s.id, e); }
+        await completerSortie(s.id, () => ({ puissanceEstimee: est ?? { v: VERSION_ESTIMATION, poidsKg, moyW: null, normW: null } }));
+      }
+      return aFaire.length;
+    })().finally(() => { estimationsEnCours = null; });
+  }
+  return estimationsEnCours;
+}
+
 export async function calculerEffortsManquants(sorties, progression = () => {}) {
   const aFaire = sorties.filter((s) => s.puissanceMoyW && !effortsAJour(s));
   let fait = 0;

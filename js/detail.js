@@ -6,10 +6,13 @@ import {
   pointsDetail, parSeconde, meilleursEfforts, intervalleTypiqueS, tempsParZone, chargeSortie,
   ZONES_PUISSANCE, ZONES_FC, PART_FTP_20_MIN,
 } from './analyse.js';
-import { lireProfil, enregistrerEfforts, lireVelos, wKg } from './profil.js';
+import { lireProfil, enregistrerEfforts, lireVelos, wKg, resumerEstimation, estimationAJour } from './profil.js';
+import { estimationPossible } from './puissance-estimee.js';
+import { memeParcoursQue } from './parcours.js';
+import { toutesLesSorties } from './db.js';
 import { htmlChoixVelo } from './velos.js';
 import { familleSortie } from './sortie.js';
-import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure } from './format.js';
+import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { afficherSegmentsSortie } from './segments.js';
 
@@ -20,6 +23,7 @@ const SERIES = [
   { champ: 'altitudeM', titre: 'Altitude', unite: 'm', dec: 0, couleur: 'var(--altitude)', aire: true, depuisZero: false },
   { champ: 'vitesseMs', titre: 'Vitesse', unite: 'km/h', facteur: 3.6, dec: 1, couleur: 'var(--accent-trait)', depuisZero: true },
   { champ: 'puissanceW', titre: 'Puissance', unite: 'W', dec: 0, couleur: 'var(--puissance)', depuisZero: true },
+  { champ: 'puissanceEstimeeW', titre: 'Puissance estimée', unite: 'W', dec: 0, couleur: 'var(--puissance)', depuisZero: true, estimee: true },
   { champ: 'fc', titre: 'Fréquence cardiaque', unite: 'bpm', dec: 0, couleur: 'var(--cardio)', depuisZero: false },
   { champ: 'cadence', titre: 'Cadence', unite: 'tr/min', dec: 0, couleur: 'var(--texte-2)', depuisZero: true },
 ];
@@ -41,7 +45,7 @@ const valeur = (v, unite, dec = 0) => (v == null ? null : `${nombre(v, dec)} ${u
 
 // ---- Chiffres ----------------------------------------------------------------
 
-function grilleChiffres(s, charge, pts) {
+function grilleChiffres(s, charge, pts, estimee = false) {
   const lignes = [];
   const ajout = (nom, val) => { if (val != null && val !== '') lignes.push(`<div class="detail"><dt>${nom}</dt><dd>${val}</dd></div>`); };
   const vitesses = pts.map((p) => p.vitesseMs).filter((v) => typeof v === 'number');
@@ -51,6 +55,10 @@ function grilleChiffres(s, charge, pts) {
   ajout('Temps total', s.dureeTotaleS != null ? chrono(s.dureeTotaleS) : null);
   ajout('Puissance moyenne', valeur(s.puissanceMoyW, 'W'));
   ajout('Puissance normalisée', valeur(s.puissanceNormW, 'W'));
+  if (estimee && s.puissanceEstimee) {
+    ajout('Puissance moy. estimée', `≈ ${s.puissanceEstimee.moyW} W`);
+    ajout('NP estimée', `≈ ${s.puissanceEstimee.normW} W`);
+  }
   ajout('Puissance max', valeur(s.puissanceMaxW, 'W'));
   ajout("Facteur d'intensité", charge.facteurIntensite != null ? nombre(charge.facteurIntensite, 2) : null);
   ajout('TSS', charge.tss != null ? nombre(charge.tss) : null);
@@ -324,6 +332,25 @@ function blocTours(tours) {
   </section>`;
 }
 
+// ---- Même parcours ------------------------------------------------------------------
+
+function htmlMemeParcours(s, groupe) {
+  const rang = groupe.findIndex((x) => x.id === s.id) + 1;
+  const lignes = groupe.map((x, k) => {
+    const w = x.puissanceNormW ? `${x.puissanceNormW} W NP` : x.puissanceEstimee?.normW ? `≈ ${x.puissanceEstimee.normW} W NP` : '';
+    const mesures = [x.vitesseMoyMs ? `${nombre(x.vitesseMoyMs * 3.6, 1)} km/h` : '', w, x.fcMoy ? `${x.fcMoy} bpm` : ''].filter(Boolean).join(' · ');
+    const etiquette = k === 0 ? '<span class="rang or">🏆 Meilleur temps</span>' : `<span class="rang${k > 2 ? ' discret' : ''}">${k + 1}e</span>`;
+    return `<a class="passage${x.id === s.id ? ' actuelle' : ''}" href="#sortie=${encodeURIComponent(x.id)}">
+      <span class="passage-nom">${fmtDateLongue.format(x.debut)}<small>${x.id === s.id ? 'Cette sortie' : echapper(x.nom || x.nomSport)}</small></span>
+      <span class="passage-temps">${chrono(x.dureeChronoS ?? 0)}${etiquette}</span>
+      <span class="passage-mesures">${mesures}</span></a>`;
+  }).join('');
+  return `<h2 class="bloc-titre">Même parcours</h2>
+    <p class="parcours-resume">Fait <b>${groupe.length} fois</b> · cette sortie : <b>${rang === 1 ? 'meilleur temps' : `${rang}e sur ${groupe.length}`}</b></p>
+    <div class="passages">${lignes}</div>
+    <p class="bloc-note">Sorties reconnues automatiquement : même départ, même arrivée, même tracé (à 150 m près), distance à 6 % près. Classement au temps en mouvement.</p>`;
+}
+
 // ---- Page ----------------------------------------------------------------------------
 
 /** Remplit `page` avec le détail de la sortie `id`. */
@@ -350,19 +377,32 @@ export async function afficherDetail(page, id, toast = () => {}) {
       console.warn('Fichier illisible', id, e);
     }
   }
+  // Pas de capteur de puissance : estimation (vitesse, pente, poids), gardée dans la sortie
+  const puissanceReelle = pts.some((p) => p.puissanceW > 0);
+  let estimee = false;
+  if (!puissanceReelle && estimationPossible(s) && pts.length > 1) {
+    const est = resumerEstimation(pts, profil.poidsKg);
+    if (est) {
+      estimee = true;
+      if (!estimationAJour(s, profil.poidsKg) || s.puissanceEstimee.normW !== est.normW) {
+        s.puissanceEstimee = est;
+        completerSortie(s.id, () => ({ puissanceEstimee: est })).catch(() => {});
+      }
+    }
+  }
   const charge = chargeSortie(s, profil.ftpW);
   const axe = axeX(pts);
   const avecGps = pts.filter((p) => typeof p.lat === 'number').length >= 2;
-  const puissance = pts.some((p) => p.puissanceW > 0) ? parSeconde(pts, 'puissanceW') : [];
-  const efforts = puissance.length ? meilleursEfforts(puissance) : {};
+  const puissance = puissanceReelle ? parSeconde(pts, 'puissanceW') : estimee ? parSeconde(pts, 'puissanceEstimeeW') : [];
+  const efforts = puissanceReelle ? meilleursEfforts(puissance) : {};
   const fcSec = parSeconde(pts, 'fc').filter((v) => v > 0);
   const intervalleS = intervalleTypiqueS(pts);
   const courbes = blocCourbes(pts, axe);
   const d = new Date(s.debut);
 
   const zonesP = puissance.length && profil.ftpW
-    ? blocZones('Zones de puissance', tempsParZone(puissance, ZONES_PUISSANCE, profil.ftpW), 'W', 'var(--puissance)',
-      `Avec ta FTP de ${profil.ftpW} W (à changer dans Réglages). Roue libre comprise dans Z1.`)
+    ? blocZones(estimee ? 'Zones de puissance (estimée)' : 'Zones de puissance', tempsParZone(puissance, ZONES_PUISSANCE, profil.ftpW), 'W', 'var(--puissance)',
+      `Avec ta FTP de ${profil.ftpW} W (à changer dans Réglages). Roue libre comprise dans Z1.${estimee ? ' Puissance estimée : à prendre comme un ordre de grandeur.' : ''}`)
     : '';
   const zonesFc = fcSec.length && profil.fcMaxBpm
     ? blocZones('Zones de fréquence cardiaque', tempsParZone(fcSec, ZONES_FC, profil.fcMaxBpm), 'bpm', 'var(--cardio)',
@@ -372,6 +412,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
   const notes = [
     charge.source === 'compteur' ? `IF et TSS calculés par le compteur avec une FTP de ${s.ftpCompteurW} W.` : '',
     charge.source === 'appli' ? `IF et TSS calculés par l'appli avec ta FTP de ${profil.ftpW} W.` : '',
+    estimee ? `Pas de capteur de puissance : puissance estimée avec la vitesse, la pente et ta masse (${profil.poidsKg} kg + 8 kg de vélo, CdA 0,32, Crr 0,004), sans vent. Écart possible d'environ 20 % ; pas comptée dans les records.` : '',
     s.sansTrace ? 'Sans trace (saisie à la main sur Strava ou fichier inutilisable) : chiffres repris de Strava.' : '',
     s.format === 'gpx' || s.format === 'tcx'
       ? `Fichier ${s.format.toUpperCase()}${s.source === 'strava' ? ' de Strava' : ''} : chiffres calculés depuis les points.` : '',
@@ -398,9 +439,10 @@ export async function afficherDetail(page, id, toast = () => {}) {
   </div>
   <div class="carte-parcours" id="carte-parcours" role="img" aria-label="Carte du parcours"${modeVue === '3d' ? ' hidden' : ''}></div>
   <div class="vue3d" id="vue3d"${modeVue === '3d' ? '' : ' hidden'}></div>` : ''}
-  ${grilleChiffres(s, charge, pts)}
+  ${grilleChiffres(s, charge, pts, estimee)}
   ${courbes.html}
   ${avecGps ? '<section class="carte bloc" id="bloc-segments-sortie"></section>' : ''}
+  <section class="carte bloc" id="bloc-meme-parcours" hidden></section>
   ${blocEfforts(efforts, intervalleS, profil.poidsKg)}
   ${zonesP}
   ${zonesFc}
@@ -441,6 +483,16 @@ export async function afficherDetail(page, id, toast = () => {}) {
   if (blocSegments) {
     const trace = vue3d?.trace ?? construireTrace(pts);
     afficherSegmentsSortie(blocSegments, s, pts, trace, () => indexCurseur, toast).catch((e) => console.warn('Segments', e));
+  }
+  // Même parcours : autres sorties identiques, classées au temps en mouvement
+  const blocParcours = page.querySelector('#bloc-meme-parcours');
+  if (blocParcours) {
+    toutesLesSorties().then((toutes) => {
+      const groupe = memeParcoursQue(s, toutes);
+      if (groupe.length < 2 || !blocParcours.isConnected) return;
+      blocParcours.innerHTML = htmlMemeParcours(s, groupe);
+      blocParcours.hidden = false;
+    }).catch((e) => console.warn('Même parcours', e));
   }
   page.querySelector('#choix-velo')?.addEventListener('change', async (e) => {
     await completerSortie(s.id, () => ({ veloId: e.target.value || null }));

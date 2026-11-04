@@ -4,6 +4,7 @@ import { toutesLesSorties } from './db.js';
 import { familleSortie } from './sortie.js';
 import { lireProfil, calculerEffortsManquants, wKg } from './profil.js';
 import { htmlListeSegments, suivreRecherche } from './segments.js';
+import { regrouperParcours } from './parcours.js';
 import { bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J } from './stats.js';
 import { DUREES_EFFORTS_S, JOURS_ESTIMATION_FTP } from './analyse.js';
 import { nombre, km, duree, echapper, majuscule, fmtDate } from './format.js';
@@ -189,7 +190,7 @@ function blocForme(sorties, profil, maintenantMs) {
       <span class="curseur" hidden></span>
     </div>
     <div class="courbes-x"><span>${debutTxt}</span><span>${finTxt}</span></div>
-    <p class="bloc-note">Charge de chaque jour = TSS des sorties avec puissance, calculé avec ta FTP actuelle (${profil.ftpW} W) ; les sorties sans capteur comptent pour 0.
+    <p class="bloc-note">Charge de chaque jour = TSS des sorties, calculé avec ta FTP actuelle (${profil.ftpW} W) ; sorties vélo sans capteur : puissance estimée (vitesse, pente, poids), les autres comptent pour 0.
     Forme = moyenne sur ${CONSTANTE_FORME_J} jours, fatigue = moyenne sur ${CONSTANTE_FATIGUE_J} jours, fraîcheur = forme − fatigue de la veille.</p>
   </section>`;
 }
@@ -262,6 +263,32 @@ function blocRecords(sorties, maintenantMs, enCours, poidsKg) {
   </section>`;
 }
 
+// ---- Mes parcours (sorties faites plusieurs fois) ------------------------------------
+
+let parcoursEnCache = { cle: '', html: '' };
+function htmlMesParcours(toutes) {
+  const cle = `${toutes.length}|${toutes.reduce((m, s) => Math.max(m, s.debut), 0)}`;
+  if (parcoursEnCache.cle === cle) return parcoursEnCache.html;
+  const groupes = regrouperParcours(toutes).slice(0, 15);
+  const nomDe = (g) => {
+    const noms = g.map((s) => s.nom).filter(Boolean);
+    const frequent = noms.sort((a, b) => noms.filter((x) => x === b).length - noms.filter((x) => x === a).length)[0];
+    return frequent || `${g[0].nomSport} de ${km(g[0].distanceM)} km`;
+  };
+  const html = `<section class="carte bloc" id="bloc-parcours">
+    <h2 class="bloc-titre">Mes parcours</h2>
+    ${groupes.length ? `<div class="passages">${groupes.map((g) => {
+      const recente = g.reduce((m, s) => (s.debut > m.debut ? s : m), g[0]);
+      return `<a class="passage" href="#sortie=${encodeURIComponent(recente.id)}">
+        <span class="passage-nom">${echapper(nomDe(g))}<small>${km(g[0].distanceM)} km · fait ${g.length} fois · dernière le ${fmtDate.format(recente.debut)}</small></span>
+        <span class="passage-temps">${duree(g[0].dureeChronoS)}<span class="rang discret">meilleur temps</span></span></a>`;
+    }).join('')}</div>` : '<p class="aide">Aucun parcours fait deux fois pour l\'instant.</p>'}
+    <p class="bloc-note">Sorties reconnues automatiquement quand le tracé est le même ; touche un parcours pour voir le classement de toutes tes sorties dessus.</p>
+  </section>`;
+  parcoursEnCache = { cle, html };
+  return html;
+}
+
 // ---- Page ----------------------------------------------------------------------------
 
 /**
@@ -288,7 +315,8 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
     ${blocBilans(sorties, maintenantMs)}
     ${blocForme(toutes, profil, maintenantMs)}
     ${blocRecords(sorties, maintenantMs, calcul, profil.poidsKg)}
-    ${segmentsHtml}`;
+    ${segmentsHtml}
+    ${htmlMesParcours(toutes)}`;
     installerCurseurForme(page, toutes, profil, maintenantMs);
   };
   rendre();
