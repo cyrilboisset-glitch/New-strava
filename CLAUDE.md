@@ -230,29 +230,28 @@ l'instant »** — à proposer quand il voudra :
 - **Liste des tâches à faire (demandée par Cyril le 4 nov. 2026), dans
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :
-  1. **Synchro Zepp pour les séances de musculation** (montre Amazfit
-     Active 3 Premium) : Zepp n'a pas d'accès ouvert ; voie probable :
-     Gadgetbridge (étape 5), mais la montre n'est alors plus avec Zepp.
-  2. **Choix des muscles avec un mannequin**, identique à l'appli de Cyril
+  (Synchro Zepp pour la musculation : RETIRÉE le 4 nov. 2026 à la demande
+  de Cyril, il ramènera ses séances de musculation à la main.)
+  1. **Choix des muscles avec un mannequin**, identique à l'appli de Cyril
      `cyrilboisset-glitch/Musculation-appli` (reprendre, ne pas modifier
      ce dépôt).
-  3. **Synchro des activités de l'appli « faux Zwift »**
+  2. **Synchro des activités de l'appli « faux Zwift »**
      (`cyrilboisset-glitch/Zwift`) : voir comment elle enregistre ses
      séances (FIT, GPX…). Ne jamais modifier le dépôt Zwift.
-  4. **Changer la nature d'une activité** (vélo, marche, musculation…), en
+  3. **Changer la nature d'une activité** (vélo, marche, musculation…), en
      recalculant ce qui en dépend (tri, totaux, vélo, puissance estimée).
-  5. **Bibliothèque de traces GPX avec conseil de sens selon le vent**
+  4. **Bibliothèque de traces GPX avec conseil de sens selon le vent**
      (fusion de `cyrilboisset-glitch/Appli-vent`) : prévision de vent =
      service météo en ligne, demander l'accord de Cyril (seule la zone
      du parcours serait envoyée).
-  6. **Fusion de Cycling Coach** (`cyrilboisset-glitch/Velo-coach`) et
+  5. **Fusion de Cycling Coach** (`cyrilboisset-glitch/Velo-coach`) et
      **envoi du suivi GPS en direct** pendant la sortie (pas un rapport).
      Lien probable avec le projet Suivi-direct (appli Flutter + page web
      pour la femme de Cyril). Limite : une appli web n'envoie plus la
      position écran éteint sur Android ; l'envoi fiable reste dans
      l'appli Flutter. À préciser avec Cyril : qui suit, d'où part la
      position.
-  7. **Segments en 3D** : afficher les segments sur la vue 3D (début et
+  6. **Segments en 3D** : afficher les segments sur la vue 3D (début et
      fin marqués sur le ruban, segment choisi mis en valeur, cadrage et
      survol du segment, comme l'examen détaillé de Parcours 3D).
 - **Lire les sorties directement sur le BiNavi** (sans Gadgetbridge ni
