@@ -159,7 +159,7 @@ async function texteToast(page) {
   await page.click('#btn-retour');
 
   // 2 ter. Réglages : FTP 250 W -> TSS de « Col du test » = 3600 × 0,8² / 36 = 64
-  await page.click('#btn-reglages');
+  await page.click('#onglet-profil');
   await page.waitForSelector('#champ-ftp');
   verif('FTP par défaut 236 W', (await page.inputValue('#champ-ftp')) === '236');
   verif('FC max : la plus haute relevée', (await page.getAttribute('#champ-fcmax', 'placeholder')) === '150');
@@ -171,12 +171,72 @@ async function texteToast(page) {
   await page.screenshot({ path: path.join(CAPTURES, 'reglages.png'), fullPage: true });
   await page.click('#btn-enregistrer');
   verif('réglages enregistrés', (await texteToast(page)).includes('FTP 250 W'));
-  await page.click('#btn-retour');
+  await page.click('#onglet-sorties');
   await page.waitForSelector('#accueil:not([hidden])');
   const col = (await page.textContent('a.sortie:has-text("Col du test")')).replace(/\s+/g, ' ');
   verif('TSS recalculé avec FTP 250 W', col.includes('TSS 64'), col);
   // Remise à 236 W pour la suite
   await page.evaluate(async () => (await import('./js/profil.js')).ecrireProfil({ ftpW: 236 }));
+
+  // 2 quater. Progrès : bilans, forme, records
+  await page.click('#onglet-progres');
+  await page.waitForSelector('#bloc-bilans');
+  verif('onglet Progrès actif', (await page.getAttribute('#onglet-progres', 'aria-current')) === 'page' && (await page.textContent('#titre-page')) === 'Progrès');
+  await page.click('[data-segments="type"] button[data-valeur="annee"]');
+  const annees = await page.$$eval('.barre-col', (els) => els.map((e) => e.getAttribute('aria-label')));
+  verif('années 2025 et 2026', annees.length === 2 && annees[0].startsWith('2025') && annees[1].startsWith('Cette année'), JSON.stringify(annees));
+  await page.click('.barre-col[data-i="0"]');
+  const bilan2025 = (await page.textContent('#bloc-bilans .stats')).replace(/\s+/g, '');
+  // 30 + 30 + 1,8 + 0,1 + 25 + 5,2 km ; 3600 + 3600 + 600 + 60 + 3540 + 2700 + 4200 s ; 400 + 180 + 40 m
+  verif('bilan 2025 : 92,1 km, 5 h 05, 620 m, 7 sorties', bilan2025 === 'Distance92,1kmTemps5h05Dénivelé620mSorties7', bilan2025);
+  await page.click('[data-segments="metrique"] button[data-valeur="denivele"]');
+  verif('barre 2025 toujours choisie après changement de mesure', (await page.getAttribute('.barre-col[data-i="0"]', 'aria-pressed')) === 'true');
+  verif('forme et fatigue affichées', !!(await page.$('#forme-graph .ligne-forme')) && (await page.textContent('#bloc-forme')).includes('Fraîcheur'));
+  await page.waitForFunction(() => !document.getElementById('records-progression'), null, { timeout: 30000 });
+  const recordsTxt = (await page.textContent('#bloc-records table')).replace(/\s+/g, ' ');
+  for (const m of ['5 s 250 W20 avr. 2025', '20 min 200 W10 mai 2025', '1 h 200 W10 mai 2025']) verif(`record « ${m} »`, recordsTxt.includes(m), recordsTxt);
+  verif('courbe de puissance', !!(await page.$('.ligne-record')));
+  await page.click('[data-segments="type"] button[data-valeur="semaine"]');
+  await page.screenshot({ path: path.join(CAPTURES, 'progres-sombre.png'), fullPage: true });
+  verif('Progrès : pas de défilement horizontal', !(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)));
+  // Lien d'un record vers sa sortie, puis retour sur Progrès
+  await page.click('#bloc-records a >> nth=0');
+  await page.waitForSelector('#page-detail .detail-nom');
+  await page.click('#btn-retour');
+  await page.waitForSelector('#bloc-bilans');
+  verif('retour du détail vers Progrès', page.url().endsWith('#progres'), page.url());
+
+  // 2 quinquies. Sauvegarde puis restauration sur un téléphone « vide »
+  await page.click('#onglet-profil');
+  await page.waitForSelector('#btn-sauvegarder');
+  const [telechargement] = await Promise.all([page.waitForEvent('download'), page.click('#btn-sauvegarder')]);
+  const cheminZip = path.join(CAPTURES, 'sauvegarde-test.zip');
+  await telechargement.saveAs(cheminZip);
+  verif('nom du fichier de sauvegarde', /^mes-sorties-sauvegarde-\d{4}-\d{2}-\d{2}\.zip$/.test(telechargement.suggestedFilename()), telechargement.suggestedFilename());
+  const sauvegarde = await JSZip.loadAsync(fs.readFileSync(cheminZip));
+  const index = JSON.parse(await sauvegarde.file('sauvegarde-mes-sorties.json').async('string'));
+  verif('sauvegarde : 7 sorties, 3 fichiers, FTP', index.sorties.length === 7 && Object.keys(sauvegarde.files).filter((n) => n.startsWith('fichiers/') && !n.endsWith('/')).length === 3 && index.reglages.ftpW === 236,
+    `${index.sorties.length} sorties, ${Object.keys(sauvegarde.files)}`);
+  verif('date de dernière sauvegarde', (await page.textContent('#sauvegarde-date')).includes("à l'instant"));
+  await page.screenshot({ path: path.join(CAPTURES, 'profil.png'), fullPage: true });
+  await page.evaluate(async () => {
+    const req = indexedDB.open('mes-sorties', 1);
+    const db = await new Promise((r) => { req.onsuccess = () => r(req.result); });
+    const tx = db.transaction(['sorties', 'fichiers'], 'readwrite');
+    tx.objectStore('sorties').clear(); tx.objectStore('fichiers').clear();
+    await new Promise((r) => { tx.oncomplete = r; });
+  });
+  await page.setInputFiles('#champ-fichier', cheminZip);
+  const tr = await texteToast(page);
+  verif('restauration : 7 nouvelles sorties', tr.includes('7 nouvelles sorties') && !tr.includes('illisible'), tr);
+  await page.setInputFiles('#champ-fichier', cheminZip);
+  verif('restauration en double : rien de nouveau', (await texteToast(page)).includes('7 déjà connues'));
+  await page.click('#onglet-sorties');
+  await page.click('a.sortie:has-text("Col du test")');
+  await page.waitForSelector('#page-detail .courbe');
+  verif('détail après restauration (fichier GPX repris)', (await page.$$('.courbe')).length === 5);
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
 
   // Lien direct vers un détail (appli rouverte sur la page)
   await page.goto(URL_APPLI + '#sortie=strava-333');
@@ -201,10 +261,10 @@ async function texteToast(page) {
   verif('réimport : aucune nouvelle, 7 déjà connues', t2.includes('Aucune nouvelle sortie') && t2.includes('7 déjà connues'), t2);
 
   // 4. Tri par activité
-  const filtres = async () => page.$$eval('.filtre', (els) => els.map((e) => `${e.textContent.replace(/\s+/g, ' ').trim()}${e.getAttribute('aria-pressed') === 'true' ? '*' : ''}`));
+  const filtres = async () => page.$$eval('#filtres .filtre', (els) => els.map((e) => `${e.textContent.replace(/\s+/g, ' ').trim()}${e.getAttribute('aria-pressed') === 'true' ? '*' : ''}`));
   const f1 = await filtres();
   verif('boutons de tri', JSON.stringify(f1) === JSON.stringify(['Tout 7*', 'Vélo 4', 'Course à pied 1', 'Marche 1', 'Musculation 1']), JSON.stringify(f1));
-  await page.click('.filtre:has-text("Vélo")');
+  await page.click('#filtres .filtre:has-text("Vélo")');
   await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
   const noms = await page.$$eval('.sortie-nom', (els) => els.map((e) => e.textContent));
   verif('Vélo : 4 sorties', JSON.stringify(noms) === JSON.stringify(['Sortie du matin', 'Col du test', 'Home trainer sans capteur', 'Fichier vide']), JSON.stringify(noms));
@@ -215,7 +275,7 @@ async function texteToast(page) {
   await page.reload();
   await page.waitForSelector('.filtre');
   verif('tri gardé après réouverture', (await filtres())[1] === 'Vélo 4*' && (await page.$$('.sortie')).length === 4, JSON.stringify(await filtres()));
-  await page.click('.filtre:has-text("Musculation")');
+  await page.click('#filtres .filtre:has-text("Musculation")');
   await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 1);
   verif('Musculation : la séance', (await page.textContent('.sortie-nom')) === 'Séance haut du corps');
   await page.screenshot({ path: path.join(CAPTURES, 'strava-3-tri-musculation.png') });
@@ -238,7 +298,7 @@ async function texteToast(page) {
   verif('réimport sans doublon', (await texteToast(page)).includes('Aucune nouvelle sortie'));
   const f2 = await filtres();
   verif('réimport : remise dans Musculation', f2.includes('Musculation 1') && !f2.some((f) => f.startsWith('Entraînement')), JSON.stringify(f2));
-  await page.click('.filtre:has-text("Tout")');
+  await page.click('#filtres .filtre:has-text("Tout")');
 
   // 6. Un .gpx seul (hors archive) : nom pris dans le fichier
   await page.evaluate(async () => {

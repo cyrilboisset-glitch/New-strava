@@ -46,7 +46,7 @@ de le relancer.
 | 1 bis | Import de l'archive Strava (FIT, GPX, TCX, CSV) | **Fait** |
 | 1 ter | Tri de la liste par activité (Vélo, Marche, Musculation…) | **Fait** |
 | 2 | Détail d'une sortie : carte, courbes, zones, FTP réglable | **Fait** |
-| 3 | Historique et charge d'entraînement (forme / fatigue) | À faire |
+| 3 | Progrès : bilans, forme / fatigue, records ; sauvegarde ; nouveau design à onglets | **Fait** |
 | 4 | Générateur de traces GPX, envoi au BiNavi via Gadgetbridge | À faire |
 | 5 | Séances de la montre Amazfit Active 3 Premium | À faire |
 
@@ -56,6 +56,7 @@ de le relancer.
 node tests/test-fit.mjs
 node tests/test-strava.mjs
 node tests/test-analyse.mjs
+TZ=Europe/Paris node tests/test-stats.mjs
 node tests/test-strava-navigateur.cjs
 ```
 

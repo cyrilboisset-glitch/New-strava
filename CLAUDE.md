@@ -80,7 +80,11 @@ js/app.js                   Carte de synchro, liste par mois, navigation (#sorti
 js/detail.js                Page de détail : carte Leaflet, courbes + curseur, efforts, zones, tours
 js/analyse.js               Calculs (sans navigateur) : points, NP, efforts, zones, IF/TSS, FTP estimée
 js/profil.js                FTP / FC max (réglages), efforts gardés par sortie, estimation de FTP
-js/reglages.js              Page Réglages
+js/reglages.js              Onglet Profil : FTP, FC max, sauvegarde, place utilisée
+js/progres.js               Onglet Progrès : bilans, forme / fatigue, records, courbe de puissance
+js/stats.js                 Calculs de Progrès (sans navigateur) : périodes, CTL/ATL/TSB, records
+js/sauvegarde.js            Export zip (index JSON + fichiers d'origine) et restauration
+js/icones.js                Icônes de sport
 js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
 js/format.js                Mise en forme (nombres, durées, dates)
 vendor/leaflet/             Leaflet 1.9.4 (BSD-2) ; fond OSM chargé en ligne
@@ -95,6 +99,7 @@ tests/test-navigateur.cjs   Appli complète dans Chromium à 390 px (Playwright)
                             tests/captures/ (non versionné)
 tests/test-strava.mjs       CSV, dates, GPX/TCX, calculs (données fabriquées)
 tests/test-analyse.mjs      Efforts, zones, IF/TSS, FTP estimée (valeurs connues)
+tests/test-stats.mjs        Bilans, forme / fatigue, records (TZ=Europe/Paris)
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
 tests/fausse-archive.mjs    Fabrique GPX, TCX, FIT et CSV aux valeurs connues
 tests/donnees/              Sorties réelles, NON versionnées : sans elles les
@@ -125,9 +130,18 @@ l'instant »** — à proposer quand il voudra :
   (Weight Training / Workout de Strava). Cyril avait déjà importé son
   archive avec la v0.2 : il doit la **réimporter une fois** pour que ses
   séances de musculation quittent « Entraînement » (pas de doublon).
-- **Sauvegarde / export des sorties** : proposée, Cyril a répondu « la
-  sauvegarde est déjà sur l'appli » (les données ne sont pourtant que
-  dans Chrome du téléphone). Ne pas insister, en reparler à l'étape 3.
+- **Étape 3 : FAITE le 4 nov. 2026** (v0.5.0), avec sauvegarde et nouveau
+  design demandé par Cyril (« plus appli Strava ») : onglets en bas
+  (Sorties, Progrès, Profil), cartes de sortie avec libellés et grand
+  aperçu du parcours. Ergonomie inspirée des applis de sport, mais nos
+  couleurs et notre nom (pas de copie de la marque Strava).
+  Progrès : bilans semaines / mois / années (barres touchables), forme
+  (CTL 42 j) / fatigue (ATL 7 j) / fraîcheur (TSB = veille), records et
+  courbe de puissance (efforts recalculés une fois pour toutes les
+  sorties : VERSION_EFFORTS). Sauvegarde : Profil → Exporter (zip dans
+  Téléchargements) ; restauration par « Importer un fichier ».
+  Attention : la classe CSS `.barre` est la barre du haut (ne pas la
+  réutiliser ; les barres du bilan sont `.bilan-barre`).
 - **Étape 2 (détail) : FAITE le 4 nov. 2026** (v0.4.0). Toucher une sortie
   ouvre sa page (#sortie=id). Courbes : altitude, vitesse, puissance, FC,
   cadence (moyenne par colonne, 300 colonnes) ; curseur commun + point sur

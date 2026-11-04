@@ -1,7 +1,10 @@
-// Page Réglages : FTP (avec estimation depuis les sorties) et FC max.
+// Page Profil : FTP (avec estimation depuis les sorties), FC max,
+// sauvegarde des sorties et place utilisée.
 import { lireProfil, ecrireProfil, estimerMaFtp } from './profil.js';
+import { creerSauvegarde, telecharger } from './sauvegarde.js';
+import { toutesLesSorties, lireReglage } from './db.js';
 import { ZONES_PUISSANCE, JOURS_ESTIMATION_FTP } from './analyse.js';
-import { nombre, echapper, fmtDate } from './format.js';
+import { nombre, echapper, fmtDate, ilYA } from './format.js';
 
 function tableauZones(ftpW) {
   if (!ftpW) return '';
@@ -20,6 +23,8 @@ function tableauZones(ftpW) {
  */
 export async function afficherReglages(page, toast) {
   const profil = await lireProfil();
+  const derniere = await lireReglage('derniereSauvegarde');
+  const nbSorties = (await toutesLesSorties()).length;
   page.innerHTML = `
   <section class="carte reglages">
     <h2 class="bloc-titre">Puissance</h2>
@@ -42,7 +47,24 @@ export async function afficherReglages(page, toast) {
     <p class="aide">${profil.fcMaxReglee || !profil.fcMaxBpm ? 'Sert aux zones de fréquence cardiaque.' : `Non réglée : l'appli prend la plus haute relevée dans tes sorties (${profil.fcMaxBpm} bpm).`}</p>
   </section>
 
-  <button id="btn-enregistrer" class="btn principal large" type="button">Enregistrer</button>`;
+  <button id="btn-enregistrer" class="btn principal large" type="button">Enregistrer les réglages</button>
+
+  <section class="carte reglages" id="bloc-sauvegarde">
+    <h2 class="bloc-titre">Sauvegarde</h2>
+    <p class="aide">Tes sorties ne sont gardées que sur ce téléphone, dans Chrome. Exporte une sauvegarde de temps en temps
+      et copie-la ailleurs (PC, Google Drive). Pour la remettre : onglet Sorties → Importer un fichier → ce zip.</p>
+    <p class="sauvegarde-date" id="sauvegarde-date">${derniere ? `Dernière sauvegarde ${ilYA(derniere)}.` : 'Aucune sauvegarde pour l\'instant.'}</p>
+    <div class="synchro-actions">
+      <button id="btn-sauvegarder" class="btn principal" type="button">Exporter une sauvegarde</button>
+      <button id="btn-restaurer" class="btn secondaire" type="button">Restaurer</button>
+    </div>
+    <p class="progression" id="sauvegarde-etat" hidden></p>
+  </section>
+
+  <section class="carte reglages">
+    <h2 class="bloc-titre">Données</h2>
+    <p class="aide" id="donnees">${nbSorties} sortie${nbSorties > 1 ? 's' : ''} sur ce téléphone.</p>
+  </section>`;
 
   const champFtp = page.querySelector('#champ-ftp');
   const champFc = page.querySelector('#champ-fcmax');
@@ -77,6 +99,32 @@ export async function afficherReglages(page, toast) {
     } catch (err) {
       console.error(err);
       estimation.textContent = `Estimation impossible : ${err.message}`;
+    } finally {
+      bouton.disabled = false;
+    }
+  });
+
+  // Place utilisée (approximative, donnée par le navigateur)
+  navigator.storage?.estimate?.().then(async (e) => {
+    const persistant = await navigator.storage.persisted?.();
+    const mo = e.usage / 1e6;
+    page.querySelector('#donnees').textContent += ` Place utilisée : environ ${nombre(mo, mo < 10 ? 1 : 0)} Mo.${persistant ? ' Stockage protégé : Chrome ne l\'effacera pas de lui-même.' : ''}`;
+  }).catch(() => {});
+
+  page.querySelector('#btn-restaurer').addEventListener('click', () => document.getElementById('champ-fichier').click());
+  page.querySelector('#btn-sauvegarder').addEventListener('click', async (e) => {
+    const bouton = e.currentTarget;
+    const etatTxt = page.querySelector('#sauvegarde-etat');
+    bouton.disabled = true;
+    etatTxt.hidden = false;
+    try {
+      const { blob, nomFichier, nbSorties: n } = await creerSauvegarde((t) => { etatTxt.textContent = t; });
+      telecharger(blob, nomFichier);
+      etatTxt.textContent = `${nomFichier} : ${n} sorties, ${nombre(blob.size / 1e6, 1)} Mo. Enregistré dans Téléchargements.`;
+      page.querySelector('#sauvegarde-date').textContent = "Dernière sauvegarde à l'instant.";
+    } catch (err) {
+      console.error(err);
+      etatTxt.textContent = `Sauvegarde impossible : ${err.message}`;
     } finally {
       bouton.disabled = false;
     }
