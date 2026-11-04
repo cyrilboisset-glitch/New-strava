@@ -231,7 +231,11 @@ l'instant »** — à proposer quand il voudra :
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :
   (Synchro Zepp pour la musculation : RETIRÉE le 4 nov. 2026 à la demande
-  de Cyril, il ramènera ses séances de musculation à la main.)
+  de Cyril, il ramènera ses séances de musculation à la main, **en
+  important un fichier exporté depuis Zepp**. Format à vérifier sur un
+  exemple fourni par Cyril avant de coder : export d'une séance (partage
+  depuis l'appli Zepp) ou export du compte Zepp (zip de CSV) ; ne pas
+  supposer le format.)
   1. **Choix des muscles avec un mannequin**, identique à l'appli de Cyril
      `cyrilboisset-glitch/Musculation-appli` (reprendre, ne pas modifier
      ce dépôt).
