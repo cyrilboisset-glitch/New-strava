@@ -59,8 +59,9 @@ async function texteToast(page) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark', timezoneId: 'Europe/Paris', locale: 'fr-FR' });
   const erreursConsole = [];
+  await ctx.route(/tile\.openstreetmap\.org/, (r) => r.abort());
   const page = await ctx.newPage();
-  page.on('console', (m) => { if (m.type() === 'error') erreursConsole.push(m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|tile\.openstreetmap/.test(m.text() + (m.location()?.url ?? ''))) erreursConsole.push(m.text()); });
   page.on('pageerror', (e) => erreursConsole.push(e.message));
   await page.goto(URL_APPLI);
   await page.waitForFunction(() => document.getElementById('synchro-titre').textContent !== 'Chargement…');
@@ -81,17 +82,23 @@ async function texteToast(page) {
   const trouve = (nom) => sorties.find((s) => s.includes(nom)) ?? '';
   const attendus = {
     'Sortie du matin': ['Dim. 1 juin · 10:00', '30,0km', '1 h 00', '400m D+', '200 W NP', 'Vélo de route'],
-    'Col du test': ['Sam. 10 mai · 09:00', '30,0km', '1 h 00', '180m D+', '200 W NP', '140 bpm', '30,0 km/h', 'Fichier GPX de Strava', '3 601 points'],
+    'Col du test': ['Sam. 10 mai · 09:00', '30,0km', '1 h 00', '180m D+', '200 W NP', 'TSS 72', '140 bpm', '30,0 km/h', 'Fichier GPX de Strava', '3 601 points'],
     Footing: ['Dim. 20 avr. · 11:00', '1,8km', '10 min', '250 W', '150 bpm', 'Course à pied', 'Fichier TCX de Strava'],
     'Home trainer sans capteur': ['Lun. 3 mars · 19:15', '25,0km', '59 min', 'Vélo virtuel', 'Sans trace'],
     'Fichier vide': ['Dim. 2 févr. · 11:00', '0,1km', '1 min'],
     'Séance haut du corps': ['Mer. 5 mars · 18:00', '45 min', 'Musculation'],
     Balade: ['Sam. 8 févr. · 14:00', '5,2km', '1 h 10', '40m D+', 'Marche'],
   };
+  // Chaque sortie : sa carte dans la liste + sa page de détail
   for (const [nom, morceaux] of Object.entries(attendus)) {
     const s = trouve(nom);
     verif(`« ${nom} » présente`, !!s);
-    for (const m of morceaux) verif(`  « ${nom} » : ${m}`, s.includes(m), s);
+    await page.click(`a.sortie:has-text("${nom}")`);
+    await page.waitForSelector('#page-detail .detail-nom');
+    const detail = (await page.textContent('#page-detail')).replace(/\s+/g, ' ');
+    for (const m of morceaux) verif(`  « ${nom} » : ${m}`, (s + ' ' + detail).includes(m), s + ' || ' + detail);
+    await page.click('#btn-retour');
+    await page.waitForSelector('#accueil:not([hidden])');
   }
   const mois = await page.$$eval('.mois-titre', (els) => els.map((e) => e.textContent));
   verif('mois', JSON.stringify(mois) === JSON.stringify(['Juin 2025', 'Mai 2025', 'Avril 2025', 'Mars 2025', 'Février 2025']), JSON.stringify(mois));
@@ -105,8 +112,87 @@ async function texteToast(page) {
   });
   verif('fichiers stockés', JSON.stringify(fichiers) === JSON.stringify(['1234-1748764800000:fit:brut', 'strava-222:gpx:brut', 'strava-333:tcx:gz']), JSON.stringify(fichiers));
 
-  await page.click('.sortie summary');
   await page.screenshot({ path: path.join(CAPTURES, 'strava-1-liste.png'), fullPage: true });
+
+  // 2 bis. Détail de « Col du test » : carte, courbes, curseur, efforts, zones
+  await page.click('a.sortie:has-text("Col du test")');
+  await page.waitForSelector('#page-detail .courbe');
+  verif('adresse du détail', page.url().includes('#sortie=strava-222'), page.url());
+  verif('titre de la barre', (await page.textContent('#titre-page')) === 'Sortie');
+  verif('carte du parcours avec la trace', await page.$eval('#carte-parcours', (c) => !!c.querySelector('path.leaflet-interactive')));
+  const courbes = await page.$$eval('.courbe-titre', (els) => els.map((e) => e.textContent.trim()));
+  verif('courbes', JSON.stringify(courbes) === JSON.stringify(['Altitude', 'Vitesse', 'Puissance', 'Fréquence cardiaque', 'Cadence']), JSON.stringify(courbes));
+  const valeurs = await page.$$eval('.courbe-valeur', (els) => els.map((e) => e.textContent));
+  verif('moyennes par défaut', JSON.stringify(valeurs) === JSON.stringify(['', 'moy. 30,0 km/h', 'moy. 200 W', 'moy. 140 bpm', 'moy. 90 tr/min']), JSON.stringify(valeurs));
+  // Doigt posé au milieu de la courbe de puissance
+  const zone = await page.$('.courbe[data-champ="puissanceW"] .courbe-zone');
+  await zone.scrollIntoViewIfNeeded();
+  const r = await zone.boundingBox();
+  await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+  const position = await page.textContent('.courbes-position');
+  verif('curseur au milieu : 15 km, 30 min', position.replace(/\s+/g, ' ') === '15,0 km · 30:00', position);
+  const auCurseur = await page.$$eval('.courbe-valeur', (els) => els.map((e) => e.textContent));
+  verif('valeurs au curseur', JSON.stringify(auCurseur) === JSON.stringify(['280 m', '30,0 km/h', '200 W', '140 bpm', '90 tr/min']), JSON.stringify(auCurseur));
+  verif('curseur visible sur toutes les courbes', (await page.$$('.curseur:not([hidden])')).length === 5);
+  verif('point du curseur sur la carte', await page.evaluate(() => [...document.querySelectorAll('#carte-parcours path.leaflet-interactive')].length >= 4));
+  const detail = (await page.textContent('#page-detail')).replace(/\s+/g, ' ');
+  for (const m of ['5 s200W', '1 min200W', '20 min200W', '1 h200W', 'Puissance normalisée200 W', "Facteur d'intensité0,85", 'TSS72',
+    'Z3 Tempo178–212 W 1 h 00100 %', 'Z5 Maximum> 135 bpm 1 h 00100 %', 'FTP de 236 W', 'FC max de 150 bpm (la plus haute relevée']) {
+    verif(`détail : « ${m} »`, detail.includes(m), detail);
+  }
+  await page.mouse.move(5, 5);
+  await page.screenshot({ path: path.join(CAPTURES, 'detail-1-sombre.png'), fullPage: true });
+  verif('détail : pas de défilement horizontal', !(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)));
+  // Efforts gardés dans la sortie (pour l'estimation de la FTP)
+  const efforts = await page.evaluate(async () => (await (await import('./js/db.js')).lireSortie('strava-222')).effortsW);
+  verif('efforts gardés', efforts?.[1200] === 200, JSON.stringify(efforts));
+
+  // Retour : la liste revient à la même place
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  verif('retour à la liste', !page.url().includes('#sortie'), page.url());
+
+  // Sortie sans trace : pas de carte ni de courbes
+  await page.click('a.sortie:has-text("Home trainer sans capteur")');
+  await page.waitForSelector('#page-detail .detail-nom');
+  verif('sans trace : ni carte ni courbes', !(await page.$('#carte-parcours')) && !(await page.$('.courbe')));
+  await page.click('#btn-retour');
+
+  // 2 ter. Réglages : FTP 250 W -> TSS de « Col du test » = 3600 × 0,8² / 36 = 64
+  await page.click('#btn-reglages');
+  await page.waitForSelector('#champ-ftp');
+  verif('FTP par défaut 236 W', (await page.inputValue('#champ-ftp')) === '236');
+  verif('FC max : la plus haute relevée', (await page.getAttribute('#champ-fcmax', 'placeholder')) === '150');
+  await page.click('#btn-estimer');
+  await page.waitForFunction(() => !document.getElementById('estimation').textContent.includes('Calcul'));
+  verif('estimation sans sortie récente', (await page.textContent('#estimation')).includes('Aucune sortie avec capteur de puissance'));
+  await page.fill('#champ-ftp', '250');
+  verif('zones recalculées en direct', (await page.textContent('#zones-reglages')).includes('Z4 Seuil226–263 W'), await page.textContent('#zones-reglages'));
+  await page.screenshot({ path: path.join(CAPTURES, 'reglages.png'), fullPage: true });
+  await page.click('#btn-enregistrer');
+  verif('réglages enregistrés', (await texteToast(page)).includes('FTP 250 W'));
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  const col = (await page.textContent('a.sortie:has-text("Col du test")')).replace(/\s+/g, ' ');
+  verif('TSS recalculé avec FTP 250 W', col.includes('TSS 64'), col);
+  // Remise à 236 W pour la suite
+  await page.evaluate(async () => (await import('./js/profil.js')).ecrireProfil({ ftpW: 236 }));
+
+  // Lien direct vers un détail (appli rouverte sur la page)
+  await page.goto(URL_APPLI + '#sortie=strava-333');
+  await page.waitForSelector('#page-detail .courbe');
+  verif('ouverture directe du détail', (await page.textContent('.detail-nom')) === 'Footing');
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+
+  // Détail en thème clair
+  const pageClaire = await ctx.newPage();
+  await pageClaire.emulateMedia({ colorScheme: 'light' });
+  await pageClaire.goto(URL_APPLI + '#sortie=1234-1748764800000');
+  await pageClaire.waitForSelector('#page-detail .courbe');
+  await pageClaire.waitForTimeout(300);
+  await pageClaire.screenshot({ path: path.join(CAPTURES, 'detail-2-clair.png'), fullPage: true });
+  await pageClaire.close();
   verif('pas de défilement horizontal', !(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)));
 
   // 3. Même archive une seconde fois : rien de nouveau
@@ -165,6 +251,18 @@ async function texteToast(page) {
   await page.setInputFiles('#champ-fichier', { name: 'sortie.gpx.gz', mimeType: 'application/gzip', buffer: zlib.gzipSync(Buffer.from(fauxGpx())) });
   verif('.gpx.gz seul importé', (await texteToast(page)).includes('1 nouvelle sortie'));
   verif('nom pris dans le GPX, type déduit', (await page.textContent('.sortie')).replace(/\s+/g, ' ').includes('Nom dans le GPX'));
+
+  // 7. Hors ligne : la liste et le détail (trace, courbes) restent disponibles
+  await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active, null, { timeout: 15000 });
+  await page.reload();
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await ctx.setOffline(true);
+  await page.reload();
+  await page.waitForSelector('a.sortie', { timeout: 10000 });
+  await page.click('a.sortie');
+  await page.waitForSelector('#page-detail .courbe', { timeout: 10000 });
+  verif('hors ligne : détail avec trace et courbes', !!(await page.$('#carte-parcours path.leaflet-interactive')) && (await page.$$('.courbe')).length === 5);
+  await ctx.setOffline(false);
 
   verif('aucune erreur dans la console', erreursConsole.length === 0, erreursConsole.join(' | '));
   await browser.close();

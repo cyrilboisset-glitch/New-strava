@@ -1,12 +1,18 @@
-// Interface : carte de synchronisation + liste des sorties par mois.
+// Interface : carte de synchronisation + liste des sorties par mois, et
+// navigation vers le détail d'une sortie (#sortie=…) et les réglages (#reglages).
 import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages } from './db.js';
 import { familleSortie } from './sortie.js';
+import { chargeSortie } from './analyse.js';
+import { lireProfil } from './profil.js';
+import { afficherDetail, fermerDetail } from './detail.js';
+import { afficherReglages } from './reglages.js';
+import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
   importerFichiers, dossierPossible, choisirDossier, dossierMemorise,
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.3.0 · tri par activité';
+export const VERSION_APPLI = '0.4.0 · détail des sorties';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -14,45 +20,14 @@ const el = {
   progression: $('progression'), btnDossier: $('btn-dossier'), btnSynchro: $('btn-synchro'),
   btnHaut: $('btn-synchro-haut'), btnImporter: $('btn-importer'), champ: $('champ-fichier'),
   btnChanger: $('btn-changer-dossier'), liste: $('liste'), filtres: $('filtres'), vide: $('vide'), toast: $('toast'),
+  accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'),
+  titrePage: $('titre-page'), btnRetour: $('btn-retour'),
 };
 
 let dossier = null;
 let occupe = false;
 let rechargerApres = false; // nouvelle version arrivée pendant un import
 let filtre = 'tout'; // famille d'activités affichée (clé de familleSortie)
-
-// ---- Formats -------------------------------------------------------------
-
-const fmtJour = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-const fmtHeure = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
-const fmtMois = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' });
-const fmtDateCourte = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-const nombre = (v, dec = 0) => v.toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-const km = (m) => nombre(m / 1000, m < 100000 ? 1 : 0);
-
-function duree(s) {
-  if (s == null) return '–';
-  const totalMin = Math.round(s / 60);
-  if (totalMin < 60) return `${totalMin} min`;
-  const h = Math.floor(totalMin / 60);
-  return `${h} h ${String(totalMin % 60).padStart(2, '0')}`;
-}
-
-function ilYA(t) {
-  const min = Math.round((Date.now() - t) / 60000);
-  if (min < 1) return "à l'instant";
-  if (min < 60) return `il y a ${min} min`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `il y a ${h} h`;
-  return `le ${fmtDateCourte.format(t)}`;
-}
-
-const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
-
-function echapper(t) {
-  return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
 
 // ---- Vignette de trace ----------------------------------------------------
 
@@ -79,39 +54,17 @@ function vignette(trace) {
 
 // ---- Liste -----------------------------------------------------------------
 
-function carteSortie(s) {
+function carteSortie(s, profil) {
   const d = new Date(s.debut);
   const effort = [];
+  const { tss } = chargeSortie(s, profil.ftpW);
   if (s.puissanceNormW) effort.push(`<span><span class="p">${s.puissanceNormW} W</span> NP</span>`);
   else if (s.puissanceMoyW) effort.push(`<span><span class="p">${s.puissanceMoyW} W</span> moy.</span>`);
-  if (s.tss != null) effort.push(`<span>TSS ${nombre(s.tss)}</span>`);
+  if (tss != null) effort.push(`<span>TSS ${nombre(tss)}</span>`);
   if (s.fcMoy) effort.push(`<span><span class="c">${s.fcMoy}</span> bpm</span>`);
 
-  const details = [];
-  const ajout = (nom, val) => { if (val != null && val !== '') details.push(`<div class="detail"><dt>${nom}</dt><dd>${val}</dd></div>`); };
-  if (s.nom) ajout('Type', echapper(s.nomSport));
-  ajout('Vitesse moyenne', s.vitesseMoyMs != null ? `${nombre(s.vitesseMoyMs * 3.6, 1)} km/h` : null);
-  ajout('Temps total', s.dureeTotaleS != null ? duree(s.dureeTotaleS) : null);
-  ajout('Puissance moyenne', s.puissanceMoyW != null ? `${s.puissanceMoyW} W` : null);
-  ajout('Puissance max', s.puissanceMaxW != null ? `${s.puissanceMaxW} W` : null);
-  ajout("Facteur d'intensité", s.facteurIntensite != null ? nombre(s.facteurIntensite, 2) : null);
-  ajout('FC max', s.fcMax != null ? `${s.fcMax} bpm` : null);
-  ajout('Cadence moyenne', s.cadenceMoy != null ? `${s.cadenceMoy} tr/min` : null);
-  ajout('Calories', s.calories != null ? `${nombre(s.calories)} kcal` : null);
-  ajout('Température moy.', s.temperatureMoy != null ? `${s.temperatureMoy} °C` : null);
-  ajout('Tours', s.nbTours || null);
-  const note = [
-    s.ftpCompteurW ? `IF et TSS calculés par le compteur avec une FTP de ${s.ftpCompteurW} W.` : '',
-    s.sansTrace ? 'Sans trace (saisie à la main sur Strava ou fichier inutilisable) : chiffres repris de Strava.' : '',
-    s.format === 'gpx' || s.format === 'tcx'
-      ? `Fichier ${s.format.toUpperCase()}${s.source === 'strava' ? ' de Strava' : ''} : chiffres calculés depuis les points.` : '',
-    s.source === 'strava' && !s.sansTrace && s.format === 'fit' ? 'Fichier FIT récupéré dans l\'archive Strava.' : '',
-    s.nbPoints ? `${nombre(s.nbPoints)} points enregistrés.` : '',
-  ].filter(Boolean).join(' ');
-
   return `
-  <details class="sortie">
-    <summary class="sortie-tete">
+  <a class="sortie sortie-tete" href="#sortie=${encodeURIComponent(s.id)}">
       <div class="vignette">${vignette(s.trace)}</div>
       <div>
         <div class="sortie-titre">
@@ -125,9 +78,7 @@ function carteSortie(s) {
         </div>
         ${effort.length ? `<div class="effort">${effort.join('')}</div>` : ''}
       </div>
-    </summary>
-    <dl class="sortie-details">${details.join('')}<div class="detail-note">${note}</div></dl>
-  </details>`;
+  </a>`;
 }
 
 // Boutons de tri : « Tout » + chaque famille présente, la plus fréquente d'abord
@@ -161,6 +112,7 @@ el.filtres.addEventListener('click', async (e) => {
 
 async function afficherListe() {
   const toutes = await toutesLesSorties();
+  const profil = await lireProfil(toutes);
   el.vide.hidden = toutes.length > 0;
   afficherFiltres(toutes);
   const sorties = toutes
@@ -190,7 +142,7 @@ async function afficherListe() {
           dist > 0 ? `${nombre(dplus)} m D+` : '',
         ].filter(Boolean).join(' · ')}</p>
       </div>
-      ${liste.map(carteSortie).join('')}
+      ${liste.map((s) => carteSortie(s, profil)).join('')}
     </section>`;
   }
   el.liste.innerHTML = html;
@@ -324,6 +276,51 @@ el.champ.addEventListener('change', async () => {
   await importerDepuis(fichiers);
 });
 
+// ---- Navigation : accueil, détail d'une sortie, réglages -------------------
+
+let navigationInterne = false; // arrivé sur la page par un lien de l'appli
+let defilementAccueil = 0;
+
+el.liste.addEventListener('click', (e) => { if (e.target.closest('a.sortie')) navigationInterne = true; });
+$('btn-reglages').addEventListener('click', () => { navigationInterne = true; });
+el.btnRetour.addEventListener('click', () => {
+  if (navigationInterne) history.back();
+  else { history.replaceState(null, '', location.pathname + location.search); router(); }
+});
+
+async function router() {
+  const h = location.hash;
+  const idSortie = h.startsWith('#sortie=') ? decodeURIComponent(h.slice(8)) : null;
+  const page = idSortie ? 'detail' : h === '#reglages' ? 'reglages' : 'accueil';
+  const etaitAccueil = !el.accueil.hidden;
+  if (etaitAccueil && page !== 'accueil') defilementAccueil = window.scrollY;
+  fermerDetail();
+  el.accueil.hidden = page !== 'accueil';
+  el.pageDetail.hidden = page !== 'detail';
+  el.pageReglages.hidden = page !== 'reglages';
+  document.body.classList.toggle('sous-page', page !== 'accueil');
+  el.titrePage.textContent = page === 'detail' ? 'Sortie' : page === 'reglages' ? 'Réglages' : 'Mes sorties';
+
+  if (page === 'detail') {
+    el.pageDetail.innerHTML = '<p class="chargement">Chargement…</p>';
+    window.scrollTo(0, 0);
+    try { await afficherDetail(el.pageDetail, idSortie); } catch (e) {
+      console.error(e);
+      el.pageDetail.innerHTML = `<section class="carte"><p>Détail impossible : ${echapper(e.message)}</p></section>`;
+    }
+  } else if (page === 'reglages') {
+    window.scrollTo(0, 0);
+    await afficherReglages(el.pageReglages, toast);
+  } else {
+    navigationInterne = false;
+    if (!etaitAccueil) {
+      await afficherListe(); // la FTP a pu changer (TSS)
+      window.scrollTo(0, defilementAccueil);
+    }
+  }
+}
+window.addEventListener('hashchange', router);
+
 // Mise à jour : à chaque ouverture ou retour dans l'appli, on demande au
 // navigateur de vérifier sw.js ; si une nouvelle version prend la main,
 // la page se recharge toute seule (après l'import en cours, s'il y en a un).
@@ -355,6 +352,8 @@ async function demarrer() {
     const recus = await viderPartages();
     await importerDepuis(recus.map((p) => ({ nom: p.nom, lire: async () => p.octets })));
   }
+
+  if (location.hash) await router();
 
   if (dossierPossible) dossier = await dossierMemorise();
   await afficherEtatDossier();

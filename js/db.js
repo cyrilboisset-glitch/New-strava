@@ -70,6 +70,15 @@ export async function completerSortie(id, maj) {
   if (champs && Object.keys(champs).length) await requete(store.put({ ...sortie, ...champs }));
 }
 
+export async function lireSortie(id) {
+  return requete((await magasin('sorties')).get(id));
+}
+
+// Fichier d'origine : { id, octets, format, gzip } ou undefined (sortie sans trace)
+export async function lireFichier(id) {
+  return requete((await magasin('fichiers')).get(id));
+}
+
 export async function lireReglage(cle) {
   return requete((await magasin('reglages')).get(cle));
 }
