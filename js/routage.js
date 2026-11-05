@@ -109,18 +109,46 @@ export function tempsEstimeS(coords, puissanceW, poidsKg, modele = MODELE) {
 
 const echapperXml = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
 
-/** Fichier GPX 1.1 (une trace) lisible par les compteurs et les applis */
-export function gpxDepuisTrace(nom, coords) {
+/** Fichier GPX 1.1 (une trace) lisible par les compteurs et les applis ; departMs : départ prévu */
+export function gpxDepuisTrace(nom, coords, { departMs = null } = {}) {
   const pts = coords.map(([la, lo, ele]) =>
     `      <trkpt lat="${la.toFixed(6)}" lon="${lo.toFixed(6)}">${typeof ele === 'number' ? `<ele>${ele.toFixed(1)}</ele>` : ''}</trkpt>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Mes sorties" xmlns="http://www.topografix.com/GPX/1/1">
-  <metadata><name>${echapperXml(nom)}</name></metadata>
+  <metadata><name>${echapperXml(nom)}</name>${departMs ? `<desc>Départ prévu</desc><time>${new Date(departMs).toISOString().replace('.000', '')}</time>` : ''}</metadata>
   <trk>
     <name>${echapperXml(nom)}</name>
     <type>cycling</type>
     <trkseg>
 ${pts}
+    </trkseg>
+  </trk>
+</gpx>
+`;
+}
+
+/**
+ * GPX 1.1 d'une sortie enregistrée (points de pointsDetail) : position, altitude, heure,
+ * puissance, FC et cadence (extensions Garmin, lues par Strava et les autres applis).
+ */
+export function gpxDepuisSortie(nom, pts, debutMs, { velo = true } = {}) {
+  const heure = (tS) => new Date(debutMs + tS * 1000).toISOString().replace('.000', '');
+  const lignes = pts.filter((p) => typeof p.lat === 'number' && typeof p.lon === 'number').map((p) => {
+    const ext = [
+      typeof p.puissanceW === 'number' ? `<power>${Math.round(p.puissanceW)}</power>` : '',
+      typeof p.fc === 'number' || typeof p.cadence === 'number'
+        ? `<gpxtpx:TrackPointExtension>${typeof p.fc === 'number' ? `<gpxtpx:hr>${Math.round(p.fc)}</gpxtpx:hr>` : ''}${typeof p.cadence === 'number' ? `<gpxtpx:cad>${Math.round(p.cadence)}</gpxtpx:cad>` : ''}</gpxtpx:TrackPointExtension>`
+        : '',
+    ].join('');
+    return `      <trkpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">${typeof p.altitudeM === 'number' ? `<ele>${p.altitudeM.toFixed(1)}</ele>` : ''}<time>${heure(p.tS)}</time>${ext ? `<extensions>${ext}</extensions>` : ''}</trkpt>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Mes sorties" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+  <metadata><name>${echapperXml(nom)}</name><time>${heure(0)}</time></metadata>
+  <trk>
+    <name>${echapperXml(nom)}</name>${velo ? '\n    <type>cycling</type>' : ''}
+    <trkseg>
+${lignes}
     </trkseg>
   </trk>
 </gpx>

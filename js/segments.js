@@ -7,9 +7,9 @@ import { pointsDetail } from './analyse.js';
 import { decouperSegment, trouverPassages, bboxCompatible, detecterMontees, detecterSprints, classer } from './segments-calc.js';
 import { lireProfil, wKg } from './profil.js';
 import { nombre, km, chrono, echapper, fmtDate } from './format.js';
-import { htmlCarteStatique } from './carte-statique.js';
+import { htmlCarteStatique, retirerCarte } from './carte-statique.js';
 import { creerVue3d } from './vue3d.js';
-import { retirerCarte } from './traces.js';
+import { proposerNomSegment, sansDoublons } from './lieux.js';
 
 export const PART_FTP_SPRINT = 1.5; // sprint : au-dessus de 150 % de la FTP
 
@@ -164,10 +164,19 @@ function apercuSegment(seg) {
 
 // ---- Bloc « Segments » du détail d'une sortie -------------------------------------------
 
-// Aperçu « Voir » d'un segment détecté : carte Leaflet de la sortie avec le segment
-// en couleur, ou 3D du segment seul. Un seul ouvert à la fois ; à libérer en quittant.
+// Aperçu « Voir » d'un segment (détecté : clé « p<n> », suivi : « s<n> ») : carte Leaflet
+// de la sortie avec le segment en couleur, ou 3D du segment seul. Un seul ouvert à la
+// fois ; à libérer en quittant.
 const COULEUR_SEGMENT = '#1e88e5';
 const apercu = { k: null, mode: 'carte', carte: null, vue: null };
+let generation = 0; // affichage du bloc en cours (les noms proposés arrivent après coup)
+
+// Points [lat, lon] d'un bout de sortie et nom proposé (lieux OpenStreetMap, sinon chiffres)
+function nomPropose(pts, i0, i1, type, distanceM, penteMoyPct) {
+  const points = pts.slice(i0, i1 + 1).filter((p) => typeof p.lat === 'number').map((p) => [p.lat, p.lon]);
+  if (points.length < 2) return Promise.resolve(null);
+  return proposerNomSegment({ type, points, distanceM, penteMoyPct }).catch(() => null);
+}
 
 function libererApercu() {
   if (apercu.carte) { retirerCarte(apercu.carte); apercu.carte = null; }
@@ -244,8 +253,15 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
   // l'aperçu ouvert sur l'affichage précédent ne correspond plus à ces propositions
   fermerApercuSegment();
 
+  // indices (dans la sortie) du segment de l'aperçu
+  const bornesApercu = () => {
+    const n = Number(apercu.k.slice(1));
+    if (apercu.k[0] === 'p') return propositions[n] ? { i0: propositions[n].i0, i1: propositions[n].i1 } : null;
+    return ici[n] ? { i0: ici[n].iDebut, i1: ici[n].iFin } : null;
+  };
+
   const monterApercu = () => {
-    const m = propositions[apercu.k];
+    const m = bornesApercu();
     const zone = bloc.querySelector('[data-apercu]');
     if (!m || !zone) return;
     const b3d = zone.querySelector('[data-valeur="3d"]');
@@ -274,15 +290,18 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
 
   const rendre = (etat = '') => {
     libererApercu();
-    const lignes = ici.map((p) => {
+    const lignes = ici.map((p, k) => {
       const g = segments.find((x) => x.id === p.segmentId);
       if (!g) return '';
       const tous = parSegment.get(g.id) ?? [];
       const rang = classer(tous).get(tous.find((x) => x.id === p.id));
-      return `<a class="passage" href="#segment=${encodeURIComponent(g.id)}">
+      const cle = `s${k}`;
+      return `<div class="passage-suivi"><a class="passage" href="#segment=${encodeURIComponent(g.id)}">
         <span class="passage-nom">${echapper(g.nom)}<small>${g.type} · ${chiffresSegment(g)}</small></span>
         <span class="passage-temps">${chrono(p.dureeS)}${rangTexte(rang, tous.length)}</span>
-        <span class="passage-mesures">${mesuresPassage(p, profil.poidsKg)}</span></a>`;
+        <span class="passage-mesures">${mesuresPassage(p, profil.poidsKg)}</span></a>
+        <button class="btn secondaire petit" type="button" data-voir="${cle}" aria-expanded="${apercu.k === cle}">${apercu.k === cle ? 'Fermer' : 'Voir'}</button></div>
+        ${apercu.k === cle ? htmlApercu() : ''}`;
     }).join('');
     const km1 = (i) => (i == null ? '–' : `km ${nombre(pts[i].distanceM / 1000, 2)}`);
     let resume = '';
@@ -299,10 +318,10 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
       ${propositions.length ? `
       <h3 class="sous-titre">Détectés sur cette sortie</h3>
       <div class="propositions">${propositions.map((m, k) => `
-        <div class="proposition"><span>${m.sprint ? '⚡' : '⛰'} <b>${echapper(m.nom)}</b><small>${m.texte}</small></span>
-        <button class="btn secondaire petit" type="button" data-voir="${k}" aria-expanded="${apercu.k === k}">${apercu.k === k ? 'Fermer' : 'Voir'}</button>
+        <div class="proposition"><span>${m.sprint ? '⚡' : '⛰'} <b data-nom-prop="${k}">${echapper(m.nom)}</b><small>${m.texte}</small></span>
+        <button class="btn secondaire petit" type="button" data-voir="p${k}" aria-expanded="${apercu.k === `p${k}`}">${apercu.k === `p${k}` ? 'Fermer' : 'Voir'}</button>
         <button class="btn secondaire petit" type="button" data-suivre="${k}">Suivre</button></div>
-        ${apercu.k === k ? htmlApercu() : ''}`).join('')}</div>` : ''}
+        ${apercu.k === `p${k}` ? htmlApercu() : ''}`).join('')}</div>` : ''}
       <details class="creation"${choix.debut != null ? ' open' : ''}>
         <summary>Créer un segment à la main</summary>
         <p class="aide">Touche une courbe (ou le ruban 3D) à l'endroit du départ, puis « Départ ici » ; fais de même pour l'arrivée.</p>
@@ -317,6 +336,35 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
     if (apercu.k != null) monterApercu();
   };
   rendre();
+
+  // Noms proposés pour les segments détectés (lieux), remplacés au fur et à mesure
+  const ma = ++generation;
+  (async () => {
+    const noms = [];
+    for (const m of propositions) {
+      const n = await nomPropose(pts, m.i0, m.i1, m.sprint ? 'Sprint' : 'Montée', m.distanceM, m.sprint ? null : m.penteMoyPct);
+      if (ma !== generation || !bloc.isConnected) return;
+      noms.push(n ?? m.nom);
+    }
+    const finaux = sansDoublons(noms, propositions.map((m) => `km ${nombre(pts[m.i0].distanceM / 1000, 1)}`));
+    finaux.forEach((n, k) => {
+      propositions[k].nom = n;
+      const el = bloc.querySelector(`[data-nom-prop="${k}"]`);
+      if (el) el.textContent = n;
+    });
+  })();
+
+  // Création à la main : nom proposé dès que le départ et l'arrivée sont choisis
+  const proposerNomManuel = async () => {
+    const champ = bloc.querySelector('#nom-segment');
+    if (choix.debut == null || choix.fin == null || choix.fin <= choix.debut || champ.value.trim()) return;
+    let d;
+    try { d = decouperSegment(pts, choix.debut, choix.fin); } catch { return; }
+    const type = d.penteMoyPct >= 3 ? 'Montée' : d.penteMoyPct <= -3 ? 'Descente' : 'Plat';
+    const n = await nomPropose(pts, choix.debut, choix.fin, type, d.distanceM, d.penteMoyPct);
+    const c = bloc.querySelector('#nom-segment');
+    if (n && c && !c.value.trim()) c.value = n;
+  };
 
   const creer = async (i0, i1, nom, sprint) => {
     rendre('Création du segment…');
@@ -335,7 +383,7 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
   bloc.onclick = async (e) => {
     const voir = e.target.closest('[data-voir]');
     if (voir) {
-      const k = Number(voir.dataset.voir);
+      const k = voir.dataset.voir;
       apercu.k = apercu.k === k ? null : k;
       const nom = bloc.querySelector('#nom-segment')?.value ?? '';
       rendre();
@@ -356,6 +404,7 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
       choix[c.dataset.choix] = i;
       rendre();
       bloc.querySelector('#nom-segment').value = nom;
+      proposerNomManuel();
       return;
     }
     if (e.target.closest('[data-creer]')) {
@@ -421,7 +470,8 @@ export async function afficherSegment(page, id, toast) {
     if (t) { etatPage.tri = t.dataset.valeur; rendre(); return; }
     const a = e.target.closest('[data-action]')?.dataset.action;
     if (a === 'renommer') {
-      const nom = prompt('Nouveau nom du segment', g.nom)?.trim();
+      const propose = await proposerNomSegment(g).catch(() => null);
+      const nom = prompt(propose && propose !== g.nom ? `Nouveau nom du segment (proposé : ${propose})` : 'Nouveau nom du segment', propose ?? g.nom)?.trim();
       if (nom) { await renommerSegment(g.id, nom); g.nom = nom; rendre(); toast('Segment renommé.'); }
     } else if (a === 'supprimer') {
       if (!confirm(`Supprimer le segment « ${g.nom} » et ses ${passages.length} passages ?`)) return;

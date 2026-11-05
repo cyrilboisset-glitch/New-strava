@@ -101,6 +101,20 @@ async function texteToast(page) {
       wind_direction_10m: time.map(() => 45), wind_gusts_10m: time.map(() => 30), precipitation_probability: time.map((t) => (h(t) === 15 || h(t) === 16 ? 80 : 0)) } };
     r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(n === 1 ? lieu : Array(n).fill(lieu)) });
   });
+  // Faux OpenStreetMap : commune « Ville <lat × 100> » ; col « Col du Test » à la longitude 5,7, vers 45,07
+  const demandesLieux = [];
+  await ctx.route(/nominatim\.openstreetmap\.org|overpass-api\.de/, (r) => {
+    const u = new URL(r.request().url());
+    demandesLieux.push(u.toString());
+    let corps;
+    if (u.host.includes('nominatim')) corps = { address: { town: `Ville ${Math.round(Number(u.searchParams.get('lat')) * 100)}` } };
+    else {
+      const m = u.searchParams.get('data').match(/around:\d+,([\d.]+),([\d.]+)/);
+      const la = Number(m[1]); const lo = Number(m[2]);
+      corps = { elements: Math.abs(lo - 5.7) < 1e-4 && la > 45.06 && la < 45.085 ? [{ type: 'node', lat: la, lon: lo, tags: { mountain_pass: 'yes', name: 'Col du Test' } }] : [] };
+    }
+    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(corps) });
+  });
   await ctx.route(/brouter\.de\/brouter/, (r) => {
     const u = new URL(r.request().url());
     demandesBRouter.push(u.searchParams.get('profile'));
@@ -282,6 +296,9 @@ async function texteToast(page) {
   const rz2 = await zoneP.boundingBox();
   await page.mouse.click(rz2.x + (rz2.width * 2) / 3, rz2.y + 40);
   await page.click('[data-choix="fin"]');
+  await page.waitForFunction(() => document.getElementById('nom-segment').value !== '', null, { timeout: 10000 });
+  const nomManuel = await page.inputValue('#nom-segment');
+  verif('nom proposé pour le segment à la main (plat entre deux communes)', /^Ville \d+ → Ville \d+$/.test(nomManuel), nomManuel);
   const choixTxt = (await page.textContent('#bloc-segments-sortie .creation')).replace(/\s+/g, ' ');
   verif('départ et arrivée choisis (km 10 et km 20)', /Départ : km 10,0\d · Arrivée : km 20,0\d · 10,0 km/.test(choixTxt), choixTxt);
   await page.fill('#nom-segment', 'Faux plat du test');
@@ -291,6 +308,12 @@ async function texteToast(page) {
   const passageTxt = (await page.textContent('#bloc-segments-sortie .passage')).replace(/\s+/g, ' ');
   // 10 km à 30 km/h = 20 min
   verif('passage : 20:00, record perso, 200 W', /Faux plat du test.*20:0\d.*Record perso.*30,0 km\/h.*200 W/.test(passageTxt), passageTxt);
+  // « Voir » sur un segment suivi : la sortie avec le segment en bleu
+  await page.click('#bloc-segments-sortie [data-voir="s0"]');
+  await page.waitForSelector('#bloc-segments-sortie .carte-segment .trait-segment', { state: 'attached' });
+  verif('Voir sur un segment suivi : carte avec le segment', (await page.textContent('#bloc-segments-sortie [data-voir="s0"]')) === 'Fermer');
+  await page.click('#bloc-segments-sortie [data-voir="s0"]');
+  verif('segment suivi : aperçu refermé', !(await page.$('#bloc-segments-sortie .apercu-segment')));
 
   // Nouvelle sortie sur la même route, une semaine après, avec une pause de 10 min au km 15
   await page.setInputFiles('#champ-fichier', { name: 'col-bis.gpx', mimeType: 'application/gpx+xml',
@@ -336,8 +359,10 @@ async function texteToast(page) {
   await page.goto(URL_APPLI + '#sortie=' + encodeURIComponent(idMontee));
   await page.waitForSelector('#bloc-segments-sortie .proposition');
   const propTxt = (await page.textContent('#bloc-segments-sortie .proposition')).replace(/\s+/g, ' ');
-  verif('montée détectée (3 km à 6 %), boutons Voir et Suivre', /Montée du km 5,\d.*à [56],\d %.*Voir.*Suivre/.test(propTxt), propTxt);
-  await page.click('#bloc-segments-sortie [data-voir="0"]');
+  verif('montée détectée (3 km à 6 %), boutons Voir et Suivre', /Montée .*à [56],\d %.*Voir.*Suivre/.test(propTxt), propTxt);
+  await page.waitForFunction(() => document.querySelector('[data-nom-prop="0"]')?.textContent === 'Montée du col du Test', null, { timeout: 15000 });
+  verif('nom proposé : col trouvé en haut de la montée (OpenStreetMap)', true);
+  await page.click('#bloc-segments-sortie [data-voir="p0"]');
   await page.waitForSelector('#bloc-segments-sortie .carte-segment .trait-segment', { state: 'attached' });
   const traits = await page.$$eval('#bloc-segments-sortie .carte-segment path.leaflet-interactive', (ps) => ps.map((p) => p.getAttribute('stroke')));
   verif('carte : la sortie en orange, le segment en bleu par-dessus', traits.includes('#1e88e5') && traits.some((c) => c && c.startsWith('#e')), JSON.stringify(traits));
@@ -349,7 +374,7 @@ async function texteToast(page) {
   });
   // 3 km sur 30 km de sortie toute droite vers le nord : le segment fait ~1/10 de la hauteur de la carte
   verif('carte cadrée sur toute la sortie (segment ≈ 1/10 de la hauteur)', largeurs.seg > 10 && largeurs.seg < largeurs.carte * 0.2, JSON.stringify(largeurs));
-  verif('bouton Fermer', (await page.textContent('#bloc-segments-sortie [data-voir="0"]')) === 'Fermer');
+  verif('bouton Fermer', (await page.textContent('#bloc-segments-sortie [data-voir="p0"]')) === 'Fermer');
   await page.locator('#bloc-segments-sortie .apercu-segment').scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(CAPTURES, 'segment-voir-carte.png') });
@@ -365,7 +390,7 @@ async function texteToast(page) {
   verif('3D : ruban en couleurs de montée (orange, 6 %)', pentes > 200, String(pentes));
   await page.locator('#bloc-segments-sortie .apercu-segment').scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(CAPTURES, 'segment-voir-3d.png') });
-  await page.click('#bloc-segments-sortie [data-voir="0"]');
+  await page.click('#bloc-segments-sortie [data-voir="p0"]');
   verif('Fermer : aperçu retiré', !(await page.$('#bloc-segments-sortie .apercu-segment')));
   await page.evaluate(async (id) => {
     const db = await (await import('./js/db.js')).ouvrirBase();
@@ -380,6 +405,21 @@ async function texteToast(page) {
   await page.click('#onglet-sorties');
   await page.click('a.sortie:has-text("Col du test")');
   await page.waitForSelector('#page-detail .courbe');
+  // Export GPX de la sortie : 3 601 points, heures, puissance, FC, cadence
+  const [dlSortie] = await Promise.all([page.waitForEvent('download'), page.click('[data-export="gpx"]')]);
+  const cheminSortie = path.join(CAPTURES, 'sortie-export.gpx');
+  await dlSortie.saveAs(cheminSortie);
+  const gpxSortie = fs.readFileSync(cheminSortie, 'utf8');
+  verif('export : message', (await texteToast(page)).includes('enregistré dans Téléchargements'));
+  const { lireGpx } = await import('../js/trace.js');
+  let relu = null;
+  try { relu = lireGpx(gpxSortie); } catch (e) { relu = { erreur: e.message }; }
+  verif('export GPX de la sortie : points, heures, capteurs', /^2025-05-10-col-du-test\.gpx$/.test(dlSortie.suggestedFilename())
+    && (gpxSortie.match(/<trkpt /g) || []).length === 3601 && gpxSortie.includes('<power>200</power>') && gpxSortie.includes('<gpxtpx:hr>140</gpxtpx:hr>')
+    && gpxSortie.includes('<gpxtpx:cad>90</gpxtpx:cad>') && gpxSortie.includes('<type>cycling</type>'), dlSortie.suggestedFilename());
+  const r0 = relu.records?.[0] ?? {};
+  verif('export GPX relu par l\'appli : 3 601 points, départ 9 h, 200 W, 140 bpm', relu.records?.length === 3601 && r0.horodatage?.getTime() === Date.UTC(2025, 4, 10, 7)
+    && r0.puissanceW === 200 && r0.fc === 140 && relu.sport === 2, JSON.stringify({ n: relu.records?.length, r0, sport: relu.sport, err: relu.erreur }));
 
   // Retour : la liste revient à la même place
   await page.click('#btn-retour');
@@ -710,6 +750,9 @@ async function texteToast(page) {
   verif('tracé : demande au profil « Route »', demandesBRouter.at(-1) === 'fastbike', JSON.stringify(demandesBRouter));
   verif('tracé : trait et 2 repères sur la carte', (await page.$$('#carte-trace .repere-trace')).length === 2 && !!(await page.$('#carte-trace path.leaflet-interactive')));
   verif('tracé : profil coloré', (await page.$$('.profil-trace rect')).length > 250);
+  await page.waitForFunction(() => document.getElementById('nom-trace').value !== '', null, { timeout: 10000 });
+  const nomAller = await page.inputValue('#nom-trace');
+  verif('nom proposé : aller simple « départ → arrivée »', /^Ville \d+ → Ville \d+$/.test(nomAller), nomAller);
   // Boucle : retour au départ -> distance doublée
   await page.click('[data-a="boucle"]');
   await page.waitForFunction((km1) => {
@@ -717,6 +760,10 @@ async function texteToast(page) {
     return m && Math.abs(Number(m[1].replace(',', '.')) - 2 * km1) < 0.15;
   }, kmTrace, { timeout: 10000 });
   verif('boucle : 3 repères, distance doublée', (await page.$$('#carte-trace .repere-trace')).length === 3);
+  await page.waitForFunction(() => document.getElementById('nom-trace').value.startsWith('Boucle'), null, { timeout: 10000 });
+  const nomBoucle = await page.inputValue('#nom-trace');
+  verif('nom proposé remplacé (pas touché par Cyril) : « Boucle de … »', /^Boucle de Ville \d+( par Ville \d+)?$/.test(nomBoucle), nomBoucle);
+  verif('noms : Nominatim et Overpass seulement', demandesLieux.every((u) => /nominatim\.openstreetmap\.org\/reverse|overpass-api\.de/.test(u)), JSON.stringify(demandesLieux.slice(-3)));
   // 3D du tracé
   await page.click('[data-segments="vue-trace"] button[data-valeur="3d"]');
   await page.waitForTimeout(500);
@@ -791,6 +838,53 @@ async function texteToast(page) {
   await page.uncheck('#couleurs-vent');
   verif('décoché : couleurs de pente', await page.$eval('#trace-3d .v3d-legende', (l) => !l.classList.contains('vent') && l.textContent.includes('> 10 %')));
   await page.click('[data-segments="vue-trace"] button[data-valeur="profil"]');
+
+  // Heure précise : 5 h 30 (avant 6 h) ajoutée au tableau, choisie, gardée avec le tracé, dans le GPX
+  await page.fill('#heure-depart', '05:30');
+  await page.waitForFunction(() => document.querySelectorAll('.vent-tableau tbody tr').length === 16, null, { timeout: 15000 });
+  const premiere = await page.$eval('.vent-tableau tbody tr', (tr) => ({ t: tr.textContent.replace(/\s+/g, ' ').trim(), c: tr.className }));
+  verif('heure précise : 5 h 30 en tête du tableau, choisie', premiere.t.startsWith('5 h 30') && premiere.c.includes('perso') && premiere.c.includes('choisie'), JSON.stringify(premiere));
+  const conseilPerso = (await page.textContent('.vent-conseil')).replace(/\s+/g, ' ');
+  verif('conseil : durée à ton heure', conseilPerso.includes('À 5 h 30 (ton heure)'), conseilPerso);
+  await page.screenshot({ path: path.join(CAPTURES, 'traces-heure.png'), fullPage: true });
+  await page.click('[data-a="enregistrer"]');
+  await texteToast(page);
+  verif('liste : départ prévu', /départ prévu .* à 5 h 30/.test(await page.textContent('#mes-traces')), await page.textContent('#mes-traces'));
+  const [dlHeure] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="gpx"]')]);
+  const cheminHeure = path.join(CAPTURES, 'trace-heure.gpx');
+  await dlHeure.saveAs(cheminHeure);
+  const tGpx = fs.readFileSync(cheminHeure, 'utf8').match(/<metadata>.*<time>([^<]+)<\/time>/)?.[1];
+  const attendu = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(5, 30, 0, 0); return d.toISOString().replace('.000', ''); });
+  verif('GPX : heure de départ prévue (demain 5 h 30)', tGpx === attendu, `${tGpx} / ${attendu}`);
+  await page.click('[data-a="nouveau"]');
+  await page.click('#mes-traces [data-t="ouvrir"]');
+  await page.waitForSelector('#trace-resume .stats');
+  verif('réouverture : heure et jour repris', (await page.inputValue('#heure-depart')) === '05:30' && (await page.inputValue('#jour-vent')) === '1');
+
+  // Segments sur le tracé : un segment fait d'un morceau du tracé enregistré
+  await page.evaluate(async () => {
+    const db = await import('./js/db.js');
+    const { decouperSegment } = await import('./js/segments-calc.js');
+    const index = await db.lireReglage('traces');
+    const t = await db.lireReglage(`trace:${index[0].id}`);
+    const pts = t.coords.map((c) => ({ lat: c[0], lon: c[1], altitudeM: c[2] }));
+    const i0 = Math.round(pts.length * 0.1); const i1 = Math.round(pts.length * 0.35);
+    const seg = { id: 'seg-trace', nom: 'Montée du tracé', ...decouperSegment(pts, i0, i1), type: 'Montée', creeLe: Date.now(), analyseFaite: true };
+    await db.ecrireReglage('segments', [...((await db.lireReglage('segments')) ?? []), seg]);
+  });
+  await page.click('[data-a="nouveau"]');
+  await page.click('#mes-traces [data-t="ouvrir"]');
+  await page.waitForSelector('#segments-trace .passage', { timeout: 10000 });
+  const segTrace = (await page.textContent('#segments-trace')).replace(/\s+/g, ' ');
+  verif('segments sur le tracé : nom, position, pas encore fait, temps estimé', /Montée du tracé\s*km [\d,]+ → [\d,]+.*Pas encore fait.*Temps estimé à \d+ W/.test(segTrace), segTrace);
+  verif('segment en bleu sur la carte du tracé', !!(await page.$('#carte-trace .trait-segment')));
+  await page.click('#segments-trace [data-seg-voir]');
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: path.join(CAPTURES, 'traces-segments.png'), fullPage: true });
+  await page.evaluate(async () => {
+    const db = await import('./js/db.js');
+    await db.ecrireReglage('segments', ((await db.lireReglage('segments')) ?? []).filter((g) => g.id !== 'seg-trace'));
+  });
   await page.click('#onglet-sorties');
   await page.waitForSelector('#accueil:not([hidden])');
 

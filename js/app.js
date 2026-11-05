@@ -10,6 +10,7 @@ import { afficherReglages } from './reglages.js';
 import { afficherProgres, htmlFiltres } from './progres.js';
 import { afficherSegment, mettreAJourPassages } from './segments.js';
 import { afficherTraces, fermerTraces } from './traces.js';
+import { brancherCache } from './lieux.js';
 import { iconeSport } from './icones.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
@@ -17,7 +18,10 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.13.0 · voir les segments';
+
+// Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
+brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
+export const VERSION_APPLI = '0.14.0 · noms, heure, segments sur les tracés';
 
 const $ = (id) => document.getElementById(id);
 const el = {
