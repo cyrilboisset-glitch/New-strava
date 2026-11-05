@@ -180,6 +180,7 @@ export function creerVue3d(conteneur, pts, options = {}) {
   let raf = 0;
   let derniereT = 0;
   let pick = [];
+  let couleurA = null; // (distance en m) -> couleur ; null = couleurs de pente
 
   conteneur.innerHTML = `
     <canvas class="v3d-toile" aria-label="Parcours en 3D : un doigt pour tourner, deux pour zoomer ou déplacer"></canvas>
@@ -311,14 +312,14 @@ export function creerVue3d(conteneur, pts, options = {}) {
     const segs = [];
     for (let j = 0; j < IX.length - 1; j++) {
       if (!VS[j] && !VS[j + 1]) continue;
-      segs.push([TP[j][2] + TP[j + 1][2], TP[j], TP[j + 1], BT[j + 1], BT[j], T.G[IX[j]]]);
+      segs.push([TP[j][2] + TP[j + 1][2], TP[j], TP[j + 1], BT[j + 1], BT[j], T.G[IX[j]], IX[j] * SEG]);
     }
     segs.sort((u, v) => v[0] - u[0]);
     // ruban opaque (plus lisible qu'en transparence), peint du plus loin au plus proche
     g.lineWidth = f;
     g.lineJoin = 'round';
-    for (const [, a, b, b0, a0, gr] of segs) {
-      g.fillStyle = GCOL(gr);
+    for (const [, a, b, b0, a0, gr, s] of segs) {
+      g.fillStyle = couleurA ? couleurA(s) : GCOL(gr);
       g.strokeStyle = g.fillStyle; // bord de même couleur : pas de fines raies entre les morceaux
       g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(b0[0], b0[1]); g.lineTo(a0[0], a0[1]); g.closePath(); g.fill(); g.stroke();
     }
@@ -487,6 +488,14 @@ export function creerVue3d(conteneur, pts, options = {}) {
     trace: T,
     /** Curseur placé depuis les courbes (indice du point de la sortie) */
     placerCurseur(iPoint) { cur = iPoint == null ? null : T.sPoint[iPoint]; },
+    /** Couleurs du ruban : fonction (distance en m) -> couleur, et légende [[couleur, texte]] ; null = pente */
+    colorer(fonction, legende = null) {
+      couleurA = fonction;
+      const lg = conteneur.querySelector('.v3d-legende');
+      lg.innerHTML = (fonction && legende ? legende : LEGENDE_PENTES.map(([g, t]) => [GCOL(g), t]))
+        .map(([c, t]) => `<span style="background:${c}">${t}</span>`).join('');
+      lg.classList.toggle('vent', !!fonction);
+    },
     afficher(oui) {
       visible = oui;
       if (oui && !raf) { derniereT = 0; raf = requestAnimationFrame(dessiner); }
