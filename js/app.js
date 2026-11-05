@@ -9,6 +9,7 @@ import { afficherDetail, fermerDetail } from './detail.js';
 import { afficherReglages } from './reglages.js';
 import { afficherProgres, htmlFiltres } from './progres.js';
 import { afficherSegment, mettreAJourPassages } from './segments.js';
+import { afficherTraces, fermerTraces } from './traces.js';
 import { iconeSport } from './icones.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
@@ -16,7 +17,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.10.0 · cartes, parcours, puissance estimée';
+export const VERSION_APPLI = '0.11.0 · création de tracés';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -26,7 +27,7 @@ const el = {
   btnChanger: $('btn-changer-dossier'), liste: $('liste'), choixActivite: $('choix-activite'), vide: $('vide'), toast: $('toast'),
   btnMenuSynchro: $('btn-menu-synchro'), menuSynchro: $('menu-synchro'), synchroCourt: $('synchro-court'),
   accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'), pageProgres: $('page-progres'),
-  pageSegment: $('page-segment'),
+  pageSegment: $('page-segment'), pageTraces: $('page-traces'),
   titrePage: $('titre-page'), btnRetour: $('btn-retour'),
 };
 
@@ -327,7 +328,7 @@ let navigationInterne = false; // arrivé sur le détail par un lien de l'appli
 let defilementListe = 0;
 let pageActuelle = 'sorties';
 
-const TITRES = { sorties: 'Mes sorties', progres: 'Progrès', profil: 'Profil', detail: 'Sortie', segment: 'Segment' };
+const TITRES = { sorties: 'Mes sorties', progres: 'Progrès', profil: 'Profil', detail: 'Sortie', segment: 'Segment', traces: 'Tracés' };
 
 document.addEventListener('click', (e) => { if (e.target.closest('a[href^="#sortie="], a[href^="#segment="]')) navigationInterne = true; });
 el.btnRetour.addEventListener('click', () => {
@@ -340,6 +341,8 @@ function pageDepuisAdresse() {
   if (h.startsWith('#sortie=')) return { page: 'detail', id: decodeURIComponent(h.slice(8)) };
   if (h.startsWith('#segment=')) return { page: 'segment', id: decodeURIComponent(h.slice(9)) };
   if (h === '#progres') return { page: 'progres' };
+  if (h === '#traces') return { page: 'traces' };
+  if (h.startsWith('#trace=')) return { page: 'traces', id: decodeURIComponent(h.slice(7)) };
   if (h === '#profil' || h === '#reglages') return { page: 'profil' };
   return { page: 'sorties' };
 }
@@ -396,8 +399,10 @@ async function afficherPage(page, id, avant, sens) {
   // en revenant d'une sous-page vers une autre sous-page (segment -> sortie), on garde le lien de retour
   pageActuelle = page;
   fermerDetail();
+  fermerTraces();
   el.accueil.hidden = page !== 'sorties';
   el.pageProgres.hidden = page !== 'progres';
+  el.pageTraces.hidden = page !== 'traces';
   el.pageDetail.hidden = page !== 'detail';
   el.pageReglages.hidden = page !== 'profil';
   el.pageSegment.hidden = page !== 'segment';
@@ -437,6 +442,9 @@ async function afficherPage(page, id, avant, sens) {
     };
     animer(el.pageProgres, sens);
     await afficherProgres(el.pageProgres, options);
+  } else if (page === 'traces') {
+    window.scrollTo(0, 0);
+    await afficherTraces(el.pageTraces, toast, id ?? null);
   } else if (page === 'profil') {
     window.scrollTo(0, 0);
     animer(el.pageReglages, sens);

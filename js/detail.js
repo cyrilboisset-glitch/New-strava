@@ -14,6 +14,7 @@ import { htmlChoixVelo } from './velos.js';
 import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
+import { retirerCarte } from './traces.js';
 import { afficherSegmentsSortie } from './segments.js';
 
 const COLONNES_COURBE = 300; // points dessinés par courbe (moyenne par colonne)
@@ -36,7 +37,7 @@ let modeVue = 'carte'; // 'carte' ou '3d', gardé d'une sortie à l'autre
 let indexCurseur = null; // point de la sortie sous le curseur des courbes (création de segment)
 
 export function fermerDetail() {
-  if (carte) { carte.remove(); carte = null; }
+  if (carte) { retirerCarte(carte); carte = null; }
   if (vue3d) { vue3d.detruire(); vue3d = null; }
   indexCurseur = null;
 }

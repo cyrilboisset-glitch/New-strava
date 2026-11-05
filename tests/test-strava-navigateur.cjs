@@ -83,10 +83,34 @@ async function texteToast(page) {
   const erreursConsole = [];
   // Tuiles OpenStreetMap injoignables ici : le test sert une fausse tuile (beige quadrillé)
   const tuilesDemandees = [];
+  // Faux BRouter : ligne droite entre les points, altitude qui monte de 3 % ;
+  // le profil « safety » simule une panne de réseau
+  const demandesBRouter = [];
+  await ctx.route(/brouter\.de\/brouter/, (r) => {
+    const u = new URL(r.request().url());
+    demandesBRouter.push(u.searchParams.get('profile'));
+    if (u.searchParams.get('profile') === 'safety') { r.abort(); return; }
+    const pts = u.searchParams.get('lonlats').split('|').map((x) => x.split(',').map(Number));
+    const coords = [];
+    let d = 0;
+    for (let k = 0; k < pts.length - 1; k++) {
+      const [lo1, la1] = pts[k]; const [lo2, la2] = pts[k + 1];
+      const kx = Math.cos(((la1 + la2) / 2) * Math.PI / 180);
+      const long = Math.hypot((la2 - la1) * 111195, (lo2 - lo1) * 111195 * kx);
+      const n = Math.max(2, Math.round(long / 20));
+      for (let i = k ? 1 : 0; i <= n; i++) {
+        const f = i / n;
+        coords.push([lo1 + (lo2 - lo1) * f, la1 + (la2 - la1) * f, 200 + (d + long * f) * 0.03]);
+      }
+      d += long;
+    }
+    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { 'track-length': String(Math.round(d)), 'filtered ascend': String(Math.round(d * 0.03)) }, geometry: { type: 'LineString', coordinates: coords } }] }) });
+  });
   await ctx.route(/tile\.openstreetmap\.org/, (r) => { tuilesDemandees.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', body: fausseTuile() }); });
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|tile\.openstreetmap/.test(m.text() + (m.location()?.url ?? ''))) erreursConsole.push(m.text()); });
-  page.on('pageerror', (e) => erreursConsole.push(e.message));
+  page.on('pageerror', (e) => { erreursConsole.push(e.message); if (process.env.PILE) console.log('PILE', e.stack); });
   await page.goto(URL_APPLI);
   await page.waitForFunction(() => document.getElementById('synchro-titre').textContent !== 'Chargement…');
   verif("l'écran vide parle de l'archive Strava", (await page.textContent('#vide')).includes('archive Strava'));
@@ -595,6 +619,69 @@ async function texteToast(page) {
   await page.waitForFunction(() => !document.documentElement.dataset.transition);
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(CAPTURES, 'liste-cartes.png') });
+
+  // Tracés : créer un parcours sur la carte, profil, 3D, enregistrer, GPX
+  await page.click('#onglet-traces');
+  await page.waitForSelector('#carte-trace.leaflet-container');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  verif('onglet Tracés', (await page.textContent('#titre-page')) === 'Tracés' && (await page.textContent('#trace-etat')).includes('Touche la carte'));
+  const zoneCarte = await page.$('#carte-trace');
+  const rc = await zoneCarte.boundingBox();
+  await page.mouse.click(rc.x + rc.width * 0.3, rc.y + rc.height * 0.7);
+  await page.mouse.click(rc.x + rc.width * 0.7, rc.y + rc.height * 0.3);
+  await page.waitForSelector('#trace-resume .stats', { timeout: 10000 });
+  const statsTrace = (await page.textContent('#trace-resume')).replace(/\s+/g, ' ');
+  const kmTrace = Number(statsTrace.match(/Distance\s*([\d,]+)/)[1].replace(',', '.'));
+  // le faux BRouter monte de 3 % : D+ = 3 % de la distance
+  const dplusTrace = Number(statsTrace.match(/Dénivelé\s*([\d\s]+?)\s*m/)[1].replace(/\s/g, ''));
+  verif('tracé : distance et D+ (3 %)', kmTrace > 0.5 && Math.abs(dplusTrace - kmTrace * 30) <= 0.05 * kmTrace * 30 + 2, statsTrace);
+  verif('tracé : demande au profil « Route »', demandesBRouter.at(-1) === 'fastbike', JSON.stringify(demandesBRouter));
+  verif('tracé : trait et 2 repères sur la carte', (await page.$$('#carte-trace .repere-trace')).length === 2 && !!(await page.$('#carte-trace path.leaflet-interactive')));
+  verif('tracé : profil coloré', (await page.$$('.profil-trace rect')).length > 250);
+  // Boucle : retour au départ -> distance doublée
+  await page.click('[data-a="boucle"]');
+  await page.waitForFunction((km1) => {
+    const m = document.getElementById('trace-resume').textContent.replace(/\s+/g, ' ').match(/Distance\s*([\d,]+)/);
+    return m && Math.abs(Number(m[1].replace(',', '.')) - 2 * km1) < 0.15;
+  }, kmTrace, { timeout: 10000 });
+  verif('boucle : 3 repères, distance doublée', (await page.$$('#carte-trace .repere-trace')).length === 3);
+  // 3D du tracé
+  await page.click('[data-segments="vue-trace"] button[data-valeur="3d"]');
+  await page.waitForTimeout(500);
+  const pixels3d = await page.$eval('#trace-3d canvas', (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; });
+  verif('tracé : vue 3D dessinée', pixels3d > 3000, String(pixels3d));
+  await page.click('[data-segments="vue-trace"] button[data-valeur="profil"]');
+  // Panne de réseau (profil « tranquille ») : message clair, le tracé reste
+  await page.selectOption('#profil-route', 'safety');
+  await page.waitForFunction(() => document.getElementById('trace-etat').textContent.includes('Calcul impossible'), null, { timeout: 10000 });
+  verif('sans réseau : message et conseil « Ligne droite »', (await page.textContent('#trace-etat')).includes('Ligne droite'));
+  // Ligne droite : sans réseau ni altitude
+  const avant = demandesBRouter.length;
+  await page.selectOption('#profil-route', 'droit');
+  await page.waitForFunction(() => document.getElementById('trace-etat').textContent.includes('Ligne droite'), null, { timeout: 10000 });
+  verif('ligne droite : aucune demande en ligne, pas de profil', demandesBRouter.length === avant && (await page.textContent('#trace-profil')).includes('Pas d\'altitude'));
+  await page.selectOption('#profil-route', 'fastbike');
+  await page.waitForSelector('.profil-trace', { timeout: 10000 });
+  // Enregistrer puis exporter le GPX
+  await page.fill('#nom-trace', 'Boucle « test » & co');
+  await page.click('[data-a="enregistrer"]');
+  verif('tracé enregistré', (await texteToast(page)).includes('Boucle « test » & co'));
+  verif('liste « Mes tracés »', (await page.textContent('#mes-traces')).includes('Boucle « test » & co'));
+  const [dlGpx] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="gpx"]')]);
+  const cheminGpx = path.join(CAPTURES, 'trace-test.gpx');
+  await dlGpx.saveAs(cheminGpx);
+  const contenuGpx = fs.readFileSync(cheminGpx, 'utf8');
+  verif('GPX : nom du fichier et contenu', dlGpx.suggestedFilename() === 'boucle-test-co.gpx' && contenuGpx.includes('<name>Boucle « test » &amp; co</name>') && (contenuGpx.match(/<trkpt /g) || []).length > 10 && contenuGpx.includes('<ele>'), dlGpx.suggestedFilename());
+  await page.waitForFunction(() => document.getElementById('toast').hidden || true);
+  await page.screenshot({ path: path.join(CAPTURES, 'traces.png'), fullPage: true });
+  // Le tracé est gardé : nouveau tracé, puis réouverture depuis la liste
+  await page.click('[data-a="nouveau"]');
+  verif('nouveau tracé : vide', (await page.$$('#carte-trace .repere-trace')).length === 0);
+  await page.click('#mes-traces [data-t="ouvrir"]');
+  await page.waitForSelector('#trace-resume .stats');
+  verif('réouverture du tracé', (await page.inputValue('#nom-trace')) === 'Boucle « test » & co' && (await page.$$('#carte-trace .repere-trace')).length === 3);
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
 
   // Transitions natives (View Transitions) : sens « avant », « retour », « onglet »
   await page.evaluate(() => {
