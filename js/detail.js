@@ -15,7 +15,7 @@ import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './carte-statique.js';
-import { afficherSegmentsSortie, fermerApercuSegment } from './segments.js';
+import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties } from './segments.js';
 import { gpxDepuisSortie, nomFichierGpx } from './routage.js';
 import { telecharger } from './sauvegarde.js';
 
@@ -403,6 +403,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
   const intervalleS = intervalleTypiqueS(pts);
   const courbes = blocCourbes(pts, axe);
   const d = new Date(s.debut);
+  const nbRecords = (await recordsDesSorties().catch(() => new Map())).get(s.id) ?? 0;
 
   const zonesP = puissance.length && profil.ftpW
     ? blocZones(estimee ? 'Zones de puissance (estimée)' : 'Zones de puissance', tempsParZone(puissance, ZONES_PUISSANCE, profil.ftpW), 'W', 'var(--puissance)',
@@ -427,7 +428,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
 
   page.innerHTML = `
   <section class="detail-entete">
-    <h2 class="detail-nom">${echapper(s.nom || s.nomSport)}</h2>
+    <h2 class="detail-nom">${echapper(s.nom || s.nomSport)}${nbRecords ? ` <span class="coupe-pr grande" title="${nbRecords} record${nbRecords > 1 ? 's' : ''} perso sur des segments">🏆<b>${nbRecords}</b></span>` : ''}</h2>
     <p class="detail-date">${majuscule(fmtJourLong.format(d))} · ${fmtHeure.format(d)}${s.nom ? ` · ${echapper(s.nomSport)}` : ''}</p>
     <div class="chiffres grands">
       ${s.distanceM ? `<span class="chiffre">${km(s.distanceM)}<small>km</small></span>` : ''}

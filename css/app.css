@@ -282,6 +282,17 @@ a.sortie:active { background: var(--surface-2); }
   background: var(--surface-2); color: var(--texte);
 }
 .sortie-titres { min-width: 0; }
+/* Coupe en or : nombre de records perso battus sur les segments */
+.coupe-pr {
+  margin-left: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; flex: none;
+  padding: 3px 9px 3px 7px; border-radius: 999px; font-size: 14px; line-height: 1.2; white-space: nowrap;
+  background: color-mix(in srgb, #f2c230 20%, transparent); border: 1px solid color-mix(in srgb, #f2c230 55%, transparent);
+}
+.coupe-pr b { font-family: var(--police-chiffres); font-size: 16px; color: #9a6b00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .coupe-pr b { color: #f2c230; } }
+:root[data-theme="dark"] .coupe-pr b { color: #f2c230; }
+.coupe-pr.grande { vertical-align: middle; margin-left: 6px; font-size: 16px; }
+.coupe-pr.grande b { font-size: 19px; }
 .sortie-nom { margin: 0; font-weight: 700; font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
 .sortie-date { margin: 1px 0 0; color: var(--texte-3); font-size: 13px; }
 .stats { display: flex; gap: 22px; margin-top: 12px; flex-wrap: wrap; }

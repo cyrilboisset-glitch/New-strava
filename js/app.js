@@ -8,7 +8,7 @@ import { htmlCarteStatique } from './carte-statique.js';
 import { afficherDetail, fermerDetail } from './detail.js';
 import { afficherReglages } from './reglages.js';
 import { afficherProgres, htmlFiltres } from './progres.js';
-import { afficherSegment, mettreAJourPassages } from './segments.js';
+import { afficherSegment, mettreAJourPassages, suivreRecherche, recordsDesSorties } from './segments.js';
 import { afficherTraces, fermerTraces } from './traces.js';
 import { brancherCache } from './lieux.js';
 import { iconeSport } from './icones.js';
@@ -21,7 +21,7 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.14.0 · noms, heure, segments sur les tracés';
+export const VERSION_APPLI = '0.15.0 · segments automatiques et records';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -48,7 +48,8 @@ function apercu(trace) {
 
 // ---- Liste -----------------------------------------------------------------
 
-function carteSortie(s, profil) {
+// nbRecords : records perso battus sur les segments (petite coupe en or)
+function carteSortie(s, profil, nbRecords = 0) {
   const d = new Date(s.debut);
   const { tss } = chargeSortie(s, profil.ftpW);
   const stats = [];
@@ -70,11 +71,16 @@ function carteSortie(s, profil) {
         <p class="sortie-nom">${echapper(s.nom || s.nomSport)}</p>
         <p class="sortie-date">${majuscule(fmtJour.format(d))} · ${fmtHeure.format(d)}${s.nom ? ` · ${echapper(s.nomSport)}` : ''}</p>
       </div>
+      ${nbRecords ? coupeRecords(nbRecords) : ''}
     </div>
     ${stats.length ? `<div class="stats">${stats.map(([l, v]) => `<div><span class="stat-label">${l}</span><span class="stat-val">${v}</span></div>`).join('')}</div>` : ''}
     ${effort.length ? `<div class="effort">${effort.join('')}</div>` : ''}
     ${apercu(s.trace)}
   </a>`;
+}
+
+export function coupeRecords(n) {
+  return `<span class="coupe-pr" title="${n} record${n > 1 ? 's' : ''} perso sur des segments" aria-label="${n} record${n > 1 ? 's' : ''} perso">🏆<b>${n}</b></span>`;
 }
 
 // Boutons de tri : « Tout » + chaque famille présente, la plus fréquente d'abord
@@ -103,6 +109,7 @@ el.choixActivite.addEventListener('change', async () => {
 async function afficherListe() {
   const toutes = await toutesLesSorties();
   const profil = await lireProfil(toutes);
+  const records = await recordsDesSorties().catch(() => new Map());
   el.vide.hidden = toutes.length > 0;
   afficherFiltres(toutes);
   const sorties = toutes
@@ -132,7 +139,7 @@ async function afficherListe() {
           dist > 0 ? `${nombre(dplus)} m D+` : '',
         ].filter(Boolean).join(' · ')}</p>
       </div>
-      ${liste.map((s) => carteSortie(s, profil)).join('')}
+      ${liste.map((s) => carteSortie(s, profil, records.get(s.id))).join('')}
     </section>`;
   }
   el.liste.innerHTML = html;
@@ -190,6 +197,9 @@ el.menuSynchro.addEventListener('click', (e) => { if (e.target.closest('.menu-it
 document.addEventListener('click', (e) => { if (menuOuvert() && !e.target.closest('.menu')) ouvrirMenu(false); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOuvert()) { ouvrirMenu(false); el.btnMenuSynchro.focus(); } });
 $('btn-restaurer-menu').addEventListener('click', () => el.champ.click());
+
+// Avancement de l'analyse des segments dans le bandeau (sauf pendant un import)
+suivreRecherche((t) => { if (!occupe) progression(t); });
 
 function progression(texte) {
   el.progression.hidden = !texte;
@@ -320,7 +330,9 @@ el.champ.addEventListener('change', async () => {
 
 // Passages sur les segments : nouvelles sorties, ou recherche interrompue (en arrière-plan)
 function chercherSegments() {
-  mettreAJourPassages().catch((e) => console.warn('Segments', e));
+  // records perso : la liste se met à jour quand l'analyse a trouvé des passages
+  mettreAJourPassages().then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
+    .catch((e) => console.warn('Segments', e));
   // puissance estimée des sorties sans capteur, puis liste à jour (TSS)
   calculerEstimationsManquantes().then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
     .catch((e) => console.warn('Estimations', e));

@@ -56,6 +56,16 @@ function fausseTuile() {
 let echecs = 0;
 const verif = (nom, ok, info = '') => { console.log(`${ok ? '✓' : '✗'} ${nom}${!ok && info ? ' — ' + info : ''}`); if (!ok) echecs++; };
 
+// Attend qu'une condition calculée dans la page (fonction async) soit vraie
+async function attendre(page, f, arg, ms = 20000) {
+  const fin = Date.now() + ms;
+  while (Date.now() < fin) {
+    if (await page.evaluate(f, arg)) return true;
+    await page.waitForTimeout(250);
+  }
+  throw new Error(`attente dépassée : ${f.toString().slice(0, 120)}`);
+}
+
 async function texteToast(page) {
   await page.waitForSelector('#toast:not([hidden])', { timeout: 30000 });
   const t = await page.textContent('#toast');
@@ -319,7 +329,7 @@ async function texteToast(page) {
   await page.setInputFiles('#champ-fichier', { name: 'col-bis.gpx', mimeType: 'application/gpx+xml',
     buffer: Buffer.from(fauxGpx({ pauseS: 600, debutMs: Date.UTC(2025, 4, 17, 7), nom: 'Col du test bis' })) });
   verif('sortie bis importée', (await texteToast(page)).includes('1 nouvelle sortie'));
-  await page.waitForFunction(async () => (await (await import('./js/segments.js')).lirePassages()).length === 2, null, { timeout: 20000 });
+  await attendre(page, async () => (await (await import('./js/segments.js')).lirePassages()).length === 2, null);
   await page.click('#bloc-segments-sortie .passage');
   await page.waitForSelector('#page-segment .passage');
   verif('page du segment', (await page.textContent('#titre-page')) === 'Segment' && (await page.textContent('#page-segment .detail-nom')) === 'Faux plat du test');
@@ -351,30 +361,39 @@ async function texteToast(page) {
     await new Promise((ok) => { tx.oncomplete = ok; });
   });
 
-  // « Voir » une montée détectée : carte de la sortie avec le segment en bleu, puis 3D du segment seul
+  // Segments automatiques : une sortie avec une montée (3 km à 6 %) et un sprint (900 W pendant 15 s)
   await page.setInputFiles('#champ-fichier', { name: 'montee.gpx', mimeType: 'application/gpx+xml',
-    buffer: Buffer.from(fauxGpx({ montee: true, lon: 5.7, debutMs: Date.UTC(2025, 4, 18, 7), nom: 'Montée à voir' })) });
+    buffer: Buffer.from(fauxGpx({ montee: true, lon: 5.7, vitesseKmh: 25, sprintW: 900, debutMs: Date.UTC(2025, 4, 18, 7), nom: 'Montée à voir' })) });
   verif('sortie avec montée importée', (await texteToast(page)).includes('1 nouvelle sortie'));
   const idMontee = await page.evaluate(async () => (await (await import('./js/db.js')).toutesLesSorties()).find((x) => x.nom === 'Montée à voir').id);
+  await attendre(page, async (id) => {
+    const l = await (await import('./js/segments.js')).lireSegments();
+    return l.some((g) => g.auto && g.type === 'Montée' && g.sortieOrigine === id) && l.some((g) => g.auto && g.type === 'Sprint' && g.sortieOrigine === id);
+  }, idMontee);
+  const autos = await page.evaluate(async (id) => (await (await import('./js/segments.js')).lireSegments()).filter((g) => g.sortieOrigine === id)
+    .map((g) => ({ type: g.type, km: Math.round(g.distanceM / 100) / 10, pente: Math.round(g.penteMoyPct * 10) / 10 })), idMontee);
+  verif('segments automatiques : la montée (≈ 3 km à 6 %) et le sprint (≥ 700 W), rien d\'autre', autos.length === 2
+    && autos.some((a) => a.type === 'Montée' && Math.abs(a.km - 3) <= 0.4 && Math.abs(a.pente - 6) <= 0.6) && autos.some((a) => a.type === 'Sprint'), JSON.stringify(autos));
+  verif('Col du test (1,2 %, 200 W) : aucun segment automatique', await page.evaluate(async () => !(await (await import('./js/segments.js')).lireSegments()).some((g) => g.auto && g.sortieOrigine === 'strava-222')));
+  await attendre(page, async (id) => (await (await import('./js/segments.js')).lireSegments()).some((g) => g.sortieOrigine === id && g.nom === 'Montée du col du Test'), idMontee);
+  verif('nom de la montée avec les lieux : col trouvé en haut (OpenStreetMap)', true);
   await page.goto(URL_APPLI + '#sortie=' + encodeURIComponent(idMontee));
-  await page.waitForSelector('#bloc-segments-sortie .proposition');
-  const propTxt = (await page.textContent('#bloc-segments-sortie .proposition')).replace(/\s+/g, ' ');
-  verif('montée détectée (3 km à 6 %), boutons Voir et Suivre', /Montée .*à [56],\d %.*Voir.*Suivre/.test(propTxt), propTxt);
-  await page.waitForFunction(() => document.querySelector('[data-nom-prop="0"]')?.textContent === 'Montée du col du Test', null, { timeout: 15000 });
-  verif('nom proposé : col trouvé en haut de la montée (OpenStreetMap)', true);
-  await page.click('#bloc-segments-sortie [data-voir="p0"]');
+  await page.waitForSelector('#bloc-segments-sortie .passage-suivi');
+  const suivis = (await page.textContent('#bloc-segments-sortie .passages')).replace(/\s+/g, ' ');
+  verif('détail : montée et sprint suivis d\'office, plus rien à « Suivre »', suivis.includes('Montée du col du Test') && suivis.includes('Sprint') && !(await page.$('#bloc-segments-sortie .proposition')), suivis);
+  verif('premier passage : pas de coupe', !(await page.$('#page-detail .coupe-pr')));
+  // « Voir » sur la montée suivie : carte de la sortie avec le segment en bleu, puis 3D du segment seul
+  await page.click('#bloc-segments-sortie [data-voir="s0"]');
   await page.waitForSelector('#bloc-segments-sortie .carte-segment .trait-segment', { state: 'attached' });
   const traits = await page.$$eval('#bloc-segments-sortie .carte-segment path.leaflet-interactive', (ps) => ps.map((p) => p.getAttribute('stroke')));
   verif('carte : la sortie en orange, le segment en bleu par-dessus', traits.includes('#1e88e5') && traits.some((c) => c && c.startsWith('#e')), JSON.stringify(traits));
   const largeurs = await page.evaluate(() => {
     const r = (sel) => document.querySelector(sel).getBoundingClientRect();
-    const seg = r('#bloc-segments-sortie .trait-segment');
-    const carte = r('#bloc-segments-sortie .carte-segment');
-    return { seg: seg.height, carte: carte.height };
+    return { seg: r('#bloc-segments-sortie .trait-segment').height, carte: r('#bloc-segments-sortie .carte-segment').height };
   });
-  // 3 km sur 30 km de sortie toute droite vers le nord : le segment fait ~1/10 de la hauteur de la carte
-  verif('carte cadrée sur toute la sortie (segment ≈ 1/10 de la hauteur)', largeurs.seg > 10 && largeurs.seg < largeurs.carte * 0.2, JSON.stringify(largeurs));
-  verif('bouton Fermer', (await page.textContent('#bloc-segments-sortie [data-voir="p0"]')) === 'Fermer');
+  // 3 km sur 25 km de sortie toute droite vers le nord : le segment fait ~1/8 de la hauteur de la carte
+  verif('carte cadrée sur toute la sortie (segment ≈ 1/8 de la hauteur)', largeurs.seg > 10 && largeurs.seg < largeurs.carte * 0.25, JSON.stringify(largeurs));
+  verif('bouton Fermer', (await page.textContent('#bloc-segments-sortie [data-voir="s0"]')) === 'Fermer');
   await page.locator('#bloc-segments-sortie .apercu-segment').scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(CAPTURES, 'segment-voir-carte.png') });
@@ -390,15 +409,48 @@ async function texteToast(page) {
   verif('3D : ruban en couleurs de montée (orange, 6 %)', pentes > 200, String(pentes));
   await page.locator('#bloc-segments-sortie .apercu-segment').scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(CAPTURES, 'segment-voir-3d.png') });
-  await page.click('#bloc-segments-sortie [data-voir="p0"]');
+  await page.click('#bloc-segments-sortie [data-voir="s0"]');
   verif('Fermer : aperçu retiré', !(await page.$('#bloc-segments-sortie .apercu-segment')));
-  await page.evaluate(async (id) => {
-    const db = await (await import('./js/db.js')).ouvrirBase();
-    const tx = db.transaction(['sorties', 'fichiers'], 'readwrite');
-    tx.objectStore('sorties').delete(id);
-    tx.objectStore('fichiers').delete(id);
+
+  // Même route une semaine après, plus vite (30 km/h) : 3 records perso -> coupe « 3 » : la montée, le sprint
+  // de la 1re sortie, et son propre sprint (plus loin), où la 1re sortie était passée moins vite
+  await page.setInputFiles('#champ-fichier', { name: 'montee-bis.gpx', mimeType: 'application/gpx+xml',
+    buffer: Buffer.from(fauxGpx({ montee: true, lon: 5.7, vitesseKmh: 30, sprintW: 900, debutMs: Date.UTC(2025, 4, 25, 7), nom: 'Montée plus vite' })) });
+  verif('deuxième sortie importée', (await texteToast(page)).includes('1 nouvelle sortie'));
+  const idBis = await page.evaluate(async () => (await (await import('./js/db.js')).toutesLesSorties()).find((x) => x.nom === 'Montée plus vite').id);
+  await attendre(page, async (id) => ((await (await import('./js/segments.js')).recordsDesSorties()).get(id) ?? 0) >= 3, idBis);
+  const segBis = await page.evaluate(async (ids) => {
+    const l = await (await import('./js/segments.js')).lireSegments();
+    return { montees: l.filter((g) => g.type === 'Montée' && ids.includes(g.sortieOrigine)).length, sprintsBis: l.filter((g) => g.type === 'Sprint' && g.sortieOrigine === ids[1]).length };
+  }, [idMontee, idBis]);
+  verif('pas de doublon : une seule montée ; le sprint de la 2e sortie (ailleurs) devient un segment', segBis.montees === 1 && segBis.sprintsBis === 1, JSON.stringify(segBis));
+  await page.goto(URL_APPLI);
+  await page.waitForSelector('#accueil:not([hidden]) a.sortie');
+  await page.waitForSelector(`a.sortie[href="#sortie=${encodeURIComponent(idBis)}"] .coupe-pr`, { timeout: 10000 });
+  const coupe = await page.textContent(`a.sortie[href="#sortie=${encodeURIComponent(idBis)}"] .coupe-pr`);
+  verif('liste : coupe en or avec 3 records', coupe.replace(/\s+/g, '') === '🏆3', coupe);
+  verif('liste : pas de coupe sur la première sortie', !(await page.$(`a.sortie[href="#sortie=${encodeURIComponent(idMontee)}"] .coupe-pr`)));
+  await page.locator(`a.sortie[href="#sortie=${encodeURIComponent(idBis)}"]`).screenshot({ path: path.join(CAPTURES, 'carte-records.png') });
+  await page.click(`a.sortie[href="#sortie=${encodeURIComponent(idBis)}"]`);
+  await page.waitForSelector('#page-detail .detail-nom .coupe-pr');
+  verif('détail : coupe 3 à côté du nom', (await page.textContent('#page-detail .detail-nom .coupe-pr')).replace(/\s+/g, '') === '🏆3');
+  await page.waitForSelector('#bloc-segments-sortie .passage-suivi');
+  verif('détail : record perso sur la montée', /Montée du col du Test.*Record perso/.test((await page.textContent('#bloc-segments-sortie')).replace(/\s+/g, ' ')));
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(CAPTURES, 'detail-records.png') });
+
+  // On retire ces deux sorties, leurs segments et leurs passages (la suite compte les sorties de l'archive)
+  await page.evaluate(async (ids) => {
+    const db = await import('./js/db.js');
+    const base = await db.ouvrirBase();
+    const tx = base.transaction(['sorties', 'fichiers'], 'readwrite');
+    for (const id of ids) { tx.objectStore('sorties').delete(id); tx.objectStore('fichiers').delete(id); }
     await new Promise((ok) => { tx.oncomplete = ok; });
-  }, idMontee);
+    await db.ecrireReglage('segments', ((await db.lireReglage('segments')) ?? []).filter((g) => !ids.includes(g.sortieOrigine)));
+    await db.ecrireReglage('passages', ((await db.lireReglage('passages')) ?? []).filter((p) => !ids.includes(p.sortieId)));
+  }, [idMontee, idBis]);
 
   await page.click('#btn-retour');
   await page.waitForSelector('#onglet-sorties', { state: 'visible' });
@@ -659,7 +711,7 @@ async function texteToast(page) {
   verif('nouvelle sortie vélo : vélo par défaut', veloAuto === 'Canyon Endurace', String(veloAuto));
 
   // 7. Hors ligne : la liste et le détail (trace, courbes) restent disponibles
-  await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active, null, { timeout: 15000 });
+  await attendre(page, async () => !!(await navigator.serviceWorker.getRegistration())?.active, null);
   await page.reload();
   await page.waitForFunction(() => !!navigator.serviceWorker.controller);
   await ctx.setOffline(true);
@@ -682,10 +734,10 @@ async function texteToast(page) {
   await page.setInputFiles('#champ-fichier', { name: 'sans-capteur.gpx', mimeType: 'application/gpx+xml',
     buffer: Buffer.from(fauxGpx({ puissance: false, debutMs: Date.UTC(2025, 4, 17, 7), nom: 'Sans capteur' })) });
   verif('sortie sans capteur importée', (await texteToast(page)).includes('1 nouvelle sortie'));
-  await page.waitForFunction(async () => {
+  await attendre(page, async () => {
     const s = (await (await import('./js/db.js')).toutesLesSorties()).find((x) => x.nom === 'Sans capteur');
     return s?.puissanceEstimee?.normW > 0;
-  }, null, { timeout: 15000 });
+  }, null);
   await page.waitForFunction(() => /≈ \d+ W NP estimée/.test(document.querySelector('a.sortie[href*="gpx-"]')?.textContent ?? document.getElementById('liste').textContent), null, { timeout: 5000 }).catch(() => {});
   const carteSansCapteur = (await page.textContent('a.sortie:has-text("Sans capteur")')).replace(/\s+/g, ' ');
   // moitié à 1,2 % (≈ 257 W), moitié à plat (≈ 150 W) : NP estimée autour de 215 W
