@@ -599,6 +599,10 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .proposition { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--ligne); }
 .proposition > span { flex: 1; min-width: 0; }
 .proposition small { display: block; font-size: 12px; color: var(--texte-3); }
+.apercu-segment { padding: 0 0 12px; }
+.apercu-segment .segments.vues { margin-top: 2px; }
+.apercu-segment .carte-parcours { margin-top: 8px; height: 240px; }
+.apercu-segment .vue3d { height: 320px; }
 .creation { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--ligne); }
 .creation summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--accent-trait); padding: 6px 0; }
 .creation .btn.principal { margin-top: 4px; }

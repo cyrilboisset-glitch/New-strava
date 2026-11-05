@@ -15,7 +15,7 @@ import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './traces.js';
-import { afficherSegmentsSortie } from './segments.js';
+import { afficherSegmentsSortie, fermerApercuSegment } from './segments.js';
 
 const COLONNES_COURBE = 300; // points dessinés par courbe (moyenne par colonne)
 
@@ -39,6 +39,7 @@ let indexCurseur = null; // point de la sortie sous le curseur des courbes (cré
 export function fermerDetail() {
   if (carte) { retirerCarte(carte); carte = null; }
   if (vue3d) { vue3d.detruire(); vue3d = null; }
+  fermerApercuSegment();
   indexCurseur = null;
 }
 

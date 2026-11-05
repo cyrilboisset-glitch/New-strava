@@ -247,6 +247,14 @@ l'instant »** — à proposer quand il voudra :
   Zepp OS. Demander à Cyril d'essayer « Partager » vers Gadgetbridge, sinon
   appli iGPSport ou câble USB. BRouter non joignable depuis l'environnement
   de Claude : testé avec une fausse réponse (CORS supposé ouvert).
+- **« Voir » un segment détecté : FAIT le 5 nov. 2026** (v0.13.0, demande de
+  Cyril). Bouton « Voir » à côté de « Suivre » dans le bloc Segments du détail :
+  ouvre sous la ligne la carte Leaflet de toute la sortie (trait orange pâli) avec
+  le segment en bleu (#1e88e5, liseré blanc, début vert / fin noire), et « 3D du
+  segment » (creerVue3d sur les seuls points du segment). Un seul aperçu ouvert
+  (`apercu` dans segments.js, libéré par `fermerApercuSegment()` depuis
+  fermerDetail). Pas de « Voir » sur les segments déjà suivis (lien vers la page
+  du segment).
 - **Liste des tâches à faire (demandée par Cyril le 4 nov. 2026), dans
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :
