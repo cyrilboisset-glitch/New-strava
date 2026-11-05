@@ -93,7 +93,8 @@ js/carte-statique.js        Petites cartes : tuiles OSM (Web Mercator) sous le t
 js/parcours.js              Même parcours (trace simplifiée) : comparaison, groupes, classement
 js/puissance-estimee.js     Puissance estimée sans capteur (vitesse, pente, masse ; modèle Parcours 3D)
 js/routage.js               Création de parcours (sans navigateur) : BRouter, GPX, D+, temps estimé
-js/traces.js                Onglet Tracés : carte d'édition, profil, 3D, enregistrer / exporter / partager
+js/traces.js                Onglet Tracés : carte d'édition, profil, 3D, vent, enregistrer / exporter / partager
+js/vent.js                  Vent (repris d'Appli-vent) : Open-Meteo, vent dans l'axe, temps avec le vent, sens, heures
 js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
 js/format.js                Mise en forme (nombres, durées, dates)
 vendor/leaflet/             Leaflet 1.9.4 (BSD-2) ; fond OSM chargé en ligne
@@ -111,6 +112,7 @@ tests/test-analyse.mjs      Efforts, zones, IF/TSS, FTP estimée (valeurs connue
 tests/test-stats.mjs        Bilans, forme / fatigue, records (TZ=Europe/Paris)
 tests/test-vue3d.mjs        Trace 3D : longueur, pentes, curseur, boucle
 tests/test-segments.mjs     Segments : temps (aussi à 8 s), sens, écart, détour, tours, montées, sprints
+tests/test-vent.mjs         Vent : caps, interpolation, temps avec le vent, sens conseillé, meilleure heure
 tests/test-routage.mjs      Tracés : adresse et réponse BRouter, GPX, D+, temps à puissance constante
 tests/test-estimation.mjs   Puissance estimée (150 W à plat / 257 W à 1,2 %), même parcours, tuiles
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
@@ -262,10 +264,20 @@ l'instant »** — à proposer quand il voudra :
      séances (FIT, GPX…). Ne jamais modifier le dépôt Zwift.
   3. **Changer la nature d'une activité** (vélo, marche, musculation…), en
      recalculant ce qui en dépend (tri, totaux, vélo, puissance estimée).
-  4. **Bibliothèque de traces GPX avec conseil de sens selon le vent**
-     (fusion de `cyrilboisset-glitch/Appli-vent`) : prévision de vent =
-     service météo en ligne, demander l'accord de Cyril (seule la zone
-     du parcours serait envoyée).
+  4. **Conseil de sens et d'heure selon le vent : FAIT le 5 nov. 2026**
+     (v0.12.0, demandé par Cyril : « merge l'appli sens du vent ») dans
+     l'onglet Tracés. Moteur d'Appli-vent traduit dans `js/vent.js`
+     (Open-Meteo sans clé, ~30 points du tracé envoyés ; 70 % du vent à
+     10 m ; sens = vent dans le dos sur le dernier tiers, égalité < 1,5 km/h
+     -> ensemble ; puissance +30 % en montée, roue libre à -6 %, 50 km/h
+     maxi, densité de l'air) ; jour (7 jours), départs de 6 h à 20 h,
+     meilleure heure = plus courte avec le vent parmi celles sans pluie
+     probable (< 50 %) ; « mettre le tracé dans ce sens » (inverse la
+     géométrie sans recalcul) ; case « Couleurs du vent » sur la 3D
+     (`vue3d.colorer`, rouge face -> gris travers -> bleu dos). Open-Meteo
+     injoignable depuis l'environnement de Claude : testé avec une fausse
+     réponse. Reste à faire de la tâche : la bibliothèque de traces GPX
+     (import de GPX existants), températures / tenue d'Appli-vent non reprises.
   5. **Fusion de Cycling Coach** (`cyrilboisset-glitch/Velo-coach`) et
      **envoi du suivi GPS en direct** pendant la sortie (pas un rapport).
      Lien probable avec le projet Suivi-direct (appli Flutter + page web

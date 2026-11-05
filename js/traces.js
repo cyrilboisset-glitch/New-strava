@@ -8,12 +8,16 @@ import {
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { telecharger } from './sauvegarde.js';
 import { nombre, km, duree, echapper, fmtDate } from './format.js';
+import { chargerMeteo, planifier, echantillonner, couleurVent, CLASSES_VENT, pointCardinal } from './vent.js';
 
 const CENTRE_DEFAUT = [45.188, 5.725]; // Grenoble
 const PUISSANCE_DEFAUT_W = 150; // comme le temps estimé de Parcours 3D
 
 // Tracé en cours (gardé quand on change d'onglet)
 const ed = { id: null, nom: '', profil: 'fastbike', points: [], route: null, calcul: 0, erreur: '' };
+// Vent : prévisions gardées pour le tracé en cours, plan (heures × sens), heure choisie, couleurs
+const vent = { series: null, jour: 0, plan: null, choix: null, couleurs: false, erreur: '', enCours: false };
+const oublierVent = () => Object.assign(vent, { series: null, plan: null, choix: null, erreur: '' });
 let carte = null;
 let couches = null;
 let vue3d = null;
@@ -111,6 +115,7 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
   if (idAOuvrir) await ouvrir(idAOuvrir);
   const profil = await lireProfil();
   const puissanceW = (await lireReglage('puissanceParcoursW')) ?? PUISSANCE_DEFAUT_W;
+  planPoids = profil.poidsKg ?? 98;
   page.innerHTML = `
   <section class="editeur-trace">
     <div class="carte-trace" id="carte-trace"></div>
@@ -136,6 +141,20 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
     </div>
     <div id="trace-profil"></div>
     <div class="vue3d" id="trace-3d" hidden></div>
+    <section class="carte bloc" id="bloc-vent" hidden>
+      <h2 class="bloc-titre">Vent : quand partir, dans quel sens ?</h2>
+      <div class="vent-choix">
+        <label class="menu-bouton choix-jour">
+          <span class="menu-libelle">Jour</span>
+          <select id="jour-vent">${joursProposes().map(([v, t]) => `<option value="${v}"${v === vent.jour ? ' selected' : ''}>${t}</option>`).join('')}</select>
+          <svg class="chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </label>
+        <button class="btn principal" type="button" data-a="vent">Prévoir</button>
+      </div>
+      <div id="vent-resultat"></div>
+      <label class="case"><input type="checkbox" id="couleurs-vent"${vent.couleurs ? ' checked' : ''}> Couleurs du vent sur la 3D (bleu : dans le dos, rouge : de face)</label>
+      <p class="bloc-note">Repris de l'appli « Vent et températures » : prévisions Open-Meteo (seule la zone du parcours, une trentaine de points, est envoyée). Sens conseillé : vent dans le dos sur le dernier tiers. Durée avec le vent prévu : puissance pour le temps estimé sur le plat, +30 % en montée, roue libre en descente.</p>
+    </section>
     <div class="trace-enregistrement">
       <label class="champ-ligne"><span>Nom du tracé</span><input id="nom-trace" type="text" maxlength="60" value="${echapper(ed.nom)}" placeholder="Ex. : boucle du Vercors"></label>
       <label class="champ-ligne"><span>Puissance pour le temps estimé (W)</span><input id="puissance-trace" type="number" inputmode="numeric" min="50" max="600" value="${puissanceW}"></label>
@@ -178,9 +197,17 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
     const b = e.target.closest('button');
     if (b) montrerVue(page, b.dataset.valeur);
   });
+  page.querySelector('#jour-vent').addEventListener('change', (e) => { vent.jour = Number(e.target.value); oublierVent(); afficherVent(page); });
+  page.querySelector('#couleurs-vent').addEventListener('change', (e) => { vent.couleurs = e.target.checked; appliquerCouleursVent(); afficherVent(page); });
+  page.querySelector('#vent-resultat').addEventListener('click', (e) => {
+    const ligne = e.target.closest('[data-heure]');
+    if (ligne) { vent.choix = Number(ligne.dataset.heure); afficherVent(page); appliquerCouleursVent(); return; }
+    if (e.target.closest('[data-a="sens-vent"]')) mettreDansLeSens(page, profil);
+  });
   page.querySelector('.editeur-trace').addEventListener('click', async (e) => {
     const a = e.target.closest('[data-a]')?.dataset.a;
     if (!a) return;
+    if (a === 'vent') { await prevoirVent(page, profil); return; }
     if (a === 'annuler') { ed.points.pop(); recalculer(page, profil); }
     else if (a === 'boucle') {
       if (ed.points.length < 2) { toastFn('Place au moins deux points.'); return; }
@@ -230,6 +257,7 @@ function recalculer(page, profil) {
       const route = await calculerRoute(ed.points, ed.profil);
       if (n !== ed.calcul) return; // une demande plus récente est partie
       ed.route = route;
+      oublierVent(); // nouveau tracé : prévisions et plan à refaire
       ed.erreur = '';
     } catch (e) {
       if (n !== ed.calcul) return;
@@ -270,6 +298,7 @@ function dessiner(page, profil, enCalcul = false) {
   const boutonsVue = page.querySelector('[data-segments="vue-trace"]');
   if (!ed.route || ed.points.length < 2) {
     resume.innerHTML = ''; blocProfil.innerHTML = ''; boutonsVue.hidden = true;
+    page.querySelector('#bloc-vent').hidden = true;
     montrerVue(page, 'profil');
     return;
   }
@@ -283,6 +312,8 @@ function dessiner(page, profil, enCalcul = false) {
   </div>`;
   blocProfil.innerHTML = st.avecAltitude ? profilSvg(ed.route) : '<p class="aide">Pas d\'altitude en ligne droite : profil et 3D indisponibles.</p>';
   boutonsVue.hidden = !st.avecAltitude;
+  page.querySelector('#bloc-vent').hidden = false;
+  afficherVent(page);
   installerCurseurProfil(page);
   if (vue3d) { vue3d.detruire(); vue3d = null; montrerVue(page, 'profil'); }
 }
@@ -324,8 +355,121 @@ function montrerVue(page, mode) {
   vue.hidden = mode !== '3d';
   if (mode === '3d' && ed.route) {
     if (!vue3d) vue3d = creerVue3d(vue, pointsDeRoute(ed.route.coords));
+    appliquerCouleursVent();
     vue3d?.afficher(true);
   } else vue3d?.afficher(false);
+}
+
+// ---- Vent : prévisions, plan des heures de départ, couleurs --------------------------
+
+const fmtHeureCourte = (ms) => `${new Date(ms).getHours()} h`;
+
+function joursProposes() {
+  const fmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' });
+  return Array.from({ length: 7 }, (_, k) => {
+    const d = new Date(); d.setDate(d.getDate() + k);
+    return [k, k === 0 ? "Aujourd'hui" : k === 1 ? 'Demain' : fmt.format(d).replace(/^./, (c) => c.toUpperCase())];
+  });
+}
+
+// Heures de départ proposées : de 6 h à 20 h (aujourd'hui : à partir de l'heure suivante)
+export function heuresDeDepart(jourDecale, maintenant = new Date()) {
+  const res = [];
+  for (let h = 6; h <= 20; h++) {
+    const d = new Date(maintenant); d.setDate(d.getDate() + jourDecale); d.setHours(h, 0, 0, 0);
+    if (d.getTime() > maintenant.getTime()) res.push(d.getTime());
+  }
+  return res;
+}
+
+async function prevoirVent(page, profil) {
+  if (!ed.route || vent.enCours) return;
+  const departs = heuresDeDepart(vent.jour);
+  if (!departs.length) { vent.erreur = 'plus d\'heure de départ possible aujourd\'hui : choisis un autre jour'; afficherVent(page); return; }
+  vent.enCours = true; vent.erreur = '';
+  afficherVent(page);
+  try {
+    const L = ed.route.distanceM;
+    const pointsMeteo = echantillonner(ed.route.coords, Math.max(500, L / 29));
+    // durée la plus longue imaginable : 12 km/h de moyenne
+    vent.series = await chargerMeteo(pointsMeteo, departs[0], departs[departs.length - 1] + (L / (12 / 3.6)) * 1000);
+    calculerPlan(page);
+  } catch (e) {
+    vent.erreur = e.message;
+  } finally {
+    vent.enCours = false;
+    afficherVent(page);
+  }
+}
+
+function calculerPlan(page) {
+  const platW = Number(page.querySelector('#puissance-trace')?.value) || PUISSANCE_DEFAUT_W;
+  vent.plan = planifier(ed.route.coords, vent.series, heuresDeDepart(vent.jour), platW, planPoids + 8);
+  vent.choix = vent.plan.meilleure.debutMs;
+  appliquerCouleursVent();
+}
+let planPoids = 98;
+
+// Mettre le tracé dans le sens conseillé (même géométrie, parcourue à l'envers)
+function mettreDansLeSens(page, profil) {
+  ed.points.reverse();
+  ed.route = { ...ed.route, coords: [...ed.route.coords].reverse() };
+  const series = vent.series;
+  dessiner(page, profil);
+  vent.series = series;
+  calculerPlan(page);
+  afficherVent(page);
+  toastFn('Tracé mis dans le sens conseillé.');
+}
+
+function heureChoisie() {
+  return vent.plan?.heures.find((h) => h.debutMs === vent.choix) ?? vent.plan?.meilleure ?? null;
+}
+
+function appliquerCouleursVent() {
+  if (!vue3d) return;
+  const h = heureChoisie();
+  if (!vent.couleurs || !h) { vue3d.colorer(null); return; }
+  // vent dans l'axe au passage, dans le sens du tracé tel qu'il est dessiné
+  const lignes = h.trace.lignes;
+  const a = (s) => {
+    let i = 0;
+    while (i < lignes.length - 1 && lignes[i + 1].distanceM <= s) i++;
+    return lignes[i].dos;
+  };
+  vue3d.colorer((s) => couleurVent(a(s)), CLASSES_VENT.map(([, c, t]) => [c, t]));
+}
+
+const signe = (v) => (Math.round(v) > 0 ? `+${Math.round(v)}` : Math.round(v) < 0 ? `−${Math.abs(Math.round(v))}` : '0');
+
+function afficherVent(page) {
+  const bloc = page.querySelector('#vent-resultat');
+  if (!bloc) return;
+  const caseCouleurs = page.querySelector('#couleurs-vent');
+  caseCouleurs.disabled = !vent.plan;
+  if (vent.enCours) { bloc.innerHTML = '<p class="progression">Prévisions météo…</p>'; return; }
+  if (vent.erreur) { bloc.innerHTML = `<p class="aide erreur">Prévision impossible : ${echapper(vent.erreur)}.</p>`; return; }
+  if (!vent.plan) { bloc.innerHTML = '<p class="aide">Choisis le jour puis « Prévoir » : l\'appli compare chaque heure de départ et les deux sens du tracé.</p>'; return; }
+  const m = vent.plan.meilleure;
+  const c = m.choix;
+  const sensTexte = m.sens === 'trace' ? 'dans le sens du tracé' : 'dans le sens inverse';
+  const choisie = heureChoisie();
+  bloc.innerHTML = `
+    <div class="vent-conseil">
+      <p><b>Pars à ${fmtHeureCourte(m.debutMs)}, ${sensTexte}</b> : ${duree(c.dureeS)} avec le vent prévu,
+        vent ${c.dosFin >= 0 ? 'dans le dos' : 'de face'} sur la fin (${signe(c.dosFin)} km/h).</p>
+      <p class="aide">Vent moyen ${Math.round(c.ventMoy)} km/h du ${pointCardinal(c.ventDe)} · ${Math.round(c.tempMin)} à ${Math.round(c.tempMax)} °C${c.pluieMax >= 20 ? ` · pluie ${Math.round(c.pluieMax)} %` : ''}.</p>
+      ${m.sens === 'inverse' ? '<button class="btn secondaire petit" type="button" data-a="sens-vent">⇄ Mettre le tracé dans ce sens</button>' : ''}
+    </div>
+    <div class="tableau-defile"><table class="tours vent-tableau">
+      <thead><tr><th>Départ</th><th>Sens</th><th>Durée</th><th>Vent fin</th><th>Pluie</th><th>°C</th></tr></thead>
+      <tbody>${vent.plan.heures.map((h) => `
+        <tr data-heure="${h.debutMs}" class="${h === m ? 'meilleure' : ''}${h === choisie ? ' choisie' : ''}">
+          <td>${fmtHeureCourte(h.debutMs)}</td><td>${h.sens === 'trace' ? 'tracé' : 'inverse ⇄'}</td><td>${duree(h.choix.dureeS)}</td>
+          <td><span class="pastille-vent" style="background:${couleurVent(h.choix.dosFin)}"></span>${signe(h.choix.dosFin)}</td>
+          <td>${Math.round(h.choix.pluieMax)} %</td><td>${Math.round(h.choix.tempMin)}–${Math.round(h.choix.tempMax)}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <p class="bloc-note">Touche une heure pour voir son vent sur la 3D (couleurs dans le sens du tracé tel qu'il est dessiné).</p>`;
 }
 
 async function enregistrer(page, profil) {

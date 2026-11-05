@@ -17,7 +17,7 @@ import {
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
-export const VERSION_APPLI = '0.11.0 · création de tracés';
+export const VERSION_APPLI = '0.12.0 · vent sur les tracés';
 
 const $ = (id) => document.getElementById(id);
 const el = {

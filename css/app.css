@@ -561,6 +561,21 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .trace-ligne { align-items: center; }
 .trace-actions { display: flex; gap: 6px; }
 #trace-3d { margin-top: 8px; }
+#bloc-vent { margin-top: 14px; }
+.vent-choix { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+.choix-jour select {
+  appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: var(--texte);
+  font: inherit; font-weight: 700; font-size: 15px; padding: 0; width: 100%; cursor: pointer;
+}
+.vent-conseil { margin: 12px 0 8px; padding: 12px; border-radius: 12px; background: var(--surface-2); }
+.vent-conseil p { margin: 0 0 6px; }
+.vent-tableau tr { cursor: pointer; }
+.vent-tableau tr.meilleure td { font-weight: 700; }
+.vent-tableau tr.choisie td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.pastille-vent { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+.aide.erreur { color: var(--danger); }
+.v3d-legende.vent span { color: #fff; }
+.v3d-legende.vent span:nth-child(3) { color: #13202b; }
 
 /* ---- Segments ---- */
 .passages { display: flex; flex-direction: column; }

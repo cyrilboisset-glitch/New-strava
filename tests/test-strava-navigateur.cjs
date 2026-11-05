@@ -86,6 +86,21 @@ async function texteToast(page) {
   // Faux BRouter : ligne droite entre les points, altitude qui monte de 3 % ;
   // le profil « safety » simule une panne de réseau
   const demandesBRouter = [];
+  // Fausse météo Open-Meteo : vent de nord-est, fort (25 km/h) avant 12 h UTC, faible (8 km/h) après ;
+  // pluie probable (80 %) à 15 h et 16 h UTC
+  const demandesMeteo = [];
+  await ctx.route(/api\.open-meteo\.com/, (r) => {
+    const u = new URL(r.request().url());
+    demandesMeteo.push(u.toString());
+    const n = u.searchParams.get('latitude').split(',').length;
+    const debut = Date.parse(`${u.searchParams.get('start_date')}T00:00:00Z`) / 1000;
+    const fin = Date.parse(`${u.searchParams.get('end_date')}T23:00:00Z`) / 1000;
+    const time = []; for (let t = debut; t <= fin; t += 3600) time.push(t);
+    const h = (t) => new Date(t * 1000).getUTCHours();
+    const lieu = { hourly: { time, temperature_2m: time.map(() => 10), wind_speed_10m: time.map((t) => (h(t) < 12 ? 25 : 8)),
+      wind_direction_10m: time.map(() => 45), wind_gusts_10m: time.map(() => 30), precipitation_probability: time.map((t) => (h(t) === 15 || h(t) === 16 ? 80 : 0)) } };
+    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(n === 1 ? lieu : Array(n).fill(lieu)) });
+  });
   await ctx.route(/brouter\.de\/brouter/, (r) => {
     const u = new URL(r.request().url());
     demandesBRouter.push(u.searchParams.get('profile'));
@@ -93,6 +108,13 @@ async function texteToast(page) {
     const pts = u.searchParams.get('lonlats').split('|').map((x) => x.split(',').map(Number));
     const coords = [];
     let d = 0;
+    // longueur totale d'abord : l'altitude monte à 3 % puis redescend (vraie boucle)
+    let total = 0;
+    for (let k = 0; k < pts.length - 1; k++) {
+      const kx0 = Math.cos(((pts[k][1] + pts[k + 1][1]) / 2) * Math.PI / 180);
+      total += Math.hypot((pts[k + 1][1] - pts[k][1]) * 111195, (pts[k + 1][0] - pts[k][0]) * 111195 * kx0);
+    }
+    const alt = (x) => 200 + Math.min(x, total - x) * 0.03;
     for (let k = 0; k < pts.length - 1; k++) {
       const [lo1, la1] = pts[k]; const [lo2, la2] = pts[k + 1];
       const kx = Math.cos(((la1 + la2) / 2) * Math.PI / 180);
@@ -100,12 +122,12 @@ async function texteToast(page) {
       const n = Math.max(2, Math.round(long / 20));
       for (let i = k ? 1 : 0; i <= n; i++) {
         const f = i / n;
-        coords.push([lo1 + (lo2 - lo1) * f, la1 + (la2 - la1) * f, 200 + (d + long * f) * 0.03]);
+        coords.push([lo1 + (lo2 - lo1) * f, la1 + (la2 - la1) * f, alt(d + long * f)]);
       }
       d += long;
     }
     r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
-      body: JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { 'track-length': String(Math.round(d)), 'filtered ascend': String(Math.round(d * 0.03)) }, geometry: { type: 'LineString', coordinates: coords } }] }) });
+      body: JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { 'track-length': String(Math.round(d)), 'filtered ascend': String(Math.round((d / 2) * 0.03)) }, geometry: { type: 'LineString', coordinates: coords } }] }) });
   });
   await ctx.route(/tile\.openstreetmap\.org/, (r) => { tuilesDemandees.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', body: fausseTuile() }); });
   const page = await ctx.newPage();
@@ -632,9 +654,9 @@ async function texteToast(page) {
   await page.waitForSelector('#trace-resume .stats', { timeout: 10000 });
   const statsTrace = (await page.textContent('#trace-resume')).replace(/\s+/g, ' ');
   const kmTrace = Number(statsTrace.match(/Distance\s*([\d,]+)/)[1].replace(',', '.'));
-  // le faux BRouter monte de 3 % : D+ = 3 % de la distance
+  // le faux BRouter monte de 3 % sur la première moitié : D+ = 1,5 % de la distance
   const dplusTrace = Number(statsTrace.match(/Dénivelé\s*([\d\s]+?)\s*m/)[1].replace(/\s/g, ''));
-  verif('tracé : distance et D+ (3 %)', kmTrace > 0.5 && Math.abs(dplusTrace - kmTrace * 30) <= 0.05 * kmTrace * 30 + 2, statsTrace);
+  verif('tracé : distance et D+ (3 % sur la moitié)', kmTrace > 0.5 && Math.abs(dplusTrace - kmTrace * 15) <= 0.05 * kmTrace * 15 + 2, statsTrace);
   verif('tracé : demande au profil « Route »', demandesBRouter.at(-1) === 'fastbike', JSON.stringify(demandesBRouter));
   verif('tracé : trait et 2 repères sur la carte', (await page.$$('#carte-trace .repere-trace')).length === 2 && !!(await page.$('#carte-trace path.leaflet-interactive')));
   verif('tracé : profil coloré', (await page.$$('.profil-trace rect')).length > 250);
@@ -680,6 +702,45 @@ async function texteToast(page) {
   await page.click('#mes-traces [data-t="ouvrir"]');
   await page.waitForSelector('#trace-resume .stats');
   verif('réouverture du tracé', (await page.inputValue('#nom-trace')) === 'Boucle « test » & co' && (await page.$$('#carte-trace .repere-trace')).length === 3);
+
+  // Vent : demain, chaque heure de 6 h à 20 h, les deux sens, la meilleure heure
+  verif('bloc vent affiché, couleurs inactives avant la prévision', await page.isVisible('#bloc-vent') && await page.$eval('#couleurs-vent', (c) => c.disabled));
+  await page.selectOption('#jour-vent', '1');
+  await page.click('[data-a="vent"]');
+  await page.waitForSelector('.vent-conseil', { timeout: 15000 });
+  const urlMeteo = new URL(demandesMeteo.at(-1));
+  verif('météo : une seule demande, une trentaine de points au plus, vent et pluie', demandesMeteo.length === 1 && urlMeteo.searchParams.get('latitude').split(',').length <= 31
+    && urlMeteo.searchParams.get('hourly').includes('wind_direction_10m') && urlMeteo.searchParams.get('hourly').includes('precipitation_probability'), demandesMeteo.at(-1));
+  const lignesVent = await page.$$eval('.vent-tableau tbody tr', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+  verif('15 heures de départ (6 h à 20 h)', lignesVent.length === 15 && lignesVent[0].startsWith('6 h') && lignesVent[14].startsWith('20 h'), JSON.stringify(lignesVent.slice(0, 2)));
+  const conseil = (await page.textContent('.vent-conseil')).replace(/\s+/g, ' ');
+  // heure de Paris = UTC + 1 : vent faible dès 13 h ; pluie à 16 h et 17 h
+  const heureConseil = Number(conseil.match(/Pars à (\d+) h/)?.[1]);
+  verif('meilleure heure : vent faible, sans pluie (13 h, 14 h, 15 h, 18 h, 19 h ou 20 h)', [13, 14, 15, 18, 19, 20].includes(heureConseil), conseil);
+  verif('conseil : vent moyen du nord-est', conseil.includes('du nord-est'), conseil);
+  // Couleurs du vent sur la 3D
+  await page.check('#couleurs-vent');
+  await page.click('[data-segments="vue-trace"] button[data-valeur="3d"]');
+  await page.waitForTimeout(600);
+  verif('3D : légende du vent', await page.$eval('#trace-3d .v3d-legende', (l) => l.classList.contains('vent') && l.textContent.includes('dans le dos') && l.textContent.includes('de face')));
+  const couleursRuban = await page.$eval('#trace-3d canvas', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const vu = new Set();
+    for (let i = 0; i < d.length; i += 4) {
+      const hex = '#' + [d[i], d[i + 1], d[i + 2]].map((x) => x.toString(16).padStart(2, '0')).join('');
+      if (['#b2182b', '#ef8a62', '#bababa', '#67a9cf', '#2166ac'].includes(hex)) vu.add(hex);
+    }
+    return [...vu];
+  });
+  verif('3D : ruban aux couleurs du vent', couleursRuban.length >= 1, JSON.stringify(couleursRuban));
+  // Choisir une autre heure (6 h, vent fort) : le ruban change de couleurs
+  await page.click('.vent-tableau tbody tr >> nth=0');
+  verif('heure choisie mise en avant', await page.$eval('.vent-tableau tbody tr', (tr) => tr.classList.contains('choisie')));
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.screenshot({ path: path.join(CAPTURES, 'traces-vent.png'), fullPage: true });
+  await page.uncheck('#couleurs-vent');
+  verif('décoché : couleurs de pente', await page.$eval('#trace-3d .v3d-legende', (l) => !l.classList.contains('vent') && l.textContent.includes('> 10 %')));
+  await page.click('[data-segments="vue-trace"] button[data-valeur="profil"]');
   await page.click('#onglet-sorties');
   await page.waitForSelector('#accueil:not([hidden])');
 
