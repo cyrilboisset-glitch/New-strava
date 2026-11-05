@@ -4,20 +4,29 @@
 import { lireReglage, ecrireReglage, toutesLesSorties, lireFichier, mettreAJourSorties } from './db.js';
 import { decoderFichier } from './fichier.js';
 import { pointsDetail } from './analyse.js';
-import { decouperSegment, trouverPassages, bboxCompatible, detecterMontees, detecterSprints, classer } from './segments-calc.js';
+import {
+  decouperSegment, trouverPassages, bboxCompatible, detecterMontees, detecterSprints, classer, dejaCouvert, recordsParSortie,
+} from './segments-calc.js';
 import { lireProfil, wKg } from './profil.js';
 import { nombre, km, chrono, echapper, fmtDate } from './format.js';
 import { htmlCarteStatique, retirerCarte } from './carte-statique.js';
-import { creerVue3d } from './vue3d.js';
-import { proposerNomSegment, sansDoublons } from './lieux.js';
+import { creerVue3d, construireTrace } from './vue3d.js';
+import { familleSortie } from './sortie.js';
+import { proposerNomSegment, sansDoublons, nomSegment } from './lieux.js';
 
-export const PART_FTP_SPRINT = 1.5; // sprint : au-dessus de 150 % de la FTP
+export const SEUIL_SPRINT_W = 700; // sprint : 700 W et plus pendant au moins 5 s (demande de Cyril)
+export const VERSION_AUTO = 1; // détection automatique des montées et sprints (à changer si les critères changent)
 
-// ---- Stockage (réglages « segments » et « passages ») ---------------------------
+// ---- Stockage (réglages « segments », « passages », « segmentsCompteur ») ----------
+// Chaque segment a un numéro d'ordre (compteur qui ne redescend jamais) ; chaque
+// sortie garde `segmentsVus` = numéro du dernier segment contre lequel elle a été
+// vérifiée, et `segmentsAuto` = version de la détection automatique faite dessus.
 
 export const lireSegments = async () => (await lireReglage('segments')) ?? [];
 export const lirePassages = async () => (await lireReglage('passages')) ?? [];
 const ecrireSegments = (l) => ecrireReglage('segments', l);
+/** Records perso battus par sortie (Map sortieId -> nombre), pour la coupe en or */
+export const recordsDesSorties = async () => recordsParSortie(await lirePassages());
 const ecrirePassages = (l) => ecrireReglage('passages', l);
 
 const nouvelId = () => `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -28,29 +37,60 @@ function typeSegment(seg) {
   return 'Plat';
 }
 
+// Analyse en cours : segments et passages en mémoire (sinon ils sont relus du stockage)
+let analyse = null;
+
+async function lireCompteur(segments) {
+  return (await lireReglage('segmentsCompteur')) ?? segments.reduce((m, g) => Math.max(m, g.ordre ?? 0), 0);
+}
+
+// Anciens segments (avant les numéros d'ordre) : numérotés par date de création
+function numeroter(segments, compteur) {
+  for (const g of [...segments].sort((a, b) => (a.creeLe ?? 0) - (b.creeLe ?? 0))) if (g.ordre == null) g.ordre = ++compteur;
+  return compteur;
+}
+
+/** Modifie la liste des segments, en mémoire si une analyse tourne, et dans le stockage */
+async function modifierSegments(f) {
+  if (analyse) { analyse.segments = f(analyse.segments); await ecrireSegments(analyse.segments); return; }
+  await ecrireSegments(f(await lireSegments()));
+}
+
 /** Crée un segment depuis les points [i0, i1] d'une sortie, puis cherche ses passages. */
 export async function creerSegment(sortie, pts, i0, i1, nom, { sprint = false } = {}, progression = () => {}) {
   const d = decouperSegment(pts, i0, i1);
-  const seg = {
-    id: nouvelId(), nom: nom.trim() || 'Segment', ...d, creeLe: Date.now(),
-    sortieOrigine: sortie.id, iOrigine: i0, analyseFaite: false,
-  };
+  const seg = { id: nouvelId(), nom: nom.trim() || 'Segment', ...d, creeLe: Date.now(), sortieOrigine: sortie.id, iOrigine: i0 };
   seg.type = sprint ? 'Sprint' : typeSegment(seg);
-  await ecrireSegments([...(await lireSegments()), seg]);
+  if (analyse) {
+    seg.ordre = ++analyse.compteur;
+    analyse.segments.push(seg);
+    analyse.nouveau = true;
+    await ecrireSegments(analyse.segments);
+    await ecrireReglage('segmentsCompteur', analyse.compteur);
+  } else {
+    const segments = await lireSegments();
+    const compteur = numeroter(segments, await lireCompteur(segments));
+    seg.ordre = compteur + 1;
+    await ecrireSegments([...segments, seg]);
+    await ecrireReglage('segmentsCompteur', seg.ordre);
+  }
   await mettreAJourPassages(progression);
   return seg;
 }
 
 export async function renommerSegment(id, nom) {
-  await ecrireSegments((await lireSegments()).map((s) => (s.id === id ? { ...s, nom } : s)));
+  await modifierSegments((l) => l.map((s) => (s.id === id ? { ...s, nom, nomAuto: false } : s)));
 }
 
 export async function supprimerSegment(id) {
-  await ecrireSegments((await lireSegments()).filter((s) => s.id !== id));
-  await ecrirePassages((await lirePassages()).filter((p) => p.segmentId !== id));
+  await modifierSegments((l) => l.filter((s) => s.id !== id));
+  if (analyse) {
+    analyse.passages = analyse.passages.filter((p) => p.segmentId !== id);
+    await ecrirePassages(analyse.passages);
+  } else await ecrirePassages((await lirePassages()).filter((p) => p.segmentId !== id));
 }
 
-// ---- Recherche des passages ----------------------------------------------------------
+// ---- Recherche des passages et segments automatiques -------------------------------------
 
 let enCours = null;
 const abonnes = new Set(); // fonctions prévenues de l'avancement (texte)
@@ -69,70 +109,150 @@ async function pointsDeLaSortie(s, cache) {
   return pts;
 }
 
-function enregistrerPassages(liste, seg, s, trouves) {
-  for (const p of trouves) {
-    const id = `${seg.id}|${s.id}|${Math.round(p.debutS)}`;
-    if (liste.some((x) => x.id === id)) continue;
-    liste.push({ id, segmentId: seg.id, sortieId: s.id, debut: s.debut + p.debutS * 1000, ...p });
-  }
+// Montées (critères de Parcours 3D) et sprints (≥ 700 W) d'une sortie vélo
+function detections(pts) {
+  const T = pts.filter((p) => typeof p.lat === 'number').length > 1 ? construireTrace(pts) : null;
+  return [
+    ...(T ? detecterMontees(T, pts.length) : []).map((d) => ({ ...d, sprint: false })),
+    ...detecterSprints(pts, SEUIL_SPRINT_W).map((d) => ({ ...d, sprint: true })),
+  ];
+}
+
+// Segment créé automatiquement ; nom provisoire avec les chiffres (les lieux viennent après)
+function segmentAuto(s, pts, d, ordre) {
+  let dec;
+  try { dec = decouperSegment(pts, d.i0, d.i1); } catch { return null; }
+  if (dec.distanceM < 80) return null; // trop court pour être retrouvé à coup sûr
+  const type = d.sprint ? 'Sprint' : typeSegment(dec);
+  return {
+    id: nouvelId(), nom: nomSegment({ type, distanceM: dec.distanceM, penteMoyPct: dec.penteMoyPct }), ...dec, type,
+    creeLe: Date.now(), sortieOrigine: s.id, iOrigine: d.i0, auto: true, nomAuto: true, ordre,
+  };
 }
 
 /**
- * Met les passages à jour : segments pas encore cherchés (dans toutes les
- * sorties), puis sorties pas encore vérifiées (contre tous les segments).
- * Reprend là où il s'était arrêté si l'appli a été fermée.
+ * Analyse les sorties : passages sur les segments qu'elles n'ont pas encore vus, et
+ * (une fois par sortie vélo) montées et sprints devenus segments automatiques quand
+ * aucun segment ne les couvre déjà. Les plus anciennes d'abord ; reprend là où elle
+ * s'était arrêtée si l'appli a été fermée. Appelée pendant une analyse : la même
+ * analyse prend en compte le nouveau travail.
+ * @returns {Promise<number>} nombre de passages trouvés
  */
 export function mettreAJourPassages(progression = () => {}) {
-  if (!enCours) {
-    enCours = (async () => {
-      const dire = (t) => { progression(t); annoncer(t); };
-      const segments = await lireSegments();
-      let sorties = await toutesLesSorties();
-      const nonVerifiees = () => sorties.filter((s) => !s.segmentsVerifies && s.trace?.length > 1);
-      if (!segments.length) {
-        await mettreAJourSorties(nonVerifiees().map((s) => s.id), { segmentsVerifies: true });
-        return 0;
+  if (analyse) { analyse.nouveau = true; analyse.suivis.add(progression); return enCours; }
+  enCours = (async () => {
+    const segments = await lireSegments();
+    const passages = await lirePassages();
+    analyse = {
+      segments, passages, ids: new Set(passages.map((p) => p.id)),
+      compteur: numeroter(segments, await lireCompteur(segments)), nouveau: false, suivis: new Set([progression]),
+    };
+    const dire = (t) => { for (const f of analyse.suivis) f(t); annoncer(t); };
+    const parDate = (l) => l.sort((a, b) => a.debut - b.debut);
+    let sorties = parDate(await toutesLesSorties());
+    const cache = new Map();
+    let trouvesTotal = 0;
+    let marques = [];
+    let ecritLe = Date.now();
+    const ecrire = async () => {
+      // noms donnés pendant l'analyse (lieux trouvés, segment renommé) : on garde ceux du stockage
+      const stock = new Map((await lireSegments()).map((g) => [g.id, g]));
+      analyse.segments = analyse.segments.map((g) => {
+        const e = stock.get(g.id);
+        return e && e.nom !== g.nom && (e.nomLieux || e.nomAuto === false) ? { ...g, nom: e.nom, nomAuto: e.nomAuto, nomLieux: e.nomLieux } : g;
+      });
+      await ecrireSegments(analyse.segments);
+      await ecrirePassages(analyse.passages);
+      await ecrireReglage('segmentsCompteur', analyse.compteur);
+      for (const [id, champs] of marques) await mettreAJourSorties([id], champs);
+      marques = [];
+      ecritLe = Date.now();
+    };
+    const ajouter = (seg, s, trouves) => {
+      for (const p of trouves) {
+        const id = `${seg.id}|${s.id}|${Math.round(p.debutS)}`;
+        if (analyse.ids.has(id)) continue;
+        analyse.ids.add(id);
+        analyse.passages.push({ id, segmentId: seg.id, sortieId: s.id, debut: s.debut + p.debutS * 1000, ...p });
+        trouvesTotal++;
       }
-      const passages = await lirePassages();
-      const cache = new Map();
-      let trouvesTotal = 0;
-      // a) segments nouveaux : toutes les sorties qui peuvent y passer
-      for (const seg of segments.filter((x) => !x.analyseFaite)) {
-        const candidates = sorties.filter((s) => bboxCompatible(seg, s.trace));
-        let k = 0;
-        for (const s of candidates) {
-          dire(`Recherche des passages sur « ${seg.nom} » : ${++k} / ${candidates.length}`);
-          const trouves = trouverPassages(seg, await pointsDeLaSortie(s, cache));
-          trouvesTotal += trouves.length;
-          enregistrerPassages(passages, seg, s, trouves);
-        }
-        seg.analyseFaite = true;
-        await ecrirePassages(passages);
-        await ecrireSegments(segments);
+    };
+    const velo = (s) => familleSortie(s).cle === 'sport-2';
+    const aFaire = (s) => s.trace?.length > 1
+      && ((s.segmentsVus ?? -1) < analyse.compteur || (velo(s) && s.segmentsAuto !== VERSION_AUTO));
+
+    for (;;) {
+      const liste = sorties.filter(aFaire);
+      if (!liste.length) {
+        if (!analyse.nouveau) break;
+        analyse.nouveau = false; // créations ou imports pendant l'analyse : on refait le tour
+        sorties = parDate(await toutesLesSorties());
+        continue;
       }
-      // b) sorties nouvelles : tous les segments
-      sorties = await toutesLesSorties();
-      const aVerifier = nonVerifiees();
       let k = 0;
-      for (const s of aVerifier) {
-        const compatibles = segments.filter((seg) => bboxCompatible(seg, s.trace));
-        if (compatibles.length) {
-          dire(`Recherche des segments dans tes sorties : ${++k} / ${aVerifier.length}`);
+      for (const s of liste) {
+        k++;
+        if (!aFaire(s)) continue;
+        const avant = analyse.compteur;
+        const auto = velo(s) && s.segmentsAuto !== VERSION_AUTO;
+        const aVerifier = analyse.segments.filter((g) => g.ordre > (s.segmentsVus ?? -1) && bboxCompatible(g, s.trace));
+        if (aVerifier.length || auto) {
+          dire(liste.length > 1 ? `Segments : analyse des sorties, ${k} / ${liste.length}` : 'Segments : analyse de la sortie…');
           const pts = await pointsDeLaSortie(s, cache);
-          for (const seg of compatibles) {
-            const trouves = trouverPassages(seg, pts);
-            trouvesTotal += trouves.length;
-            enregistrerPassages(passages, seg, s, trouves);
+          for (const g of aVerifier) ajouter(g, s, trouverPassages(g, pts));
+          if (auto && pts.length > 1) {
+            const ici = analyse.passages.filter((p) => p.sortieId === s.id);
+            for (const d of detections(pts)) {
+              if (dejaCouvert(d, ici, pts)) continue;
+              const g = segmentAuto(s, pts, d, analyse.compteur + 1);
+              if (!g) continue;
+              analyse.compteur = g.ordre;
+              analyse.segments.push(g);
+              const trouves = trouverPassages(g, pts);
+              ajouter(g, s, trouves);
+              ici.push(...trouves);
+            }
           }
         }
+        // un segment créé à la main pendant ce temps n'a pas été cherché ici : à revoir
+        const autres = analyse.segments.some((g) => g.ordre > avant && g.sortieOrigine !== s.id);
+        const champs = { segmentsVus: autres ? avant : analyse.compteur };
+        if (velo(s)) champs.segmentsAuto = VERSION_AUTO;
+        Object.assign(s, champs);
+        marques.push([s.id, champs]);
+        if (Date.now() - ecritLe > 4000) await ecrire();
       }
-      await ecrirePassages(passages);
-      await mettreAJourSorties(aVerifier.map((s) => s.id), { segmentsVerifies: true });
-      dire('');
-      return trouvesTotal;
-    })().finally(() => { enCours = null; });
-  }
+    }
+    await ecrire();
+    dire('');
+    nommerSegmentsAuto();
+    return trouvesTotal;
+  })().finally(() => { analyse = null; enCours = null; });
   return enCours;
+}
+
+// Noms avec les lieux (OpenStreetMap) pour les segments automatiques, un par un,
+// en arrière-plan. Sans réseau : on réessaiera au prochain démarrage (3 fois au plus).
+let nommage = null;
+function nommerSegmentsAuto() {
+  nommage ??= (async () => {
+    for (;;) {
+      const g = (await lireSegments()).find((x) => x.nomAuto && !x.nomLieux && (x.nomEssais ?? 0) < 3);
+      if (!g) return;
+      const horsLigne = nomSegment({ type: g.type, distanceM: g.distanceM, penteMoyPct: g.penteMoyPct });
+      let nom = await proposerNomSegment(g).catch(() => null);
+      const reussi = nom && nom !== horsLigne;
+      await modifierSegments((l) => {
+        if (reussi && l.some((x) => x.id !== g.id && x.nom === nom)) nom = `${nom} (${km(g.distanceM)} km)`;
+        return l.map((x) => {
+          if (x.id !== g.id || !x.nomAuto) return x;
+          return reussi ? { ...x, nom, nomLieux: true } : { ...x, nomEssais: (x.nomEssais ?? 0) + 1 };
+        });
+      });
+      if (!reussi) return; // pas de réseau : on arrête pour cette fois
+    }
+  })().catch((e) => console.warn('Noms des segments', e)).finally(() => { nommage = null; });
+  return nommage;
 }
 
 // ---- Affichage commun ------------------------------------------------------------------
@@ -244,11 +364,11 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
 
   const deja = (i0) => segments.some((g) => g.sortieOrigine === s.id && Math.abs((g.iOrigine ?? -9) - i0) <= 1);
   const montees = trace3d ? detecterMontees(trace3d, pts.length) : [];
-  const sprints = profil.ftpW ? detecterSprints(pts, profil.ftpW * PART_FTP_SPRINT) : [];
+  const sprints = detecterSprints(pts, SEUIL_SPRINT_W);
   const propositions = [
     ...montees.map((m) => ({ ...m, sprint: false, nom: `Montée du km ${nombre(pts[m.i0].distanceM / 1000, 1)}`, texte: `${km(m.distanceM)} km à ${nombre(m.penteMoyPct, 1)} % (+${nombre(m.gainM)} m)` })),
     ...sprints.map((m) => ({ ...m, sprint: true, nom: `Sprint du km ${nombre(pts[m.i0].distanceM / 1000, 1)}`, texte: `${nombre(m.distanceM)} m, pic ${nombre(m.picW)} W en ${Math.round(m.dureeS)} s` })),
-  ].filter((m) => !deja(m.i0)).sort((a, b) => a.i0 - b.i0);
+  ].filter((m) => !deja(m.i0) && !dejaCouvert(m, ici, pts)).sort((a, b) => a.i0 - b.i0);
 
   // l'aperçu ouvert sur l'affichage précédent ne correspond plus à ces propositions
   fermerApercuSegment();

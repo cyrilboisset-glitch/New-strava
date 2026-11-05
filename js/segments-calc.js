@@ -237,3 +237,43 @@ export function classer(passages) {
   const tries = [...passages].sort((a, b) => a.dureeS - b.dureeS);
   return new Map(tries.map((p, k) => [p, k + 1]));
 }
+
+/**
+ * Records perso battus par chaque sortie : un passage compte s'il est plus rapide
+ * que tous les passages précédents (par date) sur le même segment, et qu'il y en
+ * avait au moins un (le premier passage n'est pas un record « battu »).
+ * @param {{segmentId, sortieId, debut, dureeS}[]} passages
+ * @returns {Map<string, number>}  sortieId -> nombre de records
+ */
+export function recordsParSortie(passages) {
+  const parSegment = new Map();
+  for (const p of passages) {
+    if (!parSegment.has(p.segmentId)) parSegment.set(p.segmentId, []);
+    parSegment.get(p.segmentId).push(p);
+  }
+  const res = new Map();
+  for (const liste of parSegment.values()) {
+    liste.sort((a, b) => a.debut - b.debut);
+    let meilleur = Infinity;
+    for (const p of liste) {
+      if (meilleur < Infinity && p.dureeS < meilleur) res.set(p.sortieId, (res.get(p.sortieId) ?? 0) + 1);
+      meilleur = Math.min(meilleur, p.dureeS);
+    }
+  }
+  return res;
+}
+
+/**
+ * Le morceau [i0, i1] d'une sortie est-il déjà couvert par un passage de cette
+ * sortie ? (au moins la moitié du plus long des deux en commun, en distance)
+ * @param {{i0, i1}} morceau
+ * @param {{iDebut, iFin}[]} passages  passages de la même sortie
+ */
+export function dejaCouvert(morceau, passages, pts) {
+  const d = (i) => pts[Math.max(0, Math.min(pts.length - 1, i))].distanceM;
+  const long = d(morceau.i1) - d(morceau.i0);
+  return passages.some((p) => {
+    const commun = Math.min(d(morceau.i1), d(p.iFin)) - Math.max(d(morceau.i0), d(p.iDebut));
+    return commun > 0 && commun >= 0.5 * Math.max(long, d(p.iFin) - d(p.iDebut));
+  });
+}

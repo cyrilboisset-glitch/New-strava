@@ -275,6 +275,23 @@ l'instant »** — à proposer quand il voudra :
   bouton « Proposer un nom ». Segments détectés : noms remplacés au fur et à
   mesure (doublons : « (km X) ») ; création à la main : nom proposé ;
   « Renommer » propose un nom. Testé avec de faux Nominatim / Overpass seulement.
+- **v0.15.0 (5 nov. 2026) : segments automatiques et records**, demande de
+  Cyril (« une passe sur toutes mes sorties », « une petite coupe en or avec le
+  nombre de PR »). `mettreAJourPassages` (segments.js) analyse les sorties de la
+  plus ancienne à la plus récente : chaque segment a un `ordre` (compteur
+  `segmentsCompteur`, jamais réutilisé), chaque sortie garde `segmentsVus` (dernier
+  ordre vérifié) et, pour les sorties vélo, `segmentsAuto` = VERSION_AUTO (1).
+  Détection : montées (critères Parcours 3D inchangés) et sprints **≥ 700 W
+  pendant ≥ 5 s** (SEUIL_SPRINT_W ; Cyril a dit « supérieur à 700 W »), ≥ 80 m ;
+  pas de nouveau segment si un passage de la sortie couvre déjà la moitié du
+  morceau (`dejaCouvert`). Segments `auto`, nom provisoire avec les chiffres, puis
+  lieux OpenStreetMap en arrière-plan (`nommerSegmentsAuto`, 3 essais sans
+  réseau). Analyse en mémoire (`analyse`) : créations / renommages / suppressions
+  pendant l'analyse passent par elle ; écriture toutes les 4 s, reprise au
+  redémarrage ; avancement dans le bandeau. Records : `recordsParSortie`
+  (segments-calc.js) = passages plus rapides que tous ceux d'avant (par date), le
+  premier passage ne compte pas ; coupe 🏆 N sur la carte de la liste et à côté
+  du nom dans le détail. Plus de seuil 150 % FTP pour les sprints détectés.
 - **Liste des tâches à faire (demandée par Cyril le 4 nov. 2026), dans
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :

@@ -1,6 +1,6 @@
 // Tests des segments : découpe, passages (sens, écart, tours), montées, sprints.
 // Traces fabriquées aux valeurs connues. Lancer : node tests/test-segments.mjs
-import { decouperSegment, trouverPassages, bboxCompatible, detecterMontees, detecterSprints, classer } from '../js/segments-calc.js';
+import { decouperSegment, trouverPassages, bboxCompatible, detecterMontees, detecterSprints, classer, recordsParSortie, dejaCouvert } from '../js/segments-calc.js';
 import { pointsDetail } from '../js/analyse.js';
 import { construireTrace } from '../js/vue3d.js';
 import { lireGpx } from '../js/trace.js';
@@ -115,6 +115,21 @@ const s1020 = decouperSegment(gpx, gpx.findIndex((p) => p.distanceM >= 10000), g
 proche('GPX : 1 200 s', trouverPassages(s1020, gpx)[0].dureeS, 1200, 1);
 const gpxPause = pointsDetail(lireGpx(fauxGpx({ pauseS: 600 })).records);
 proche('GPX avec pause : 1 800 s (temps écoulé, comme Strava)', trouverPassages(s1020, gpxPause)[0].dureeS, 1800, 1);
+
+// Records perso battus : plus rapide que tous les passages d'avant (le premier ne compte pas)
+const P = (segmentId, sortieId, jour, dureeS) => ({ segmentId, sortieId, debut: Date.UTC(2026, 0, jour), dureeS });
+const recs = recordsParSortie([
+  P('a', 's1', 1, 300), P('a', 's2', 2, 290), P('a', 's3', 3, 295), P('a', 's4', 4, 280),
+  P('b', 's2', 2, 60), P('b', 's4', 4, 55), P('b', 's3', 3, 60),
+]);
+egal('records : s2 bat s1 (a), s4 bat s2 (a) et s2 (b), s3 rien, s1 premier passage', [recs.get('s1'), recs.get('s2'), recs.get('s3'), recs.get('s4')], [undefined, 1, undefined, 2]);
+egal('records : dans l\'ordre des dates, pas de l\'import', recordsParSortie([P('a', 'x', 5, 200), P('a', 'y', 1, 250)]).get('x'), 1);
+
+// Déjà couvert : au moins la moitié en commun
+const pl = Array.from({ length: 101 }, (_, i) => ({ distanceM: i * 10 }));
+egal('couvert : même morceau à 50 m près', dejaCouvert({ i0: 20, i1: 60 }, [{ iDebut: 25, iFin: 62 }], pl), true);
+egal('pas couvert : morceaux voisins', dejaCouvert({ i0: 20, i1: 40 }, [{ iDebut: 38, iFin: 70 }], pl), false);
+egal('pas couvert : petit bout dans un long segment', dejaCouvert({ i0: 50, i1: 55 }, [{ iDebut: 0, iFin: 100 }], pl), false);
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);
