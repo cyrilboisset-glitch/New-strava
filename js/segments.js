@@ -8,6 +8,8 @@ import { decouperSegment, trouverPassages, bboxCompatible, detecterMontees, dete
 import { lireProfil, wKg } from './profil.js';
 import { nombre, km, chrono, echapper, fmtDate } from './format.js';
 import { htmlCarteStatique } from './carte-statique.js';
+import { creerVue3d } from './vue3d.js';
+import { retirerCarte } from './traces.js';
 
 export const PART_FTP_SPRINT = 1.5; // sprint : au-dessus de 150 % de la FTP
 
@@ -162,6 +164,57 @@ function apercuSegment(seg) {
 
 // ---- Bloc « Segments » du détail d'une sortie -------------------------------------------
 
+// Aperçu « Voir » d'un segment détecté : carte Leaflet de la sortie avec le segment
+// en couleur, ou 3D du segment seul. Un seul ouvert à la fois ; à libérer en quittant.
+const COULEUR_SEGMENT = '#1e88e5';
+const apercu = { k: null, mode: 'carte', carte: null, vue: null };
+
+function libererApercu() {
+  if (apercu.carte) { retirerCarte(apercu.carte); apercu.carte = null; }
+  if (apercu.vue) { apercu.vue.detruire(); apercu.vue = null; }
+}
+
+/** Ferme l'aperçu (appelé en quittant le détail) */
+export function fermerApercuSegment() {
+  libererApercu();
+  apercu.k = null;
+}
+
+function htmlApercu() {
+  return `<div class="apercu-segment entree-fondu" data-apercu>
+    <div class="segments vues" role="group" data-segments="vue-segment">
+      <button type="button" data-valeur="carte" aria-pressed="${apercu.mode === 'carte'}">Carte</button>
+      <button type="button" data-valeur="3d" aria-pressed="${apercu.mode === '3d'}">3D du segment</button>
+    </div>
+    <div class="carte-parcours carte-segment" role="img" aria-label="Le segment sur la carte de la sortie"${apercu.mode === 'carte' ? '' : ' hidden'}></div>
+    <div class="vue3d vue3d-segment"${apercu.mode === '3d' ? '' : ' hidden'}></div>
+  </div>`;
+}
+
+/** Carte de toute la sortie (trait orange pâli) avec le segment par-dessus (bleu) */
+function carteSegment(div, pts, i0, i1) {
+  const L = globalThis.L;
+  if (!L) return null;
+  const gps = pts.filter((p) => typeof p.lat === 'number');
+  const pas = Math.max(1, Math.ceil(gps.length / 3000));
+  const ligne = gps.filter((_, i) => i % pas === 0 || i === gps.length - 1).map((p) => [p.lat, p.lon]);
+  const seg = pts.slice(i0, i1 + 1).filter((p) => typeof p.lat === 'number').map((p) => [p.lat, p.lon]);
+  if (ligne.length < 2 || seg.length < 2) return null;
+  const trait = getComputedStyle(document.documentElement).getPropertyValue('--trace-carte').trim() || '#e8590c';
+  const carte = L.map(div, { scrollWheelZoom: false, attributionControl: true });
+  carte.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(carte);
+  const sortie = L.polyline(ligne, { color: trait, weight: 3, opacity: 0.6 }).addTo(carte);
+  L.polyline(seg, { color: '#fff', weight: 9, opacity: 0.9 }).addTo(carte);
+  L.polyline(seg, { color: COULEUR_SEGMENT, weight: 6, opacity: 1, className: 'trait-segment' }).addTo(carte);
+  L.circleMarker(seg[0], { radius: 6, color: '#fff', weight: 2, fillColor: '#2e9e4f', fillOpacity: 1 }).addTo(carte).bindTooltip('Début du segment');
+  L.circleMarker(seg[seg.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#15171b', fillOpacity: 1 }).addTo(carte).bindTooltip('Fin du segment');
+  carte.fitBounds(sortie.getBounds(), { padding: [16, 16] });
+  return carte;
+}
+
 /**
  * @param {HTMLElement} bloc
  * @param {object} s  la sortie
@@ -188,7 +241,39 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
     ...sprints.map((m) => ({ ...m, sprint: true, nom: `Sprint du km ${nombre(pts[m.i0].distanceM / 1000, 1)}`, texte: `${nombre(m.distanceM)} m, pic ${nombre(m.picW)} W en ${Math.round(m.dureeS)} s` })),
   ].filter((m) => !deja(m.i0)).sort((a, b) => a.i0 - b.i0);
 
+  // l'aperçu ouvert sur l'affichage précédent ne correspond plus à ces propositions
+  fermerApercuSegment();
+
+  const monterApercu = () => {
+    const m = propositions[apercu.k];
+    const zone = bloc.querySelector('[data-apercu]');
+    if (!m || !zone) return;
+    const b3d = zone.querySelector('[data-valeur="3d"]');
+    const montrer = (mode) => {
+      if (mode === '3d' && !apercu.vue) {
+        try { apercu.vue = creerVue3d(zone.querySelector('.vue3d-segment'), pts.slice(m.i0, m.i1 + 1)); } catch (e) { console.warn('3D du segment', e); }
+        if (!apercu.vue) { b3d.disabled = true; toast('Segment trop court pour la 3D.'); mode = 'carte'; }
+      }
+      apercu.mode = mode;
+      zone.querySelector('.carte-segment').hidden = mode !== 'carte';
+      zone.querySelector('.vue3d-segment').hidden = mode !== '3d';
+      for (const b of zone.querySelectorAll('[data-segments="vue-segment"] button')) b.setAttribute('aria-pressed', String(b.dataset.valeur === mode));
+      apercu.vue?.afficher(mode === '3d');
+      if (mode === 'carte') {
+        if (!apercu.carte) {
+          try { apercu.carte = carteSegment(zone.querySelector('.carte-segment'), pts, m.i0, m.i1); } catch (e) { console.warn('Carte du segment', e); }
+        } else apercu.carte.invalidateSize();
+      }
+    };
+    zone.querySelector('[data-segments="vue-segment"]').onclick = (e) => {
+      const b = e.target.closest('button');
+      if (b && !b.disabled) montrer(b.dataset.valeur);
+    };
+    montrer(apercu.mode);
+  };
+
   const rendre = (etat = '') => {
+    libererApercu();
     const lignes = ici.map((p) => {
       const g = segments.find((x) => x.id === p.segmentId);
       if (!g) return '';
@@ -215,7 +300,9 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
       <h3 class="sous-titre">Détectés sur cette sortie</h3>
       <div class="propositions">${propositions.map((m, k) => `
         <div class="proposition"><span>${m.sprint ? '⚡' : '⛰'} <b>${echapper(m.nom)}</b><small>${m.texte}</small></span>
-        <button class="btn secondaire petit" type="button" data-suivre="${k}">Suivre</button></div>`).join('')}</div>` : ''}
+        <button class="btn secondaire petit" type="button" data-voir="${k}" aria-expanded="${apercu.k === k}">${apercu.k === k ? 'Fermer' : 'Voir'}</button>
+        <button class="btn secondaire petit" type="button" data-suivre="${k}">Suivre</button></div>
+        ${apercu.k === k ? htmlApercu() : ''}`).join('')}</div>` : ''}
       <details class="creation"${choix.debut != null ? ' open' : ''}>
         <summary>Créer un segment à la main</summary>
         <p class="aide">Touche une courbe (ou le ruban 3D) à l'endroit du départ, puis « Départ ici » ; fais de même pour l'arrivée.</p>
@@ -227,6 +314,7 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
         <label class="champ-ligne"><span>Nom</span><input id="nom-segment" type="text" maxlength="50" placeholder="Ex. : montée de Saint-Nizier"></label>
         <button class="btn principal" type="button" data-creer${resume && !resume.startsWith('Pas') ? '' : ' disabled'}>Créer le segment</button>
       </details>`;
+    if (apercu.k != null) monterApercu();
   };
   rendre();
 
@@ -245,6 +333,15 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
   };
 
   bloc.onclick = async (e) => {
+    const voir = e.target.closest('[data-voir]');
+    if (voir) {
+      const k = Number(voir.dataset.voir);
+      apercu.k = apercu.k === k ? null : k;
+      const nom = bloc.querySelector('#nom-segment')?.value ?? '';
+      rendre();
+      bloc.querySelector('#nom-segment').value = nom;
+      return;
+    }
     const suivre = e.target.closest('[data-suivre]');
     if (suivre) {
       const m = propositions[Number(suivre.dataset.suivre)];

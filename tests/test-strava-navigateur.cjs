@@ -327,6 +327,56 @@ async function texteToast(page) {
     r.onsuccess = () => tx.objectStore('reglages').put(r.result.filter((p) => p.sortieId !== bis.id), 'passages');
     await new Promise((ok) => { tx.oncomplete = ok; });
   });
+
+  // « Voir » une montée détectée : carte de la sortie avec le segment en bleu, puis 3D du segment seul
+  await page.setInputFiles('#champ-fichier', { name: 'montee.gpx', mimeType: 'application/gpx+xml',
+    buffer: Buffer.from(fauxGpx({ montee: true, lon: 5.7, debutMs: Date.UTC(2025, 4, 18, 7), nom: 'Montée à voir' })) });
+  verif('sortie avec montée importée', (await texteToast(page)).includes('1 nouvelle sortie'));
+  const idMontee = await page.evaluate(async () => (await (await import('./js/db.js')).toutesLesSorties()).find((x) => x.nom === 'Montée à voir').id);
+  await page.goto(URL_APPLI + '#sortie=' + encodeURIComponent(idMontee));
+  await page.waitForSelector('#bloc-segments-sortie .proposition');
+  const propTxt = (await page.textContent('#bloc-segments-sortie .proposition')).replace(/\s+/g, ' ');
+  verif('montée détectée (3 km à 6 %), boutons Voir et Suivre', /Montée du km 5,\d.*à [56],\d %.*Voir.*Suivre/.test(propTxt), propTxt);
+  await page.click('#bloc-segments-sortie [data-voir="0"]');
+  await page.waitForSelector('#bloc-segments-sortie .carte-segment .trait-segment', { state: 'attached' });
+  const traits = await page.$$eval('#bloc-segments-sortie .carte-segment path.leaflet-interactive', (ps) => ps.map((p) => p.getAttribute('stroke')));
+  verif('carte : la sortie en orange, le segment en bleu par-dessus', traits.includes('#1e88e5') && traits.some((c) => c && c.startsWith('#e')), JSON.stringify(traits));
+  const largeurs = await page.evaluate(() => {
+    const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+    const seg = r('#bloc-segments-sortie .trait-segment');
+    const carte = r('#bloc-segments-sortie .carte-segment');
+    return { seg: seg.height, carte: carte.height };
+  });
+  // 3 km sur 30 km de sortie toute droite vers le nord : le segment fait ~1/10 de la hauteur de la carte
+  verif('carte cadrée sur toute la sortie (segment ≈ 1/10 de la hauteur)', largeurs.seg > 10 && largeurs.seg < largeurs.carte * 0.2, JSON.stringify(largeurs));
+  verif('bouton Fermer', (await page.textContent('#bloc-segments-sortie [data-voir="0"]')) === 'Fermer');
+  await page.locator('#bloc-segments-sortie .apercu-segment').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: path.join(CAPTURES, 'segment-voir-carte.png') });
+  await page.click('#bloc-segments-sortie [data-segments="vue-segment"] button[data-valeur="3d"]');
+  await page.waitForTimeout(700);
+  verif('3D du segment affichée, carte cachée', await page.isVisible('#bloc-segments-sortie .vue3d-segment canvas') && !(await page.isVisible('#bloc-segments-sortie .carte-segment')));
+  const pentes = await page.$eval('#bloc-segments-sortie .vue3d-segment canvas', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 150 && d[i + 1] > 60 && d[i + 1] < 160 && d[i + 2] < 80) n++;
+    return n;
+  });
+  verif('3D : ruban en couleurs de montée (orange, 6 %)', pentes > 200, String(pentes));
+  await page.locator('#bloc-segments-sortie .apercu-segment').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(CAPTURES, 'segment-voir-3d.png') });
+  await page.click('#bloc-segments-sortie [data-voir="0"]');
+  verif('Fermer : aperçu retiré', !(await page.$('#bloc-segments-sortie .apercu-segment')));
+  await page.evaluate(async (id) => {
+    const db = await (await import('./js/db.js')).ouvrirBase();
+    const tx = db.transaction(['sorties', 'fichiers'], 'readwrite');
+    tx.objectStore('sorties').delete(id);
+    tx.objectStore('fichiers').delete(id);
+    await new Promise((ok) => { tx.oncomplete = ok; });
+  }, idMontee);
+
+  await page.click('#btn-retour');
+  await page.waitForSelector('#onglet-sorties', { state: 'visible' });
   await page.click('#onglet-sorties');
   await page.click('a.sortie:has-text("Col du test")');
   await page.waitForSelector('#page-detail .courbe');
