@@ -312,6 +312,14 @@ l'instant »** — à proposer quand il voudra :
   bloc « Puissances » (remplace « Meilleurs efforts ») comme Progrès : 5 s à 1 h,
   cette sortie / record (🏆 si record), courbe de puissance (`htmlCourbePuissance`
   exportée de progres.js), FTP estimée après la sortie avec l'écart.
+- **v0.18.0 (5 nov. 2026) : réglage auto de la FTP**, demande de Cyril.
+  `reglerFtpAuto` (profil.js), appelé après le calcul des efforts à chaque
+  import et au démarrage (chercherSegments, app.js) : si 95 % du meilleur 20 min
+  des 6 dernières semaines dépasse la FTP réglée, elle monte à cette valeur
+  (toast). **Jamais de baisse automatique.** Case « Régler la FTP
+  automatiquement » dans Profil (réglage `ftpAuto`, oui par défaut ; cochée =
+  vérification tout de suite) ; hausses gardées dans `ftpHausses` (dernière
+  affichée). Les deux réglages sont dans la sauvegarde.
 - **Liste des tâches à faire (demandée par Cyril le 4 nov. 2026), dans
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :

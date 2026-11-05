@@ -622,14 +622,15 @@ async function texteToast(page) {
   // Changement de vélo dans le détail d'une sortie
   await page.click('#onglet-sorties');
   await page.click('a.sortie:has-text("Col du test")');
-  await page.waitForSelector('#choix-velo');
+  await page.waitForFunction(() => document.querySelector('#page-detail .detail-nom')?.textContent.startsWith('Col du test') && !!document.querySelector('#page-detail #choix-velo') && !document.documentElement.dataset.transition);
   verif('détail : vélo de la sortie', (await page.$eval('#choix-velo', (s) => s.selectedOptions[0].textContent)) === 'Canyon Endurace');
   await page.selectOption('#choix-velo', { label: 'Home trainer' });
   await page.waitForTimeout(200);
   await page.click('#btn-retour');
   await page.click('#onglet-profil');
-  await page.waitForSelector('#bloc-velos .velo');
-  const km2 = await page.$$eval('#bloc-velos .velo-km', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ')));
+  // la page Profil se redessine après coup : on attend le nouveau kilométrage (5 s au plus)
+  await page.waitForFunction(() => document.querySelector('#bloc-velos .velo-km')?.textContent.includes('1 030'), null, { timeout: 5000 }).catch(() => {});
+  const km2 =await page.$$eval('#bloc-velos .velo-km', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ')));
   verif('après changement : Canyon 1 030 km, home trainer 55 km', km2[0].startsWith('1 030 km · 1 sortie') && km2[1].startsWith('55 km · 2 sorties'), JSON.stringify(km2));
 
   // 2 quinquies. Sauvegarde puis restauration sur un téléphone « vide »
@@ -940,7 +941,12 @@ async function texteToast(page) {
   await page.screenshot({ path: path.join(CAPTURES, 'traces-heure.png'), fullPage: true });
   await page.click('[data-a="enregistrer"]');
   await texteToast(page);
-  verif('liste : départ prévu', /départ prévu .* à 5 h 30/.test(await page.textContent('#mes-traces')), await page.textContent('#mes-traces'));
+  await attendre(page, async () => !!(await (await import('./js/db.js')).lireReglage('traces'))?.[0]?.departMs, null, 5000).catch(() => {});
+  await page.waitForFunction(() => document.getElementById('mes-traces').textContent.includes('départ prévu'), null, { timeout: 5000 }).catch(() => {});
+  verif('liste : départ prévu', /départ prévu .* à 5 h 30/.test(await page.textContent('#mes-traces')), JSON.stringify(await page.evaluate(async () => {
+    const db = await import('./js/db.js');
+    return { index: await db.lireReglage('traces'), heure: document.getElementById('heure-depart').value, jour: document.getElementById('jour-vent').value };
+  })));
   const [dlHeure] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="gpx"]')]);
   const cheminHeure = path.join(CAPTURES, 'trace-heure.gpx');
   await dlHeure.saveAs(cheminHeure);
@@ -1007,6 +1013,30 @@ async function texteToast(page) {
   });
   verif('animations coupées si l\'on demande moins d\'animations', duree === '0.001s', duree);
   await sobre.close();
+
+  // Réglage automatique de la FTP : sortie d'il y a 2 jours à 300 W pendant 1 h -> 95 % de 300 W = 285 W
+  await page.goto(URL_APPLI);
+  await page.waitForSelector('#accueil:not([hidden])');
+  const ftpAvantAuto = await page.evaluate(async () => (await (await import('./js/profil.js')).lireProfil()).ftpW);
+  await page.setInputFiles('#champ-fichier', { name: 'ftp.gpx', mimeType: 'application/gpx+xml',
+    buffer: Buffer.from(fauxGpx({ lon: 6.1, puissanceW: 300, debutMs: Date.now() - 2 * 86400000, nom: 'Sortie à 300 W' })) });
+  await attendre(page, async () => (await (await import('./js/db.js')).toutesLesSorties()).some((x) => x.nom === 'Sortie à 300 W'), null);
+  verif('sortie à 300 W importée', true);
+  await attendre(page, async () => (await (await import('./js/profil.js')).lireProfil()).ftpW === 285, null);
+  // le message de la FTP remplace celui de l'import
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes('FTP réglée'), null, { timeout: 10000 });
+  const toastFtp = await texteToast(page);
+  verif(`FTP réglée automatiquement : ${ftpAvantAuto} → 285 W, avec un message`, /FTP réglée automatiquement : \d+ → 285 W/.test(toastFtp), toastFtp);
+  await page.click('#onglet-profil');
+  await page.waitForSelector('#champ-ftp');
+  verif('Profil : FTP 285 W, case cochée, dernière hausse', (await page.inputValue('#champ-ftp')) === '285' && await page.isChecked('#ftp-auto')
+    && (await page.textContent('#ftp-auto-aide')).includes('→ 285 W'));
+  // Plus faible ensuite (250 W) : la FTP ne baisse pas
+  await page.uncheck('#ftp-auto');
+  verif('case décochée : coupé', (await texteToast(page)).includes('coupé') && await page.evaluate(async () => (await (await import('./js/db.js')).lireReglage('ftpAuto')) === false));
+  await page.check('#ftp-auto');
+  verif('recochée : FTP pas dépassée, inchangée', (await texteToast(page)).includes('pas dépassée') && (await page.inputValue('#champ-ftp')) === '285');
+  await page.screenshot({ path: path.join(CAPTURES, 'ftp-auto.png') });
 
   verif('aucune erreur dans la console', erreursConsole.length === 0, erreursConsole.join(' | '));
   await browser.close();

@@ -32,6 +32,8 @@ export async function creerSauvegarde(progression = () => {}) {
       traces: await lireReglage('traces') ?? null,
       objectifs: await lireReglage('objectifs') ?? null,
       segmentsCompteur: await lireReglage('segmentsCompteur') ?? null,
+      ftpAuto: await lireReglage('ftpAuto') ?? null,
+      ftpHausses: await lireReglage('ftpHausses') ?? null,
     },
     sorties: [],
     tracesCompletes: [],
@@ -83,7 +85,7 @@ export async function restaurerSauvegarde(zip, bilan, connues, progression = () 
   for (const t of index.tracesCompletes ?? []) {
     if (t?.id && (await lireReglage(`trace:${t.id}`)) == null) await ecrireReglage(`trace:${t.id}`, t);
   }
-  for (const cle of ['ftpW', 'fcMaxBpm', 'poidsKg', 'velos', 'segments', 'passages', 'puissanceParcoursW', 'traces', 'objectifs', 'segmentsCompteur']) {
+  for (const cle of ['ftpW', 'fcMaxBpm', 'poidsKg', 'velos', 'segments', 'passages', 'puissanceParcoursW', 'traces', 'objectifs', 'segmentsCompteur', 'ftpAuto', 'ftpHausses']) {
     if (index.reglages?.[cle] && (await lireReglage(cle)) == null) await ecrireReglage(cle, index.reglages[cle]);
   }
   let i = 0;

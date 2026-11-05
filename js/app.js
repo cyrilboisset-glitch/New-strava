@@ -3,7 +3,7 @@
 import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages } from './db.js';
 import { familleSortie } from './sortie.js';
 import { chargeSortie } from './analyse.js';
-import { lireProfil, calculerEstimationsManquantes, calculerEffortsManquants } from './profil.js';
+import { lireProfil, calculerEstimationsManquantes, calculerEffortsManquants, reglerFtpAuto } from './profil.js';
 import { htmlCarteStatique } from './carte-statique.js';
 import { afficherDetail, fermerDetail } from './detail.js';
 import { afficherReglages } from './reglages.js';
@@ -21,7 +21,7 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.17.0 · anneaux des objectifs, puissances, FTP';
+export const VERSION_APPLI = '0.18.0 · FTP réglée automatiquement';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -337,7 +337,15 @@ function chercherSegments() {
   calculerEstimationsManquantes().then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
     .catch((e) => console.warn('Estimations', e));
   // efforts (meilleures puissances) des nouvelles sorties : records et FTP à jour après chaque sortie
-  toutesLesSorties().then((toutes) => calculerEffortsManquants(toutes)).catch((e) => console.warn('Efforts', e));
+  // puis réglage automatique de la FTP (seulement à la hausse)
+  toutesLesSorties().then((toutes) => calculerEffortsManquants(toutes))
+    .then(() => reglerFtpAuto())
+    .then((h) => {
+      if (!h) return;
+      toast(`FTP réglée automatiquement : ${h.avantW} → ${h.ftpW} W (meilleur 20 min du ${fmtJour.format(new Date(h.sortie.debut))}).`);
+      if (pageActuelle === 'sorties') afficherListe();
+    })
+    .catch((e) => console.warn('Efforts / FTP', e));
 }
 
 // ---- Navigation : accueil, détail d'une sortie, réglages -------------------
