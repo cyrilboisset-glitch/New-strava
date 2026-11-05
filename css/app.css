@@ -643,7 +643,7 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .btn.danger { color: var(--danger); }
 .velo-form { padding: 12px; margin: 8px 0; border-radius: 12px; background: var(--surface-2); }
 .champ-ligne { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--texte-2); }
-.champ-ligne input, .lot select, .velo-sortie select {
+.champ-ligne input, .champ-ligne select, .lot select, .velo-sortie select {
   min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--ligne);
   background: var(--surface); color: var(--texte); font: inherit; font-size: 16px;
 }
@@ -669,3 +669,22 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 @media (prefers-reduced-motion: reduce) {
   .icone-btn.tourne svg { animation: none; }
 }
+
+/* ---- Objectifs (Progrès) ---- */
+.objectif { padding: 12px 0; border-top: 1px solid var(--ligne); }
+#bloc-objectifs .bloc-titre + .objectif { border-top: 0; padding-top: 2px; }
+.objectif-tete { display: flex; align-items: center; gap: 10px; }
+.objectif-nom { flex: 1; min-width: 0; font-weight: 600; }
+.objectif-actions { display: flex; gap: 6px; }
+.objectif-chiffres { margin: 6px 0; display: flex; align-items: baseline; gap: 6px; color: var(--texte-2); }
+.objectif-chiffres b { font-family: var(--police-chiffres); font-size: 24px; color: var(--texte); }
+.objectif-chiffres span { margin-left: auto; font-family: var(--police-chiffres); font-weight: 600; font-size: 18px; color: var(--texte); }
+.objectif-jauge { position: relative; height: 12px; border-radius: 6px; background: var(--surface-2); overflow: visible; }
+.objectif-rempli { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: var(--accent-trait); transition: width 0.6s ease; }
+.objectif.atteint .objectif-rempli { background: #f2c230; }
+.objectif-repere { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--texte); border-radius: 1px; }
+.objectif-detail { margin: 8px 0 0; font-size: 13px; color: var(--texte-2); }
+.objectif-form { padding: 10px 0; border-top: 1px solid var(--ligne); }
+.objectif-form select, .objectif-form input { font: inherit; }
+#bloc-objectifs > .btn { margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) { .objectif-rempli { transition: none; } }

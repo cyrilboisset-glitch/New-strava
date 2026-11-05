@@ -1,11 +1,13 @@
-// Page Progrès : bilans (semaines / mois / années), forme et fatigue,
-// records de puissance (avec courbe de puissance).
-import { toutesLesSorties } from './db.js';
+// Page Progrès : objectifs (semaine / mois / année), bilans, forme et fatigue,
+// records de puissance (avec courbe de puissance), mes parcours.
+import { toutesLesSorties, lireReglage, ecrireReglage } from './db.js';
 import { familleSortie } from './sortie.js';
 import { lireProfil, calculerEffortsManquants, wKg } from './profil.js';
-import { htmlListeSegments, suivreRecherche } from './segments.js';
 import { regrouperParcours } from './parcours.js';
-import { bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J } from './stats.js';
+import {
+  bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J,
+  avancementObjectif, TYPES_OBJECTIF, PERIODES_OBJECTIF,
+} from './stats.js';
 import { DUREES_EFFORTS_S, JOURS_ESTIMATION_FTP } from './analyse.js';
 import { nombre, km, duree, echapper, majuscule, fmtDate } from './format.js';
 
@@ -39,7 +41,85 @@ const fmtMoisLong = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'num
 
 const etat = { type: 'semaine', metrique: 'distance', choix: null, plage: 'j90' };
 let calculEnCours = null;
-let desabonnerSegments = null;
+let edition = null; // objectif en cours de saisie : null, 'nouveau' ou son id
+
+// ---- Objectifs ---------------------------------------------------------------------
+
+const UNITES_OBJECTIF = { distance: 'km', denivele: 'm', ftp: 'W' };
+const fmtJourMois = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+
+function libelleObjectif(o, a) {
+  if (o.periode === 'annee') return `${TYPES_OBJECTIF[o.type]} · ${new Date(a.debutMs).getFullYear()}`;
+  if (o.periode === 'mois') return `${TYPES_OBJECTIF[o.type]} · ${fmtMoisLong.format(a.debutMs)}`;
+  return `${TYPES_OBJECTIF[o.type]} · semaine du ${fmtJourMois.format(a.debutMs)} au ${fmtJourMois.format(a.finMs - 86400000)}`;
+}
+
+function valeurObjectif(type, v) {
+  return type === 'distance' ? `${nombre(v, v < 100 ? 1 : 0)} km` : type === 'denivele' ? `${nombre(v)} m` : `${nombre(v)} W`;
+}
+
+function formulaireObjectif(o) {
+  const type = o?.type ?? 'distance';
+  return `<form class="objectif-form" data-id="${o?.id ?? ''}">
+    <label class="champ-ligne"><span>Objectif</span>
+      <select name="type">${Object.entries(TYPES_OBJECTIF).map(([k, t]) => `<option value="${k}"${k === type ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+    <label class="champ-ligne"><span>Période</span>
+      <select name="periode">${Object.entries(PERIODES_OBJECTIF).map(([k, t]) => `<option value="${k}"${k === (o?.periode ?? 'annee') ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+    <label class="champ-ligne"><span>Valeur à atteindre (<span class="unite-objectif">${UNITES_OBJECTIF[type]}</span>)</span>
+      <input name="cible" type="number" inputmode="numeric" min="1" step="any" required value="${o?.cible ?? ''}"></label>
+    <div class="synchro-actions">
+      <button class="btn principal" type="submit">Enregistrer</button>
+      <button class="btn secondaire" type="button" data-obj="annuler">Annuler</button>
+    </div>
+  </form>`;
+}
+
+function blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs) {
+  const ordre = (o) => Object.keys(TYPES_OBJECTIF).indexOf(o.type) * 3 + Object.keys(PERIODES_OBJECTIF).indexOf(o.periode);
+  const lignes = [...objectifs].sort((a, b) => ordre(a) - ordre(b)).map((o) => {
+    if (edition === o.id) return formulaireObjectif(o);
+    const a = avancementObjectif(o, sortiesVelo, maintenantMs);
+    const pct = Math.round(a.part * 100);
+    let detail;
+    if (o.type === 'ftp') {
+      detail = a.fait
+        ? `${nombre(a.fait)} W estimée (meilleur 20 min × 95 %, le ${fmtDate.format(a.sortieFtp.debut)}) · FTP réglée : ${nombre(profil.ftpW)} W`
+        : `Pas encore d'effort de 20 min avec capteur sur la période · FTP réglée : ${nombre(profil.ftpW)} W`;
+      if (a.fait && a.fait >= a.cible) detail = `Objectif atteint ! ${detail}`;
+    } else if (a.fait >= a.cible) {
+      detail = 'Objectif atteint !';
+    } else {
+      const semaines = a.joursRestants / 7;
+      const rythme = o.periode === 'semaine' || semaines < 1
+        ? `${valeurObjectif(o.type, a.reste / Math.max(1, Math.ceil(a.joursRestants)))} par jour`
+        : `${valeurObjectif(o.type, a.reste / semaines)} par semaine`;
+      const ecart = Math.abs(a.ecart) < a.cible * 0.005 ? 'Pile dans le rythme'
+        : `${a.ecart > 0 ? 'En avance' : 'En retard'} de ${valeurObjectif(o.type, Math.abs(a.ecart))} sur un rythme régulier`;
+      detail = `${ecart} · reste ${valeurObjectif(o.type, a.reste)}, soit ${rythme}`;
+    }
+    return `<div class="objectif${a.fait >= a.cible ? ' atteint' : ''}" data-id="${o.id}">
+      <div class="objectif-tete">
+        <span class="objectif-nom">${libelleObjectif(o, a)}</span>
+        <span class="objectif-actions">
+          <button class="btn secondaire petit" type="button" data-obj="modifier" aria-label="Modifier">✎</button>
+          <button class="btn secondaire petit danger" type="button" data-obj="supprimer" aria-label="Supprimer">✕</button>
+        </span>
+      </div>
+      <p class="objectif-chiffres"><b>${a.fait || o.type !== 'ftp' ? valeurObjectif(o.type, a.fait) : '–'}</b> / ${valeurObjectif(o.type, a.cible)}<span>${pct} %</span></p>
+      <div class="objectif-jauge" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, pct)}">
+        <span class="objectif-rempli" style="width:${Math.min(100, a.part * 100).toFixed(1)}%"></span>
+        ${a.attendu != null ? `<span class="objectif-repere" style="left:${(a.partEcoulee * 100).toFixed(1)}%" title="Rythme régulier"></span>` : ''}
+      </div>
+      <p class="objectif-detail">${detail}</p>
+    </div>`;
+  }).join('');
+  return `<section class="carte bloc" id="bloc-objectifs">
+    <h2 class="bloc-titre">Mes objectifs</h2>
+    ${lignes || (edition ? '' : '<p class="aide">Aucun objectif pour l\'instant : distance ou dénivelé sur la semaine, le mois ou l\'année, ou une FTP à atteindre.</p>')}
+    ${edition === 'nouveau' ? formulaireObjectif(null) : '<button class="btn secondaire" type="button" data-obj="ajouter">+ Ajouter un objectif</button>'}
+    ${objectifs.length ? '<p class="bloc-note">Sorties vélo de la semaine (du lundi), du mois ou de l\'année en cours. Le trait sur la jauge marque où tu devrais en être à rythme régulier.</p>' : ''}
+  </section>`;
+}
 
 /** Rangée des boutons de tri par activité (partagée avec la liste) */
 export function htmlFiltres(toutes, filtre) {
@@ -308,28 +388,61 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
   const sorties = toutes.filter((s) => filtre === 'tout' || familleSortie(s).cle === filtre);
 
   let calcul = '';
-  const segmentsHtml = await htmlListeSegments();
+  let objectifs = (await lireReglage('objectifs')) ?? [];
+  const sortiesVelo = toutes.filter((s) => familleSortie(s).cle === 'sport-2');
+  edition = null;
   const rendre = () => {
     page.innerHTML = `
     ${familles.size > 1 ? `<nav class="filtres" aria-label="Type d'activité">${filtresHtml}</nav>` : ''}
+    ${blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs)}
     ${blocBilans(sorties, maintenantMs)}
     ${blocForme(toutes, profil, maintenantMs)}
     ${blocRecords(sorties, maintenantMs, calcul, profil.poidsKg)}
-    ${segmentsHtml}
     ${htmlMesParcours(toutes)}`;
     installerCurseurForme(page, toutes, profil, maintenantMs);
   };
   rendre();
 
-  // Recherche des passages sur les segments en cours : avancement, puis liste à jour
-  desabonnerSegments?.();
-  desabonnerSegments = suivreRecherche(async (t) => {
-    const p = page.querySelector('#segments-recherche');
-    if (p) { p.hidden = !t; p.textContent = t; }
-    if (!t && page.querySelector('#bloc-segments')) page.querySelector('#bloc-segments').outerHTML = await htmlListeSegments();
-  });
+  // Objectifs : ajout, modification, suppression (réglage « objectifs »)
+  const garderObjectifs = async (liste) => { objectifs = liste; await ecrireReglage('objectifs', liste); };
+  const rendreObjectifs = () => {
+    page.querySelector('#bloc-objectifs').outerHTML = blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs);
+    page.querySelector('.objectif-form input[name="cible"]')?.focus();
+  };
+  page.onsubmit = async (e) => {
+    const f = e.target.closest('.objectif-form');
+    if (!f) return;
+    e.preventDefault();
+    const cible = Number(f.cible.value);
+    if (!(cible > 0)) { f.cible.focus(); return; }
+    const o = { id: f.dataset.id || `o${Date.now().toString(36)}`, type: f.type.value, periode: f.periode.value, cible };
+    // un seul objectif par grandeur et par période : le nouveau remplace l'ancien
+    await garderObjectifs([...objectifs.filter((x) => x.id !== o.id && !(x.type === o.type && x.periode === o.periode)), o]);
+    edition = null;
+    rendreObjectifs();
+  };
+  page.onchange = (e) => {
+    if (e.target.name === 'type' && e.target.closest('.objectif-form')) {
+      e.target.closest('.objectif-form').querySelector('.unite-objectif').textContent = UNITES_OBJECTIF[e.target.value];
+    }
+  };
 
   page.onclick = async (e) => {
+    const obj = e.target.closest('[data-obj]');
+    if (obj) {
+      const a = obj.dataset.obj;
+      const id = obj.closest('[data-id]')?.dataset.id;
+      if (a === 'ajouter') edition = 'nouveau';
+      else if (a === 'annuler') edition = null;
+      else if (a === 'modifier') edition = id;
+      else if (a === 'supprimer') {
+        const o = objectifs.find((x) => x.id === id);
+        if (!confirm(`Supprimer l'objectif « ${TYPES_OBJECTIF[o.type]} · ${PERIODES_OBJECTIF[o.periode].toLowerCase()} » ?`)) return;
+        await garderObjectifs(objectifs.filter((x) => x.id !== id));
+      }
+      rendreObjectifs();
+      return;
+    }
     const f = e.target.closest('.filtre');
     if (f) { await options.changerFiltre(f.dataset.cle); return; }
     const seg = e.target.closest('[data-segments] button');

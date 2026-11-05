@@ -292,6 +292,14 @@ l'instant »** — à proposer quand il voudra :
   (segments-calc.js) = passages plus rapides que tous ceux d'avant (par date), le
   premier passage ne compte pas ; coupe 🏆 N sur la carte de la liste et à côté
   du nom dans le détail. Plus de seuil 150 % FTP pour les sprints détectés.
+- **v0.16.0 (5 nov. 2026) : objectifs**, demande de Cyril. Liste « Mes
+  segments » retirée de Progrès (les segments restent dans le détail des sorties
+  et leurs pages). Bloc « Mes objectifs » en tête de Progrès (réglage
+  `objectifs`, dans la sauvegarde) : distance, dénivelé ou FTP, sur la semaine
+  (du lundi), le mois ou l'année en cours ; un seul par grandeur et période.
+  `avancementObjectif` (stats.js) : sorties vélo seulement ; jauge + trait du
+  rythme régulier, avance / retard, reste par semaine (par jour pour la semaine) ;
+  FTP = 95 % du meilleur 20 min de la période, avec la FTP réglée à côté.
 - **Liste des tâches à faire (demandée par Cyril le 4 nov. 2026), dans
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :

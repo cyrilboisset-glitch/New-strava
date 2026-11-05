@@ -602,27 +602,3 @@ export async function afficherSegment(page, id, toast) {
   };
   return g;
 }
-
-// ---- Liste des segments (onglet Progrès) ---------------------------------------------------
-
-export async function htmlListeSegments() {
-  const segments = await lireSegments();
-  if (!segments.length) {
-    return `<section class="carte bloc" id="bloc-segments"><h2 class="bloc-titre">Mes segments</h2>
-      <p class="aide">Pas encore de segment. Dans le détail d'une sortie, touche « Suivre » sur une montée ou un sprint détecté, ou crée un segment à la main : l'appli retrouve alors tous tes passages.</p></section>`;
-  }
-  const passages = await lirePassages();
-  const lignes = segments.map((g) => {
-    const ps = passages.filter((p) => p.segmentId === g.id);
-    const rec = ps.length ? Math.min(...ps.map((p) => p.dureeS)) : null;
-    return { g, n: ps.length, rec, dernier: ps.length ? Math.max(...ps.map((p) => p.debut)) : 0 };
-  }).sort((a, b) => b.dernier - a.dernier);
-  return `<section class="carte bloc" id="bloc-segments">
-    <h2 class="bloc-titre">Mes segments</h2>
-    <p class="progression" id="segments-recherche" hidden></p>
-    <div class="passages">${lignes.map(({ g, n, rec }) => `
-      <a class="passage" href="#segment=${encodeURIComponent(g.id)}">
-        <span class="passage-nom">${echapper(g.nom)}<small>${g.type} · ${chiffresSegment(g)}</small></span>
-        <span class="passage-temps">${rec != null ? chrono(rec) : '–'}<span class="rang discret">${n} passage${n > 1 ? 's' : ''}</span></span></a>`).join('')}</div>
-  </section>`;
-}

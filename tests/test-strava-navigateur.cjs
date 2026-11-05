@@ -346,8 +346,39 @@ async function texteToast(page) {
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
   await page.click('#onglet-progres');
-  await page.waitForSelector('#bloc-segments .passage');
-  verif('Progrès : mes segments', (await page.textContent('#bloc-segments')).replace(/\s+/g, ' ').includes('2 passages'));
+  await page.waitForSelector('#bloc-objectifs');
+  verif('Progrès : plus de liste des segments, bloc objectifs en tête', !(await page.$('#bloc-segments')) && (await page.textContent('#bloc-objectifs')).includes('Aucun objectif'));
+  // Objectifs : 5 000 km sur l'année, puis une FTP de 260 W sur le mois
+  await page.click('[data-obj="ajouter"]');
+  await page.selectOption('.objectif-form select[name="periode"]', 'annee');
+  await page.fill('.objectif-form input[name="cible"]', '5000');
+  await page.click('.objectif-form button[type="submit"]');
+  await page.waitForSelector('#bloc-objectifs .objectif');
+  const objTxt = (await page.textContent('#bloc-objectifs .objectif')).replace(/\s+/g, ' ');
+  verif('objectif distance sur l\'année : libellé, chiffres, rythme', new RegExp(`Distance · ${new Date().getFullYear()}.*/ 5 000 km.*%.*reste .* km, soit .* km par semaine`).test(objTxt), objTxt);
+  await page.click('[data-obj="ajouter"]');
+  await page.selectOption('.objectif-form select[name="type"]', 'ftp');
+  verif('unité qui suit le type', (await page.textContent('.objectif-form .unite-objectif')) === 'W');
+  await page.selectOption('.objectif-form select[name="periode"]', 'mois');
+  await page.fill('.objectif-form input[name="cible"]', '260');
+  await page.click('.objectif-form button[type="submit"]');
+  await page.waitForFunction(() => document.querySelectorAll('#bloc-objectifs .objectif').length === 2);
+  const ftpTxt = (await page.textContent('#bloc-objectifs .objectif:nth-of-type(2)')).replace(/\s+/g, ' ');
+  verif('objectif FTP : cible et FTP réglée', /FTP · .*\/ 260 W.*FTP réglée : 2\d\d W/.test(ftpTxt), ftpTxt);
+  await page.screenshot({ path: path.join(CAPTURES, 'objectifs.png') });
+  // Modifier : 6 000 km ; gardé après réouverture de l'onglet
+  await page.click('#bloc-objectifs .objectif [data-obj="modifier"]');
+  await page.fill('.objectif-form input[name="cible"]', '6000');
+  await page.click('.objectif-form button[type="submit"]');
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.click('#onglet-progres');
+  await page.waitForSelector('#bloc-objectifs .objectif');
+  verif('objectif modifié et gardé', (await page.textContent('#bloc-objectifs')).replace(/\s+/g, ' ').includes('/ 6 000 km') &&(await page.$$('#bloc-objectifs .objectif')).length === 2, (await page.textContent('#bloc-objectifs')).replace(/\s+/g, ' '));
+  page.once('dialog', (d) => d.accept());
+  await page.click('#bloc-objectifs .objectif:nth-of-type(2) [data-obj="supprimer"]');
+  await page.waitForFunction(() => document.querySelectorAll('#bloc-objectifs .objectif').length === 1);
+  verif('objectif FTP supprimé', !(await page.textContent('#bloc-objectifs')).includes('260 W'));
   // On retire la sortie « bis » (et son passage) : la suite du test compte les sorties de l'archive
   await page.evaluate(async () => {
     const db = await (await import('./js/db.js')).ouvrirBase();
