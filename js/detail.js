@@ -14,8 +14,10 @@ import { htmlChoixVelo } from './velos.js';
 import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
-import { retirerCarte } from './traces.js';
+import { retirerCarte } from './carte-statique.js';
 import { afficherSegmentsSortie, fermerApercuSegment } from './segments.js';
+import { gpxDepuisSortie, nomFichierGpx } from './routage.js';
+import { telecharger } from './sauvegarde.js';
 
 const COLONNES_COURBE = 300; // points dessinés par courbe (moyenne par colonne)
 
@@ -449,7 +451,11 @@ export async function afficherDetail(page, id, toast = () => {}) {
   ${zonesP}
   ${zonesFc}
   ${blocTours(tours)}
-  ${notes ? `<p class="detail-pied">${notes}</p>` : ''}`;
+  ${notes ? `<p class="detail-pied">${notes}</p>` : ''}
+  ${avecGps ? `<div class="synchro-actions export-sortie">
+    <button class="btn secondaire" type="button" data-export="gpx">Exporter en GPX</button>
+    <button class="btn secondaire" type="button" data-export="partager">Partager le GPX</button>
+  </div>` : ''}`;
 
   let marqueur = null;
   if (avecGps) {
@@ -496,6 +502,20 @@ export async function afficherDetail(page, id, toast = () => {}) {
       blocParcours.hidden = false;
     }).catch((e) => console.warn('Même parcours', e));
   }
+  // Export GPX de la sortie (trace, altitude, heures, puissance, FC, cadence)
+  page.querySelector('.export-sortie')?.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-export]');
+    if (!b) return;
+    const nom = s.nom || `${s.nomSport ?? 'Sortie'} du ${fmtDateLongue.format(s.debut)}`;
+    const xml = gpxDepuisSortie(nom, pts, new Date(s.debut).getTime(), { velo: familleSortie(s).cle === 'sport-2' });
+    const fichier = new File([xml], nomFichierGpx(`${new Date(s.debut).toISOString().slice(0, 10)} ${nom}`), { type: 'application/gpx+xml' });
+    if (b.dataset.export === 'partager' && navigator.canShare?.({ files: [fichier] })) {
+      try { await navigator.share({ files: [fichier], title: nom }); } catch (err) { if (err.name !== 'AbortError') toast(`Partage impossible : ${err.message}`); }
+      return;
+    }
+    telecharger(fichier, fichier.name);
+    toast(`${fichier.name} enregistré dans Téléchargements.`);
+  });
   page.querySelector('#choix-velo')?.addEventListener('change', async (e) => {
     await completerSortie(s.id, () => ({ veloId: e.target.value || null }));
   });

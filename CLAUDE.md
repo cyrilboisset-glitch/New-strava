@@ -94,6 +94,7 @@ js/parcours.js              Même parcours (trace simplifiée) : comparaison, gr
 js/puissance-estimee.js     Puissance estimée sans capteur (vitesse, pente, masse ; modèle Parcours 3D)
 js/routage.js               Création de parcours (sans navigateur) : BRouter, GPX, D+, temps estimé
 js/traces.js                Onglet Tracés : carte d'édition, profil, 3D, vent, enregistrer / exporter / partager
+js/lieux.js                 Noms proposés (tracés, segments) avec les lieux OpenStreetMap (Nominatim, Overpass)
 js/vent.js                  Vent (repris d'Appli-vent) : Open-Meteo, vent dans l'axe, temps avec le vent, sens, heures
 js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
 js/format.js                Mise en forme (nombres, durées, dates)
@@ -113,6 +114,7 @@ tests/test-stats.mjs        Bilans, forme / fatigue, records (TZ=Europe/Paris)
 tests/test-vue3d.mjs        Trace 3D : longueur, pentes, curseur, boucle
 tests/test-segments.mjs     Segments : temps (aussi à 8 s), sens, écart, détour, tours, montées, sprints
 tests/test-vent.mjs         Vent : caps, interpolation, temps avec le vent, sens conseillé, meilleure heure
+tests/test-lieux.mjs        Noms proposés : « de / du / d' », tracés, segments, Nominatim / Overpass, cache
 tests/test-routage.mjs      Tracés : adresse et réponse BRouter, GPX, D+, temps à puissance constante
 tests/test-estimation.mjs   Puissance estimée (150 W à plat / 257 W à 1,2 %), même parcours, tuiles
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
@@ -231,7 +233,7 @@ l'instant »** — à proposer quand il voudra :
   comme `sectorize` de Parcours-3d, + sprints sur pics de puissance,
   seuil ~150 % FTP, réglable) et manuels (début / fin choisis, nommés),
   avec les vraies données (temps, W, NP, FC, VAM, W/kg). Noms des cols :
-  pas de requête réseau sans accord de Cyril (« Montée du km X »).
+  accord de Cyril donné le 5 nov. 2026 (OpenStreetMap, voir v0.14.0).
 - **Étape 4 (création de parcours GPX) : FAITE le 5 nov. 2026** (v0.11.0).
   Onglet « Tracés » (#traces) : toucher la carte pour placer les points
   (glisser = déplacer, toucher = retirer), itinéraire BRouter en ligne
@@ -255,6 +257,24 @@ l'instant »** — à proposer quand il voudra :
   (`apercu` dans segments.js, libéré par `fermerApercuSegment()` depuis
   fermerDetail). Pas de « Voir » sur les segments déjà suivis (lien vers la page
   du segment).
+- **v0.14.0 (5 nov. 2026)**, demandes de Cyril :
+  1) « Voir » aussi sur les segments suivis du détail (clé d'aperçu « s<n> » ;
+  « p<n> » pour les détectés) ; 2) segments enregistrés retrouvés sur un tracé
+  (`trouverPassages` sur les points du tracé) : en bleu sur la carte, bloc
+  « Segments sur ce tracé » (position, record, temps estimé à la puissance du
+  tracé, « Voir » = cadrer la carte) ; 3) heure de départ (case « Heure » du bloc
+  vent, `ed.heure`) : ajoutée au tableau (même hors 6 h–20 h, marquée ★), choisie
+  pour la 3D, gardée avec le tracé (`departMs`, jour repris s'il est dans les
+  7 jours) et mise dans le GPX (`<metadata><time>`) ; 4) export GPX d'une sortie
+  (bas du détail : Exporter / Partager ; puissance, FC, cadence en extensions
+  Garmin ; relu par `lireGpx`) ; 5) noms proposés (`js/lieux.js`) : **Cyril a
+  accepté le 5 nov. 2026 l'envoi de quelques points à OpenStreetMap** (Nominatim
+  pour la commune, Overpass pour un col / sommet nommé à ≤ 300 m), une demande
+  par seconde, cache dans le réglage `lieux` ; sans réseau, noms avec les
+  chiffres. Tracé : rempli tant que le nom est vide ou reste la proposition,
+  bouton « Proposer un nom ». Segments détectés : noms remplacés au fur et à
+  mesure (doublons : « (km X) ») ; création à la main : nom proposé ;
+  « Renommer » propose un nom. Testé avec de faux Nominatim / Overpass seulement.
 - **Liste des tâches à faire (demandée par Cyril le 4 nov. 2026), dans
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :

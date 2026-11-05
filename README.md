@@ -62,6 +62,7 @@ node tests/test-segments.mjs
 node tests/test-estimation.mjs
 node tests/test-routage.mjs
 node tests/test-vent.mjs
+node tests/test-lieux.mjs
 node tests/test-strava-navigateur.cjs
 ```
 

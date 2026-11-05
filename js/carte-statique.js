@@ -66,3 +66,10 @@ export function htmlCarteStatique(trace, { largeur = 320, hauteur = 150, classe 
       <circle class="apercu-arrivee" cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="4.5"/></svg>
     <span class="attribution">© OpenStreetMap</span></div>`;
 }
+
+// Retire une carte Leaflet ; si un zoom animé est en cours, à la fin du zoom
+// (sinon Leaflet plante en terminant son animation sur une carte retirée)
+export function retirerCarte(c) {
+  if (c._animatingZoom) c.once('zoomend', () => c.remove());
+  else c.remove();
+}
