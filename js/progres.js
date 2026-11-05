@@ -33,7 +33,7 @@ function joursPlage(tout) {
   }
   return p === 'tout' ? tout : tout.slice(-Number(p.slice(1)));
 }
-const RECORDS_AFFICHES = { 5: '5 s', 60: '1 min', 300: '5 min', 1200: '20 min', 3600: '1 h' };
+export const RECORDS_AFFICHES = { 5: '5 s', 60: '1 min', 300: '5 min', 1200: '20 min', 3600: '1 h' };
 
 const fmtSemaine = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
 const fmtMoisCourt = new Intl.DateTimeFormat('fr-FR', { month: 'short' });
@@ -55,7 +55,7 @@ function libelleObjectif(o, a) {
 }
 
 function valeurObjectif(type, v) {
-  return type === 'distance' ? `${nombre(v, v < 100 ? 1 : 0)} km` : type === 'denivele' ? `${nombre(v)} m` : `${nombre(v)} W`;
+  return type === 'distance' ? `${nombre(v, v > 0 && v < 100 ? 1 : 0)} km` : type === 'denivele' ? `${nombre(v)} m` : `${nombre(v)} W`;
 }
 
 function formulaireObjectif(o) {
@@ -74,30 +74,41 @@ function formulaireObjectif(o) {
   </form>`;
 }
 
+// Anneau : arc extérieur rouge = où j'en suis, arc intérieur bleu = où je devrais en être
+function anneau(partFait, partAttendu) {
+  const arc = (r, part, classe) => {
+    const c = 2 * Math.PI * r;
+    const l = Math.max(0, Math.min(1, part)) * c;
+    return `<circle class="anneau-fond" cx="60" cy="60" r="${r}"/>${l > 0.5 ? `<circle class="${classe}" cx="60" cy="60" r="${r}" stroke-dasharray="${l.toFixed(2)} ${c.toFixed(2)}" transform="rotate(-90 60 60)"/>` : ''}`;
+  };
+  return `<svg class="anneau" viewBox="0 0 120 120" aria-hidden="true">${arc(52, partFait, 'anneau-fait')}${partAttendu != null ? arc(39, partAttendu, 'anneau-attendu') : ''}</svg>`;
+}
+
 function blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs) {
   const ordre = (o) => Object.keys(TYPES_OBJECTIF).indexOf(o.type) * 3 + Object.keys(PERIODES_OBJECTIF).indexOf(o.periode);
   const lignes = [...objectifs].sort((a, b) => ordre(a) - ordre(b)).map((o) => {
     if (edition === o.id) return formulaireObjectif(o);
-    const a = avancementObjectif(o, sortiesVelo, maintenantMs);
+    const a = avancementObjectif(o, sortiesVelo, maintenantMs, { ftpW: profil.ftpW });
     const pct = Math.round(a.part * 100);
+    const atteint = a.fait >= a.cible;
     let detail;
     if (o.type === 'ftp') {
-      detail = a.fait
-        ? `${nombre(a.fait)} W estimée (meilleur 20 min × 95 %, le ${fmtDate.format(a.sortieFtp.debut)}) · FTP réglée : ${nombre(profil.ftpW)} W`
-        : `Pas encore d'effort de 20 min avec capteur sur la période · FTP réglée : ${nombre(profil.ftpW)} W`;
-      if (a.fait && a.fait >= a.cible) detail = `Objectif atteint ! ${detail}`;
-    } else if (a.fait >= a.cible) {
-      detail = 'Objectif atteint !';
-    } else {
+      detail = [
+        a.fait ? `FTP estimée après ta dernière sortie : 95 % du meilleur 20 min des 6 dernières semaines (le ${fmtDate.format(a.sortieFtp.debut)})` : 'Pas d\'effort de 20 min avec capteur ces 6 dernières semaines',
+        a.departFtpW != null && !atteint ? `départ de la période : ${nombre(a.departFtpW)} W` : '',
+        `FTP réglée : ${nombre(profil.ftpW)} W`,
+      ].filter(Boolean).join(' · ');
+    } else if (!atteint) {
       const semaines = a.joursRestants / 7;
       const rythme = o.periode === 'semaine' || semaines < 1
         ? `${valeurObjectif(o.type, a.reste / Math.max(1, Math.ceil(a.joursRestants)))} par jour`
         : `${valeurObjectif(o.type, a.reste / semaines)} par semaine`;
       const ecart = Math.abs(a.ecart) < a.cible * 0.005 ? 'Pile dans le rythme'
-        : `${a.ecart > 0 ? 'En avance' : 'En retard'} de ${valeurObjectif(o.type, Math.abs(a.ecart))} sur un rythme régulier`;
+        : `${a.ecart > 0 ? 'En avance' : 'En retard'} de ${valeurObjectif(o.type, Math.abs(a.ecart))}`;
       detail = `${ecart} · reste ${valeurObjectif(o.type, a.reste)}, soit ${rythme}`;
-    }
-    return `<div class="objectif${a.fait >= a.cible ? ' atteint' : ''}" data-id="${o.id}">
+    } else detail = '';
+    const fait = a.fait || o.type !== 'ftp' ? valeurObjectif(o.type, a.fait) : '–';
+    return `<div class="objectif${atteint ? ' atteint' : ''}" data-id="${o.id}">
       <div class="objectif-tete">
         <span class="objectif-nom">${libelleObjectif(o, a)}</span>
         <span class="objectif-actions">
@@ -105,19 +116,23 @@ function blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs) {
           <button class="btn secondaire petit danger" type="button" data-obj="supprimer" aria-label="Supprimer">✕</button>
         </span>
       </div>
-      <p class="objectif-chiffres"><b>${a.fait || o.type !== 'ftp' ? valeurObjectif(o.type, a.fait) : '–'}</b> / ${valeurObjectif(o.type, a.cible)}<span>${pct} %</span></p>
-      <div class="objectif-jauge" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, pct)}">
-        <span class="objectif-rempli" style="width:${Math.min(100, a.part * 100).toFixed(1)}%"></span>
-        ${a.attendu != null ? `<span class="objectif-repere" style="left:${(a.partEcoulee * 100).toFixed(1)}%" title="Rythme régulier"></span>` : ''}
+      <div class="objectif-cercle" role="img" aria-label="${fait} sur ${valeurObjectif(o.type, a.cible)}${a.attendu != null ? `, ${valeurObjectif(o.type, a.attendu)} prévus à ce jour` : ''}">
+        ${anneau(a.part, a.attendu != null ? a.attendu / a.cible : null)}
+        <span class="objectif-centre"><b>${pct} %</b><small>${atteint ? 'atteint !' : 'de l\'objectif'}</small></span>
       </div>
-      <p class="objectif-detail">${detail}</p>
+      <ul class="objectif-legende">
+        <li><span class="puce fait"></span>${o.type === 'ftp' ? 'FTP estimée' : 'Fait'} : <b>${fait}</b></li>
+        ${a.attendu != null ? `<li><span class="puce attendu"></span>Prévu à ce jour : <b>${valeurObjectif(o.type, a.attendu)}</b></li>` : ''}
+        <li><span class="puce cible"></span>Objectif : <b>${valeurObjectif(o.type, a.cible)}</b></li>
+      </ul>
+      ${detail ? `<p class="objectif-detail">${detail}</p>` : ''}
     </div>`;
   }).join('');
   return `<section class="carte bloc" id="bloc-objectifs">
     <h2 class="bloc-titre">Mes objectifs</h2>
-    ${lignes || (edition ? '' : '<p class="aide">Aucun objectif pour l\'instant : distance ou dénivelé sur la semaine, le mois ou l\'année, ou une FTP à atteindre.</p>')}
+    ${lignes ? `<div class="objectifs">${lignes}</div>` : (edition ? '' : '<p class="aide">Aucun objectif pour l\'instant : distance ou dénivelé sur la semaine, le mois ou l\'année, ou une FTP à atteindre.</p>')}
     ${edition === 'nouveau' ? formulaireObjectif(null) : '<button class="btn secondaire" type="button" data-obj="ajouter">+ Ajouter un objectif</button>'}
-    ${objectifs.length ? '<p class="bloc-note">Sorties vélo de la semaine (du lundi), du mois ou de l\'année en cours. Le trait sur la jauge marque où tu devrais en être à rythme régulier.</p>' : ''}
+    ${objectifs.length ? '<p class="bloc-note">Sorties vélo de la semaine (du lundi), du mois ou de l\'année en cours. Arc rouge : où tu en es ; arc bleu : où tu devrais en être en avançant régulièrement (pour la FTP : de ta FTP du début de la période jusqu\'à l\'objectif).</p>' : ''}
   </section>`;
 }
 
@@ -312,27 +327,8 @@ function blocRecords(sorties, maintenantMs, enCours, poidsKg) {
       <td><a href="#sortie=${encodeURIComponent(r.sortie.id)}"><b>${nombre(r.w)} W</b><small>${wKg(r.w, poidsKg) ? `${wKg(r.w, poidsKg)} W/kg · ` : ''}${fmtDate.format(r.sortie.debut)}</small></a></td>
       <td>${rec ? `${nombre(rec.w)} W` : '–'}</td></tr>`;
   }).join('');
-  // Courbe de puissance : durée en échelle logarithmique
-  const durees = DUREES_EFFORTS_S.filter((d) => tousTemps[d]);
-  let courbe = '';
-  if (durees.length >= 3) {
-    const lx = (d) => ((Math.log(d) - Math.log(durees[0])) / (Math.log(durees[durees.length - 1]) - Math.log(durees[0]))) * 300;
-    const haut = Math.max(...durees.map((d) => tousTemps[d].w)) * 1.08;
-    const ly = (w) => 100 - (w / haut) * 100;
-    const ligne = (rec) => durees.filter((d) => rec[d]).map((d, i) => `${i ? 'L' : 'M'}${lx(d).toFixed(2)} ${ly(rec[d].w).toFixed(2)}`).join('');
-    const etiquettes = { 5: '5 s', 60: '1 min', 300: '5 min', 1200: '20 min', 3600: '1 h' };
-    courbe = `
-    <h3 class="sous-titre">Courbe de puissance</h3>
-    <div class="legende"><span><span class="puce record"></span>Record</span><span><span class="puce recent"></span>${JOURS_ESTIMATION_FTP / 7} dernières semaines</span></div>
-    <div class="courbe-puissance">
-      <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
-        <path class="ligne-record" d="${ligne(tousTemps)}"/>
-        <path class="ligne-recent" d="${ligne(recents)}"/>
-      </svg>
-      <span class="courbe-axe haut">${nombre(haut / 1.08)} W</span>
-    </div>
-    <div class="axe-log">${durees.filter((d) => etiquettes[d]).map((d) => `<span style="left:${((lx(d) / 300) * 100).toFixed(1)}%">${etiquettes[d]}</span>`).join('')}</div>`;
-  }
+  const enW = (rec) => Object.fromEntries(Object.entries(rec).filter(([, r]) => r).map(([d, r]) => [d, r.w]));
+  const courbe = htmlCourbePuissance(enW(tousTemps), enW(recents), `${JOURS_ESTIMATION_FTP / 7} dernières semaines`);
   return `
   <section class="carte bloc" id="bloc-records">
     <h2 class="bloc-titre">Records de puissance</h2>
@@ -341,6 +337,33 @@ function blocRecords(sorties, maintenantMs, enCours, poidsKg) {
     ${courbe}
     <p class="bloc-note">Ton BiNavi enregistre environ un point toutes les 8 s : les records courts (5 s, 1 min) sont approximatifs.</p>
   </section>`;
+}
+
+/**
+ * Courbe de puissance (durée en échelle logarithmique) : records en trait plein,
+ * l'autre série (6 dernières semaines, ou une sortie) en couleur.
+ * @param {Object<number, number>} record  durée (s) -> W
+ * @param {Object<number, number>} autre   durée (s) -> W
+ */
+export function htmlCourbePuissance(record, autre, legendeAutre) {
+  const durees = DUREES_EFFORTS_S.filter((d) => record[d] || autre[d]);
+  if (durees.length < 3) return '';
+  const lx = (d) => ((Math.log(d) - Math.log(durees[0])) / (Math.log(durees[durees.length - 1]) - Math.log(durees[0]))) * 300;
+  const haut = Math.max(...durees.map((d) => Math.max(record[d] ?? 0, autre[d] ?? 0))) * 1.08;
+  const ly = (w) => 100 - (w / haut) * 100;
+  const ligne = (rec) => durees.filter((d) => rec[d]).map((d, i) => `${i ? 'L' : 'M'}${lx(d).toFixed(2)} ${ly(rec[d]).toFixed(2)}`).join('');
+  const etiquettes = { 5: '5 s', 60: '1 min', 300: '5 min', 1200: '20 min', 3600: '1 h' };
+  return `
+    <h3 class="sous-titre">Courbe de puissance</h3>
+    <div class="legende"><span><span class="puce record"></span>Record</span><span><span class="puce recent"></span>${legendeAutre}</span></div>
+    <div class="courbe-puissance">
+      <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+        <path class="ligne-record" d="${ligne(record)}"/>
+        <path class="ligne-recent" d="${ligne(autre)}"/>
+      </svg>
+      <span class="courbe-axe haut">${nombre(haut / 1.08)} W</span>
+    </div>
+    <div class="axe-log">${durees.filter((d) => etiquettes[d]).map((d) => `<span style="left:${((lx(d) / 300) * 100).toFixed(1)}%">${etiquettes[d]}</span>`).join('')}</div>`;
 }
 
 // ---- Mes parcours (sorties faites plusieurs fois) ------------------------------------

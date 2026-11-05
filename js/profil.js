@@ -141,6 +141,30 @@ export async function calculerEffortsManquants(sorties, progression = () => {}) 
   return aFaire.length;
 }
 
+// ---- Réglage automatique de la FTP (demandé par Cyril le 5 nov. 2026) ---------------
+// Après chaque import : si 95 % du meilleur 20 min des 6 dernières semaines dépasse la
+// FTP réglée, elle monte à cette valeur. Elle ne baisse jamais toute seule (sinon elle
+// chuterait après 6 semaines sans effort de 20 min à fond). Réglage `ftpAuto` (oui par
+// défaut) ; hausses gardées dans `ftpHausses` [{ le, avantW, ftpW, sortieId, sortieDebut }].
+
+export const lireFtpAuto = async () => (await lireReglage('ftpAuto')) !== false;
+export const ecrireFtpAuto = (oui) => ecrireReglage('ftpAuto', !!oui);
+export const lireHaussesFtp = async () => (await lireReglage('ftpHausses')) ?? [];
+
+/** @returns {Promise<{avantW, ftpW, sortie} | null>}  la hausse faite, ou null */
+export async function reglerFtpAuto(maintenantMs = Date.now()) {
+  if (!(await lireFtpAuto())) return null;
+  const r = await estimerMaFtp(maintenantMs);
+  if (!r) return null;
+  const avantW = (await lireReglage('ftpW')) ?? FTP_DEFAUT_W;
+  if (r.ftpW <= avantW) return null;
+  await ecrireReglage('ftpW', r.ftpW);
+  const hausses = await lireHaussesFtp();
+  hausses.push({ le: maintenantMs, avantW, ftpW: r.ftpW, sortieId: r.sortie.id, sortieDebut: r.sortie.debut });
+  await ecrireReglage('ftpHausses', hausses.slice(-50));
+  return { avantW, ftpW: r.ftpW, sortie: r.sortie };
+}
+
 /**
  * Estimation de la FTP : calcule d'abord les efforts manquants des sorties
  * des 6 dernières semaines (avec puissance), puis 95 % du meilleur 20 min.

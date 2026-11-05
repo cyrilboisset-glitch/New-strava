@@ -1,7 +1,7 @@
 // Tests de la page Progrès : bilans par période, forme / fatigue, records.
 // Valeurs connues d'avance. Lancer : TZ=Europe/Paris node tests/test-stats.mjs
 // (les semaines et les mois se comptent en heure locale)
-import { bilanPeriodes, formeFatigue, etatFraicheur, records, debutPeriode, avancementObjectif } from '../js/stats.js';
+import { bilanPeriodes, formeFatigue, etatFraicheur, records, debutPeriode, avancementObjectif, ftpApresSortie } from '../js/stats.js';
 
 process.env.TZ = process.env.TZ || 'Europe/Paris';
 let echecs = 0;
@@ -88,8 +88,13 @@ const dm = avancementObjectif({ type: 'denivele', periode: 'mois', cible: 3000 }
 egal('mois : 1 000 m en novembre (pas le 31 oct.), 15 % du mois écoulé', [dm.fait, Math.round(dm.partEcoulee * 1000) / 1000], [1000, 0.15]);
 const da = avancementObjectif({ type: 'distance', periode: 'annee', cible: 5000 }, so, jeudi);
 egal('année : 2026 seulement (pas le 31 déc. 2025)', da.fait, 120);
-const df = avancementObjectif({ type: 'ftp', periode: 'mois', cible: 250 }, so, jeudi);
-egal('FTP : 95 % du meilleur 20 min du mois (250 W -> 238 W), pas de rythme', [df.fait, df.attendu, df.reste], [238, null, 12]);
+const df = avancementObjectif({ type: 'ftp', periode: 'mois', cible: 250 }, so, jeudi, { ftpW: 230 });
+// pas d'effort de 20 min avant novembre : départ = FTP réglée 230 W ; 15 % du mois -> 233 W attendus
+egal('FTP : estimée aujourd\'hui (250 W sur 20 min -> 238 W), attendu 233 W depuis la FTP réglée', [df.fait, Math.round(df.attendu), df.reste, df.departFtpW], [238, 233, 12, 230]);
+const avant = [...so, { debut: new Date(2026, 9, 20, 9).getTime(), effortsW: { 1200: 220 } }];
+egal('FTP : départ = FTP estimée au début du mois (220 W -> 209 W)', avancementObjectif({ type: 'ftp', periode: 'mois', cible: 250 }, avant, jeudi, { ftpW: 230 }).departFtpW, 209);
+egal('FTP après chaque sortie : 209 W le 20 oct., 238 W le 3 nov., toujours 238 W le 5 nov. (240 W < 250 W)',
+  [ftpApresSortie(avant[5], avant).ftpW, ftpApresSortie(so[0], avant).ftpW, ftpApresSortie(so[1], avant).ftpW], [209, 238, 238]);
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);

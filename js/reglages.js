@@ -1,6 +1,8 @@
 // Page Profil : FTP (avec estimation depuis les sorties), FC max,
 // sauvegarde des sorties et place utilisée.
-import { lireProfil, ecrireProfil, estimerMaFtp, wKg } from './profil.js';
+import {
+  lireProfil, ecrireProfil, estimerMaFtp, wKg, lireFtpAuto, ecrireFtpAuto, lireHaussesFtp, reglerFtpAuto,
+} from './profil.js';
 import { afficherVelos } from './velos.js';
 import { creerSauvegarde, telecharger } from './sauvegarde.js';
 import { toutesLesSorties, lireReglage } from './db.js';
@@ -26,6 +28,8 @@ export async function afficherReglages(page, toast) {
   const profil = await lireProfil();
   const derniere = await lireReglage('derniereSauvegarde');
   const nbSorties = (await toutesLesSorties()).length;
+  const ftpAuto = await lireFtpAuto();
+  const derniereHausse = (await lireHaussesFtp()).at(-1) ?? null;
   page.innerHTML = `
   <section class="carte reglages">
     <h2 class="bloc-titre">Puissance</h2>
@@ -34,6 +38,8 @@ export async function afficherReglages(page, toast) {
       <span class="champ-saisie"><input id="champ-ftp" type="number" inputmode="numeric" min="50" max="600" step="1" value="${profil.ftpW ?? ''}"> W</span>
     </label>
     <p class="aide">Sert aux zones de puissance, au facteur d'intensité et au TSS de toutes les sorties. <span id="ftp-wkg">${wKg(profil.ftpW, profil.poidsKg) ? `Soit ${wKg(profil.ftpW, profil.poidsKg)} W/kg.` : ''}</span></p>
+    <label class="case"><input type="checkbox" id="ftp-auto"${ftpAuto ? ' checked' : ''}> Régler la FTP automatiquement</label>
+    <p class="aide" id="ftp-auto-aide">Après chaque sortie : si 95 % de ton meilleur 20 min des 6 dernières semaines dépasse ta FTP, elle monte à cette valeur. Elle ne baisse jamais toute seule.${derniereHausse ? ` Dernière hausse : le ${fmtDate.format(derniereHausse.le)}, ${derniereHausse.avantW} → ${derniereHausse.ftpW} W.` : ''}</p>
     <label class="champ">
       <span>Poids</span>
       <span class="champ-saisie"><input id="champ-poids" type="number" inputmode="decimal" min="30" max="250" step="0.1" value="${profil.poidsKg ?? ''}"> kg</span>
@@ -144,6 +150,18 @@ export async function afficherReglages(page, toast) {
     } finally {
       bouton.disabled = false;
     }
+  });
+
+  // Réglage automatique : enregistré tout de suite ; activé -> vérifié tout de suite
+  page.querySelector('#ftp-auto').addEventListener('change', async (e) => {
+    await ecrireFtpAuto(e.target.checked);
+    if (!e.target.checked) { toast('Réglage automatique de la FTP coupé.'); return; }
+    const h = await reglerFtpAuto();
+    if (h) {
+      champFtp.value = h.ftpW;
+      champFtp.dispatchEvent(new Event('input'));
+      toast(`FTP réglée automatiquement : ${h.avantW} → ${h.ftpW} W.`);
+    } else toast('Réglage automatique de la FTP activé : ta FTP actuelle n\'est pas dépassée.');
   });
 
   page.querySelector('#btn-enregistrer').addEventListener('click', async () => {
