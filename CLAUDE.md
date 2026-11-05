@@ -92,6 +92,8 @@ js/segments.js              Segments : stockage (réglages segments / passages),
 js/carte-statique.js        Petites cartes : tuiles OSM (Web Mercator) sous le tracé, sans Leaflet
 js/parcours.js              Même parcours (trace simplifiée) : comparaison, groupes, classement
 js/puissance-estimee.js     Puissance estimée sans capteur (vitesse, pente, masse ; modèle Parcours 3D)
+js/routage.js               Création de parcours (sans navigateur) : BRouter, GPX, D+, temps estimé
+js/traces.js                Onglet Tracés : carte d'édition, profil, 3D, enregistrer / exporter / partager
 js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
 js/format.js                Mise en forme (nombres, durées, dates)
 vendor/leaflet/             Leaflet 1.9.4 (BSD-2) ; fond OSM chargé en ligne
@@ -109,6 +111,7 @@ tests/test-analyse.mjs      Efforts, zones, IF/TSS, FTP estimée (valeurs connue
 tests/test-stats.mjs        Bilans, forme / fatigue, records (TZ=Europe/Paris)
 tests/test-vue3d.mjs        Trace 3D : longueur, pentes, curseur, boucle
 tests/test-segments.mjs     Segments : temps (aussi à 8 s), sens, écart, détour, tours, montées, sprints
+tests/test-routage.mjs      Tracés : adresse et réponse BRouter, GPX, D+, temps à puissance constante
 tests/test-estimation.mjs   Puissance estimée (150 W à plat / 257 W à 1,2 %), même parcours, tuiles
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
 tests/fausse-archive.mjs    Fabrique GPX, TCX, FIT et CSV aux valeurs connues
@@ -227,6 +230,21 @@ l'instant »** — à proposer quand il voudra :
   seuil ~150 % FTP, réglable) et manuels (début / fin choisis, nommés),
   avec les vraies données (temps, W, NP, FC, VAM, W/kg). Noms des cols :
   pas de requête réseau sans accord de Cyril (« Montée du km X »).
+- **Étape 4 (création de parcours GPX) : FAITE le 5 nov. 2026** (v0.11.0).
+  Onglet « Tracés » (#traces) : toucher la carte pour placer les points
+  (glisser = déplacer, toucher = retirer), itinéraire BRouter en ligne
+  (`https://brouter.de/brouter`, profils fastbike / trekking / safety, ou
+  « ligne droite » sans réseau ; seuls les points placés sont envoyés),
+  boucle, inverser, ma position ; distance, D+, pente max (100 m), temps
+  estimé à puissance constante (150 W par défaut, réglage
+  `puissanceParcoursW`, même modèle physique, descentes ≤ 60 km/h) ;
+  profil coloré + curseur, 3D ; enregistrer (réglages `traces` + `trace:<id>`,
+  inclus dans la sauvegarde), exporter GPX, partager (Web Share).
+  Envoi au BiNavi NON vérifié : la copie GitHub de Gadgetbridge (déc. 2024)
+  n'a pas encore iGPSport ; l'envoi de GPX n'y existe que pour Garmin et
+  Zepp OS. Demander à Cyril d'essayer « Partager » vers Gadgetbridge, sinon
+  appli iGPSport ou câble USB. BRouter non joignable depuis l'environnement
+  de Claude : testé avec une fausse réponse (CORS supposé ouvert).
 - **Liste des tâches à faire (demandée par Cyril le 4 nov. 2026), dans
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :

@@ -28,9 +28,16 @@ export async function creerSauvegarde(progression = () => {}) {
       velos: await lireReglage('velos') ?? null,
       segments: await lireReglage('segments') ?? null,
       passages: await lireReglage('passages') ?? null,
+      puissanceParcoursW: await lireReglage('puissanceParcoursW') ?? null,
+      traces: await lireReglage('traces') ?? null,
     },
     sorties: [],
+    tracesCompletes: [],
   };
+  for (const t of (await lireReglage('traces')) ?? []) {
+    const complet = await lireReglage(`trace:${t.id}`);
+    if (complet) index.tracesCompletes.push(complet);
+  }
   let i = 0;
   for (const s of sorties) {
     progression(`Sauvegarde : ${++i} / ${sorties.length}`);
@@ -71,7 +78,10 @@ export async function restaurerSauvegarde(zip, bilan, connues, progression = () 
   const index = JSON.parse(await zip.file(NOM_INDEX).async('string'));
   if (index.format !== FORMAT) throw new Error('sauvegarde inconnue');
   // Réglages repris seulement s'ils ne sont pas déjà faits sur ce téléphone
-  for (const cle of ['ftpW', 'fcMaxBpm', 'poidsKg', 'velos', 'segments', 'passages']) {
+  for (const t of index.tracesCompletes ?? []) {
+    if (t?.id && (await lireReglage(`trace:${t.id}`)) == null) await ecrireReglage(`trace:${t.id}`, t);
+  }
+  for (const cle of ['ftpW', 'fcMaxBpm', 'poidsKg', 'velos', 'segments', 'passages', 'puissanceParcoursW', 'traces']) {
     if (index.reglages?.[cle] && (await lireReglage(cle)) == null) await ecrireReglage(cle, index.reglages[cle]);
   }
   let i = 0;

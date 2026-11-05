@@ -47,7 +47,7 @@ de le relancer.
 | 1 ter | Tri de la liste par activité (Vélo, Marche, Musculation…) | **Fait** |
 | 2 | Détail d'une sortie : carte, courbes, zones, FTP réglable | **Fait** |
 | 3 | Progrès : bilans, forme / fatigue, records ; sauvegarde ; nouveau design à onglets | **Fait** |
-| 4 | Générateur de traces GPX, envoi au BiNavi via Gadgetbridge | À faire |
+| 4 | Création de tracés GPX (onglet Tracés) ; envoi au BiNavi à vérifier | **Fait** |
 | 5 | Séances de la montre Amazfit Active 3 Premium | À faire |
 
 ## Tests
@@ -60,6 +60,7 @@ TZ=Europe/Paris node tests/test-stats.mjs
 node tests/test-vue3d.mjs
 node tests/test-segments.mjs
 node tests/test-estimation.mjs
+node tests/test-routage.mjs
 node tests/test-strava-navigateur.cjs
 ```
 
