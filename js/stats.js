@@ -1,7 +1,7 @@
 // Calculs de la page Progrès (sans navigateur, testés dans Node) :
 // bilans par semaine / mois / année, forme et fatigue (CTL / ATL / TSB),
 // records de puissance.
-import { chargeSortie } from './analyse.js';
+import { chargeSortie, PART_FTP_20_MIN } from './analyse.js';
 
 const JOUR_MS = 86400000;
 export const CONSTANTE_FORME_J = 42; // CTL : charge chronique (« forme »)
@@ -129,4 +129,41 @@ export function records(sorties, durees, depuisMs = -Infinity) {
     }
   }
   return res;
+}
+
+// ---- Objectifs (semaine, mois ou année en cours) --------------------------------------
+
+export const TYPES_OBJECTIF = { distance: 'Distance', denivele: 'Dénivelé', ftp: 'FTP' };
+export const PERIODES_OBJECTIF = { semaine: 'Semaine', mois: 'Mois', annee: 'Année' };
+
+/**
+ * Où en est un objectif sur la période en cours.
+ * Distance et dénivelé : total des sorties données (vélo) depuis le début de la période ;
+ * « attendu » = cible × part de la période écoulée (rythme régulier).
+ * FTP : la plus haute FTP estimée sur la période (95 % du meilleur 20 min).
+ * @param {{type: 'distance'|'denivele'|'ftp', periode: 'semaine'|'mois'|'annee', cible: number}} obj
+ * @returns {{debutMs, finMs, fait, cible, part, attendu, ecart, reste, partEcoulee, joursRestants, sortieFtp?}}
+ */
+export function avancementObjectif(obj, sorties, maintenantMs = Date.now()) {
+  const debutMs = debutPeriode(maintenantMs, obj.periode);
+  const finMs = periodeSuivante(debutMs, obj.periode);
+  const dans = sorties.filter((s) => s.debut >= debutMs && s.debut < finMs && s.debut <= maintenantMs);
+  const partEcoulee = Math.min(1, Math.max(0, (maintenantMs - debutMs) / (finMs - debutMs)));
+  const joursRestants = Math.max(0, (finMs - maintenantMs) / JOUR_MS);
+  let fait = 0;
+  let sortieFtp = null;
+  if (obj.type === 'distance') fait = dans.reduce((a, s) => a + (s.distanceM ?? 0), 0) / 1000;
+  else if (obj.type === 'denivele') fait = dans.reduce((a, s) => a + (s.denivelePosM ?? 0), 0);
+  else {
+    for (const s of dans) {
+      const p20 = s.effortsW?.[1200];
+      if (p20 && Math.round(p20 * PART_FTP_20_MIN) > fait) { fait = Math.round(p20 * PART_FTP_20_MIN); sortieFtp = s; }
+    }
+  }
+  const cible = obj.cible;
+  const attendu = obj.type === 'ftp' ? null : cible * partEcoulee;
+  return {
+    debutMs, finMs, fait, cible, part: cible > 0 ? fait / cible : 0, attendu,
+    ecart: attendu == null ? null : fait - attendu, reste: Math.max(0, cible - fait), partEcoulee, joursRestants, sortieFtp,
+  };
 }

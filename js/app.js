@@ -21,7 +21,7 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.15.0 · segments automatiques et records';
+export const VERSION_APPLI = '0.16.0 · objectifs';
 
 const $ = (id) => document.getElementById(id);
 const el = {

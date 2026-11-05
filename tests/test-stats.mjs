@@ -1,7 +1,7 @@
 // Tests de la page Progrès : bilans par période, forme / fatigue, records.
 // Valeurs connues d'avance. Lancer : TZ=Europe/Paris node tests/test-stats.mjs
 // (les semaines et les mois se comptent en heure locale)
-import { bilanPeriodes, formeFatigue, etatFraicheur, records, debutPeriode } from '../js/stats.js';
+import { bilanPeriodes, formeFatigue, etatFraicheur, records, debutPeriode, avancementObjectif } from '../js/stats.js';
 
 process.env.TZ = process.env.TZ || 'Europe/Paris';
 let echecs = 0;
@@ -71,6 +71,25 @@ const r = records(avecEfforts, [5, 1200, 3600]);
 egal('records de tous les temps', [r[5].w, r[5].sortie.id, r[1200].w, r[3600]], [700, 'b', 250, null]);
 const r6 = records(avecEfforts, [5, 1200], date(2026, 9, 1));
 egal('records récents', [r6[5].w, r6[1200].sortie.id], [600, 'a']);
+
+// Objectifs : jeudi 5 nov. 2026 à 12 h (Paris) ; semaine du lundi 2 au dimanche 8
+const jeudi = new Date(2026, 10, 5, 12).getTime();
+const so = [
+  { debut: new Date(2026, 10, 3, 9).getTime(), distanceM: 50000, denivelePosM: 600, effortsW: { 1200: 250 } },
+  { debut: new Date(2026, 10, 5, 8).getTime(), distanceM: 30000, denivelePosM: 400, effortsW: { 1200: 240 } },
+  { debut: new Date(2026, 9, 31, 9).getTime(), distanceM: 40000, denivelePosM: 300 },
+  { debut: new Date(2025, 11, 31, 9).getTime(), distanceM: 99000, denivelePosM: 999 },
+  { debut: new Date(2026, 10, 6, 9).getTime(), distanceM: 77000 }, // plus tard (pas encore faite)
+];
+const ds = avancementObjectif({ type: 'distance', periode: 'semaine', cible: 200 }, so, jeudi);
+egal('semaine : 80 km faits, 100 attendus à mi-semaine, 20 de retard, reste 120 km, 3,5 jours',
+  [ds.fait, Math.round(ds.attendu), Math.round(ds.ecart), ds.reste, ds.joursRestants], [80, 100, -20, 120, 3.5]);
+const dm = avancementObjectif({ type: 'denivele', periode: 'mois', cible: 3000 }, so, jeudi);
+egal('mois : 1 000 m en novembre (pas le 31 oct.), 15 % du mois écoulé', [dm.fait, Math.round(dm.partEcoulee * 1000) / 1000], [1000, 0.15]);
+const da = avancementObjectif({ type: 'distance', periode: 'annee', cible: 5000 }, so, jeudi);
+egal('année : 2026 seulement (pas le 31 déc. 2025)', da.fait, 120);
+const df = avancementObjectif({ type: 'ftp', periode: 'mois', cible: 250 }, so, jeudi);
+egal('FTP : 95 % du meilleur 20 min du mois (250 W -> 238 W), pas de rythme', [df.fait, df.attendu, df.reste], [238, null, 12]);
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);
