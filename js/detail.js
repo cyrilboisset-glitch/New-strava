@@ -4,7 +4,7 @@ import { lireSortie, lireFichier, completerSortie } from './db.js';
 import { decoderFichier } from './fichier.js';
 import {
   pointsDetail, parSeconde, meilleursEfforts, intervalleTypiqueS, tempsParZone, chargeSortie,
-  ZONES_PUISSANCE, ZONES_FC, PART_FTP_20_MIN,
+  ZONES_PUISSANCE, ZONES_FC, DUREES_EFFORTS_S, JOURS_ESTIMATION_FTP, estimerFtp,
 } from './analyse.js';
 import { lireProfil, enregistrerEfforts, lireVelos, wKg, resumerEstimation, estimationAJour } from './profil.js';
 import { estimationPossible } from './puissance-estimee.js';
@@ -16,6 +16,8 @@ import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, 
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './carte-statique.js';
 import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties } from './segments.js';
+import { records, ftpApresSortie } from './stats.js';
+import { htmlCourbePuissance, RECORDS_AFFICHES } from './progres.js';
 import { gpxDepuisSortie, nomFichierGpx } from './routage.js';
 import { telecharger } from './sauvegarde.js';
 
@@ -31,7 +33,6 @@ const SERIES = [
   { champ: 'cadence', titre: 'Cadence', unite: 'tr/min', dec: 0, couleur: 'var(--texte-2)', depuisZero: true },
 ];
 
-const NOMS_EFFORTS = { 5: '5 s', 60: '1 min', 300: '5 min', 1200: '20 min', 3600: '1 h' };
 
 let carte = null; // carte Leaflet affichée (à libérer en quittant la page)
 let vue3d = null; // vue 3D (boucle d'affichage à arrêter en quittant la page)
@@ -279,21 +280,31 @@ function creerCarte(div, pts) {
 
 // ---- Efforts et zones ---------------------------------------------------------------
 
-function blocEfforts(efforts, intervalleS, poidsKg) {
-  const lignes = Object.entries(NOMS_EFFORTS).filter(([d]) => efforts[d]);
-  if (!lignes.length) return '';
-  const p20 = efforts[1200];
-  const note = [
-    intervalleS > 2 ? `Enregistrement environ toutes les ${intervalleS} s : les efforts courts (5 s, 1 min) sont approximatifs.` : '',
-    p20 ? `Sur cette sortie, 95 % du meilleur 20 min donnent ${nombre(Math.round(p20 * PART_FTP_20_MIN))} W (estimation de FTP valable seulement si ces 20 min étaient à fond).` : '',
-  ].filter(Boolean).join(' ');
+// Puissances par durée (comme les records de Progrès) : cette sortie, ton record,
+// courbe de puissance, et FTP estimée après cette sortie
+function blocPuissances(s, efforts, recordsTous, intervalleS, poidsKg, ftpApres, ftpAvant) {
+  const lignes = Object.entries(RECORDS_AFFICHES).filter(([d]) => efforts[d]).map(([d, nom]) => {
+    const w = efforts[d];
+    const r = recordsTous[d];
+    const estRecord = r && (r.sortie.id === s.id || w >= r.w);
+    return `<tr><th scope="row">${nom}</th>
+      <td><b>${nombre(w)} W</b>${wKg(w, poidsKg) ? `<small>${wKg(w, poidsKg)} W/kg</small>` : ''}</td>
+      <td>${estRecord ? '<span class="rang or">🏆 Record</span>'
+        : r ? `<a href="#sortie=${encodeURIComponent(r.sortie.id)}"><b>${nombre(r.w)} W</b><small>${fmtDateLongue.format(r.sortie.debut)}</small></a>` : '–'}</td></tr>`;
+  }).join('');
+  if (!lignes) return '';
+  const recordW = Object.fromEntries(Object.entries(recordsTous).filter(([, r]) => r).map(([d, r]) => [d, Math.max(r.w, efforts[d] ?? 0)]));
+  const ecart = ftpApres && ftpAvant ? ftpApres.ftpW - ftpAvant.ftpW : null;
   return `
-  <section class="carte bloc">
-    <h2 class="bloc-titre">Meilleurs efforts</h2>
-    <div class="efforts">
-      ${lignes.map(([d, nomDuree]) => `<div class="effort-case"><span class="effort-duree">${nomDuree}</span><span class="effort-w">${nombre(efforts[d])}<small>W</small></span>${poidsKg ? `<span class="effort-wkg">${wKg(efforts[d], poidsKg)} W/kg</span>` : ''}</div>`).join('')}
-    </div>
-    ${note ? `<p class="bloc-note">${note}</p>` : ''}
+  <section class="carte bloc" id="bloc-puissances">
+    <h2 class="bloc-titre">Puissances</h2>
+    ${ftpApres ? `<p class="ftp-apres">FTP estimée après cette sortie : <b>${nombre(ftpApres.ftpW)} W</b>${ecart ? ` <span class="${ecart > 0 ? 'hausse' : 'baisse'}">${ecart > 0 ? '+' : '−'}${Math.abs(ecart)} W</span>` : ''}${wKg(ftpApres.ftpW, poidsKg) ? ` · ${wKg(ftpApres.ftpW, poidsKg)} W/kg` : ''}</p>` : ''}
+    <table class="records"><thead><tr><th></th><th>Cette sortie</th><th>Record</th></tr></thead><tbody>${lignes}</tbody></table>
+    ${htmlCourbePuissance(recordW, efforts, 'Cette sortie')}
+    <p class="bloc-note">${[
+      ftpApres ? `FTP recalculée après chaque sortie : 95 % du meilleur 20 min des ${JOURS_ESTIMATION_FTP / 7} semaines qui finissent avec cette sortie${ftpApres.sortie.id === s.id ? ' (meilleur 20 min : cette sortie)' : ` (meilleur 20 min : sortie du ${fmtDateLongue.format(ftpApres.sortie.debut)})`}.` : '',
+      intervalleS > 2 ? `Enregistrement environ toutes les ${intervalleS} s : les puissances courtes (5 s, 1 min) sont approximatives.` : '',
+    ].filter(Boolean).join(' ')}</p>
   </section>`;
 }
 
@@ -399,6 +410,11 @@ export async function afficherDetail(page, id, toast = () => {}) {
   const avecGps = pts.filter((p) => typeof p.lat === 'number').length >= 2;
   const puissance = puissanceReelle ? parSeconde(pts, 'puissanceW') : estimee ? parSeconde(pts, 'puissanceEstimeeW') : [];
   const efforts = puissanceReelle ? meilleursEfforts(puissance) : {};
+  // Records et FTP : toutes les sorties, celle-ci avec ses efforts tout juste calculés
+  const toutesAvec = puissanceReelle ? (await toutesLesSorties()).map((x) => (x.id === s.id ? { ...x, effortsW: efforts } : x)) : [];
+  const recordsTous = puissanceReelle ? records(toutesAvec, DUREES_EFFORTS_S) : {};
+  const ftpApres = puissanceReelle ? ftpApresSortie({ ...s, effortsW: efforts }, toutesAvec) : null;
+  const ftpAvant = puissanceReelle ? estimerFtp(toutesAvec, s.debut - 1) : null;
   const fcSec = parSeconde(pts, 'fc').filter((v) => v > 0);
   const intervalleS = intervalleTypiqueS(pts);
   const courbes = blocCourbes(pts, axe);
@@ -448,7 +464,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
   ${courbes.html}
   ${avecGps ? '<section class="carte bloc" id="bloc-segments-sortie"></section>' : ''}
   <section class="carte bloc" id="bloc-meme-parcours" hidden></section>
-  ${blocEfforts(efforts, intervalleS, profil.poidsKg)}
+  ${puissanceReelle ? blocPuissances(s, efforts, recordsTous, intervalleS, profil.poidsKg, ftpApres, ftpAvant) : ''}
   ${zonesP}
   ${zonesFc}
   ${blocTours(tours)}

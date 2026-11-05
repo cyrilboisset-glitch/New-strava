@@ -254,7 +254,7 @@ async function texteToast(page) {
   verif('curseur visible sur toutes les courbes', (await page.$$('.curseur:not([hidden])')).length === 5);
   verif('point du curseur sur la carte', await page.evaluate(() => [...document.querySelectorAll('#carte-parcours path.leaflet-interactive')].length >= 4));
   const detail = (await page.textContent('#page-detail')).replace(/\s+/g, ' ');
-  for (const m of ['5 s200W', '1 min200W', '20 min200W', '1 h200W', 'Puissance normalisée200 W', "Facteur d'intensité0,85", 'TSS72',
+  for (const m of ['5 s 200 W', '1 min 200 W', '20 min 200 W', '1 h 200 W', 'Puissance normalisée200 W', "Facteur d'intensité0,85", 'TSS72',
     'Z3 Tempo178–212 W 1 h 00100 %', 'Z5 Maximum> 135 bpm 1 h 00100 %', 'FTP de 236 W', 'FC max de 150 bpm (la plus haute relevée']) {
     verif(`détail : « ${m} »`, detail.includes(m), detail);
   }
@@ -355,7 +355,9 @@ async function texteToast(page) {
   await page.click('.objectif-form button[type="submit"]');
   await page.waitForSelector('#bloc-objectifs .objectif');
   const objTxt = (await page.textContent('#bloc-objectifs .objectif')).replace(/\s+/g, ' ');
-  verif('objectif distance sur l\'année : libellé, chiffres, rythme', new RegExp(`Distance · ${new Date().getFullYear()}.*/ 5 000 km.*%.*reste .* km, soit .* km par semaine`).test(objTxt), objTxt);
+  verif('objectif distance sur l\'année : libellé, chiffres, rythme', new RegExp(`Distance · ${new Date().getFullYear()}.*0 % ?de l'objectif.*Fait : 0 km.*Prévu à ce jour : [\\d ]+ km.*Objectif : 5 000 km.*reste .* km, soit .* km par semaine`).test(objTxt), objTxt);
+  const arcs = await page.$eval('#bloc-objectifs .objectif', (o) => ({ rouge: !!o.querySelector('.anneau-fait'), bleu: o.querySelector('.anneau-attendu')?.getAttribute('stroke-dasharray') }));
+  verif('anneau : pas d\'arc rouge (0 km), arc bleu = part de l\'année écoulée', !arcs.rouge && Number(arcs.bleu?.split(' ')[0]) > 0, JSON.stringify(arcs));
   await page.click('[data-obj="ajouter"]');
   await page.selectOption('.objectif-form select[name="type"]', 'ftp');
   verif('unité qui suit le type', (await page.textContent('.objectif-form .unite-objectif')) === 'W');
@@ -364,7 +366,7 @@ async function texteToast(page) {
   await page.click('.objectif-form button[type="submit"]');
   await page.waitForFunction(() => document.querySelectorAll('#bloc-objectifs .objectif').length === 2);
   const ftpTxt = (await page.textContent('#bloc-objectifs .objectif:nth-of-type(2)')).replace(/\s+/g, ' ');
-  verif('objectif FTP : cible et FTP réglée', /FTP · .*\/ 260 W.*FTP réglée : 2\d\d W/.test(ftpTxt), ftpTxt);
+  verif('objectif FTP : cible et FTP réglée', /FTP · .*Objectif : 260 W.*FTP réglée : 2\d\d W/.test(ftpTxt), ftpTxt);
   await page.screenshot({ path: path.join(CAPTURES, 'objectifs.png') });
   // Modifier : 6 000 km ; gardé après réouverture de l'onglet
   await page.click('#bloc-objectifs .objectif [data-obj="modifier"]');
@@ -374,7 +376,7 @@ async function texteToast(page) {
   await page.waitForSelector('#accueil:not([hidden])');
   await page.click('#onglet-progres');
   await page.waitForSelector('#bloc-objectifs .objectif');
-  verif('objectif modifié et gardé', (await page.textContent('#bloc-objectifs')).replace(/\s+/g, ' ').includes('/ 6 000 km') &&(await page.$$('#bloc-objectifs .objectif')).length === 2, (await page.textContent('#bloc-objectifs')).replace(/\s+/g, ' '));
+  verif('objectif modifié et gardé', (await page.textContent('#bloc-objectifs')).replace(/\s+/g, ' ').includes('Objectif : 6 000 km') &&(await page.$$('#bloc-objectifs .objectif')).length === 2, (await page.textContent('#bloc-objectifs')).replace(/\s+/g, ' '));
   page.once('dialog', (d) => d.accept());
   await page.click('#bloc-objectifs .objectif:nth-of-type(2) [data-obj="supprimer"]');
   await page.waitForFunction(() => document.querySelectorAll('#bloc-objectifs .objectif').length === 1);
@@ -503,6 +505,12 @@ async function texteToast(page) {
   const r0 = relu.records?.[0] ?? {};
   verif('export GPX relu par l\'appli : 3 601 points, départ 9 h, 200 W, 140 bpm', relu.records?.length === 3601 && r0.horodatage?.getTime() === Date.UTC(2025, 4, 10, 7)
     && r0.puissanceW === 200 && r0.fc === 140 && relu.sport === 2, JSON.stringify({ n: relu.records?.length, r0, sport: relu.sport, err: relu.erreur }));
+  // Puissances par durée (200 W constants pendant 1 h) et FTP estimée après la sortie
+  const puiss = (await page.textContent('#bloc-puissances')).replace(/\s+/g, ' ');
+  verif('détail : puissances 5 s à 1 h (200 W), colonne record, courbe', /5 s 200 W.*1 min 200 W.*5 min 200 W.*20 min 200 W.*1 h 200 W/.test(puiss)
+    && puiss.includes('Cette sortie') && puiss.includes('Record') && !!(await page.$('#bloc-puissances .courbe-puissance path.ligne-recent')), puiss);
+  verif('détail : FTP estimée après la sortie (≥ 95 % de 200 W = 190 W)', /FTP estimée après cette sortie : (19\d|2\d\d) W/.test(puiss), puiss);
+  await page.locator('#bloc-puissances').screenshot({ path: path.join(CAPTURES, 'detail-puissances.png') });
 
   // Retour : la liste revient à la même place
   await page.click('#btn-retour');
@@ -781,7 +789,7 @@ async function texteToast(page) {
   verif('détail : courbe « Puissance estimée »', titresCourbes.includes('Puissance estimée') && !titresCourbes.includes('Puissance'), JSON.stringify(titresCourbes));
   const detailEst = (await page.textContent('#page-detail')).replace(/\s+/g, ' ');
   verif('détail : NP estimée et avertissement', detailEst.includes('NP estimée≈') && detailEst.includes('Pas de capteur de puissance : puissance estimée') && detailEst.includes('Zones de puissance (estimée)'), detailEst.slice(0, 400));
-  verif('détail : pas de meilleurs efforts pour une estimation', !detailEst.includes('Meilleurs efforts'));
+  verif('détail : pas de bloc Puissances pour une estimation', !(await page.$('#bloc-puissances')));
   await page.waitForFunction(() => !document.documentElement.dataset.transition);
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(CAPTURES, 'detail-estimee.png'), fullPage: true });

@@ -670,21 +670,42 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
   .icone-btn.tourne svg { animation: none; }
 }
 
-/* ---- Objectifs (Progrès) ---- */
-.objectif { padding: 12px 0; border-top: 1px solid var(--ligne); }
-#bloc-objectifs .bloc-titre + .objectif { border-top: 0; padding-top: 2px; }
-.objectif-tete { display: flex; align-items: center; gap: 10px; }
-.objectif-nom { flex: 1; min-width: 0; font-weight: 600; }
-.objectif-actions { display: flex; gap: 6px; }
-.objectif-chiffres { margin: 6px 0; display: flex; align-items: baseline; gap: 6px; color: var(--texte-2); }
-.objectif-chiffres b { font-family: var(--police-chiffres); font-size: 24px; color: var(--texte); }
-.objectif-chiffres span { margin-left: auto; font-family: var(--police-chiffres); font-weight: 600; font-size: 18px; color: var(--texte); }
-.objectif-jauge { position: relative; height: 12px; border-radius: 6px; background: var(--surface-2); overflow: visible; }
-.objectif-rempli { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: var(--accent-trait); transition: width 0.6s ease; }
-.objectif.atteint .objectif-rempli { background: #f2c230; }
-.objectif-repere { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--texte); border-radius: 1px; }
-.objectif-detail { margin: 8px 0 0; font-size: 13px; color: var(--texte-2); }
+/* ---- Objectifs (Progrès) : anneaux ---- */
+.objectifs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px 14px; }
+.objectif { display: flex; flex-direction: column; min-width: 0; }
+.objectif-tete { display: flex; align-items: flex-start; gap: 6px; min-height: 40px; }
+.objectif-nom { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; line-height: 1.25; }
+.objectif-actions { display: flex; gap: 4px; }
+.objectif-actions .btn.petit { min-height: 32px; min-width: 32px; padding: 0 8px; }
+.objectif-cercle { position: relative; width: min(100%, 150px); aspect-ratio: 1; margin: 8px auto 6px; }
+.anneau { width: 100%; height: 100%; display: block; }
+.anneau circle { fill: none; stroke-linecap: round; }
+.anneau-fond { stroke: var(--surface-2); stroke-width: 10; }
+.anneau-fait { stroke: #e5484d; stroke-width: 10; transition: stroke-dasharray 0.8s ease; }
+.anneau-attendu { stroke: #2f7ff0; stroke-width: 10; transition: stroke-dasharray 0.8s ease; }
+.objectif-centre { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.objectif-centre b { font-family: var(--police-chiffres); font-size: 26px; line-height: 1; }
+.objectif-centre small { font-size: 11px; color: var(--texte-3); }
+.objectif.atteint .objectif-centre b { color: #9a6b00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .objectif.atteint .objectif-centre b { color: #f2c230; } }
+:root[data-theme="dark"] .objectif.atteint .objectif-centre b { color: #f2c230; }
+.objectif-legende { list-style: none; margin: 0; padding: 0; font-size: 13px; color: var(--texte-2); }
+.objectif-legende li { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.objectif-legende b { color: var(--texte); font-variant-numeric: tabular-nums; }
+.objectif-legende .puce { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.puce.fait { background: #e5484d; }
+.puce.attendu { background: #2f7ff0; }
+.puce.cible { background: transparent; border: 2px solid var(--texte-3); width: 8px; height: 8px; }
+.objectif-detail { margin: 6px 0 0; font-size: 12px; color: var(--texte-3); }
 .objectif-form { padding: 10px 0; border-top: 1px solid var(--ligne); }
-.objectif-form select, .objectif-form input { font: inherit; }
-#bloc-objectifs > .btn { margin-top: 8px; }
-@media (prefers-reduced-motion: reduce) { .objectif-rempli { transition: none; } }
+#bloc-objectifs > .btn { margin-top: 14px; }
+@media (prefers-reduced-motion: reduce) { .anneau-fait, .anneau-attendu { transition: none; } }
+/* Détail : FTP estimée après la sortie */
+.ftp-apres { margin: 0 0 10px; font-size: 15px; }
+.ftp-apres b { font-family: var(--police-chiffres); font-size: 20px; }
+.ftp-apres .hausse { color: #2e9e4f; font-weight: 700; }
+.ftp-apres .baisse { color: #e5484d; font-weight: 700; }
+.objectif-legende li { display: block; text-indent: -16px; padding-left: 16px; }
+.objectif-legende .puce { display: inline-block; margin-right: 6px; vertical-align: 0; text-indent: 0; }
+#bloc-puissances td small { display: block; font-size: 12px; color: var(--texte-3); }
+.objectif-legende b { white-space: nowrap; }
