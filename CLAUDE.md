@@ -366,6 +366,14 @@ l'instant »** — à proposer quand il voudra :
   story), pastilles numérotées sur la carte selon l'heure EXIF (ou la position),
   marque « Mes sorties » + adresse. Partage par le menu d'Android (Web Share),
   sinon téléchargement JPEG. Les photos ne sont pas gardées.
+- **v0.23.0 (6 nov. 2026) : menus repliables**, demande de Cyril (« ça prendrait
+  moins de place »). `htmlRepli` / `suivreReplis` (format.js) : <details> avec
+  titre + résumé, état ouvert gardé pendant la session. Segments du détail
+  (résumé : nombre, 🏆 records, « à suivre » ; ouvert d'office si un aperçu
+  « Voir », une création à la main ou une analyse est en cours), Même parcours
+  (« 2e sur 3 · record 59:59 » ou « 🏆 meilleur temps sur 3 »), Segments sur
+  ce tracé (« 3 segments · 1 pas encore fait »). « Mes parcours » retiré de
+  Progrès (Cyril : pas utile) ; `regrouperParcours` reste dans parcours.js.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

@@ -8,7 +8,7 @@ import {
   decouperSegment, trouverPassages, bboxCompatible, detecterMontees, detecterSprints, classer, dejaCouvert, recordsParSortie,
 } from './segments-calc.js';
 import { lireProfil, wKg } from './profil.js';
-import { nombre, km, chrono, echapper, fmtDate } from './format.js';
+import { nombre, km, chrono, echapper, fmtDate, htmlRepli, suivreReplis } from './format.js';
 import { htmlCarteStatique, retirerCarte } from './carte-statique.js';
 import { creerVue3d, construireTrace } from './vue3d.js';
 import { familleSortie } from './sortie.js';
@@ -431,8 +431,13 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
         resume = `${km(d.distanceM)} km${d.penteMoyPct != null ? `, ${nombre(d.penteMoyPct, 1)} % de moyenne, +${nombre(d.denivelePosM)} m` : ''}`;
       } catch { resume = 'Pas de GPS sur ce passage.'; }
     }
-    bloc.innerHTML = `
-      <h2 class="bloc-titre">Segments</h2>
+    const nRecords = recordsParSortie(passages).get(s.id) ?? 0;
+    const resumeSegments = [
+      ici.length ? `${ici.length} segment${ici.length > 1 ? 's' : ''}` : 'Aucun segment',
+      nRecords ? `🏆 ${nRecords} record${nRecords > 1 ? 's' : ''}` : '',
+      propositions.length ? `${propositions.length} à suivre` : '',
+    ].filter(Boolean).join(' · ');
+    bloc.innerHTML = htmlRepli('segments-sortie', 'Segments', resumeSegments, `
       ${etat ? `<p class="progression">${echapper(etat)}</p>` : ''}
       ${lignes ? `<div class="passages">${lignes}</div>` : '<p class="aide">Aucun segment sur cette sortie pour l\'instant.</p>'}
       ${propositions.length ? `
@@ -452,7 +457,8 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
         <p class="aide">Départ : <b>${km1(choix.debut)}</b> · Arrivée : <b>${km1(choix.fin)}</b>${resume ? ` · ${resume}` : ''}</p>
         <label class="champ-ligne"><span>Nom</span><input id="nom-segment" type="text" maxlength="50" placeholder="Ex. : montée de Saint-Nizier"></label>
         <button class="btn principal" type="button" data-creer${resume && !resume.startsWith('Pas') ? '' : ' disabled'}>Créer le segment</button>
-      </details>`;
+      </details>`, apercu.k != null || choix.debut != null || !!etat);
+    suivreReplis(bloc);
     if (apercu.k != null) monterApercu();
   };
   rendre();

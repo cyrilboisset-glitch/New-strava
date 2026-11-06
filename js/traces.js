@@ -8,7 +8,7 @@ import {
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { telecharger } from './sauvegarde.js';
 import { retirerCarte, htmlCarteStatique } from './carte-statique.js';
-import { nombre, km, duree, chrono, echapper, fmtDate } from './format.js';
+import { nombre, km, duree, chrono, echapper, fmtDate, htmlRepli, suivreReplis } from './format.js';
 import { lireSegments, lirePassages } from './segments.js';
 import { bboxCompatible, trouverPassages } from './segments-calc.js';
 import { proposerNomTrace } from './lieux.js';
@@ -338,7 +338,9 @@ async function afficherSegmentsTrace(page, profil) {
     }
   }
   const puissanceW = Number(page.querySelector('#puissance-trace')?.value) || PUISSANCE_DEFAUT_W;
-  bloc.innerHTML = `<h2 class="bloc-titre">Segments sur ce tracé</h2>
+  const pasFaits = trouves.filter((t) => !passages.some((p) => p.segmentId === t.g.id)).length;
+  const resume = `${trouves.length} segment${trouves.length > 1 ? 's' : ''}${pasFaits ? ` · ${pasFaits} pas encore fait${pasFaits > 1 ? 's' : ''}` : ''}`;
+  bloc.innerHTML = htmlRepli('segments-trace', 'Segments sur ce tracé', resume, `
     <div class="passages">${trouves.map((t) => {
       const record = passages.filter((p) => p.segmentId === t.g.id).sort((a, b) => a.dureeS - b.dureeS)[0];
       const estime = tempsEstimeS(coords.slice(t.i0, t.i1 + 1), puissanceW, profil.poidsKg);
@@ -348,7 +350,8 @@ async function afficherSegmentsTrace(page, profil) {
         <span class="passage-mesures">Temps estimé à ${puissanceW} W : ${chrono(estime)}</span></a>
         <button class="btn secondaire petit" type="button" data-seg-voir="${t.i0}-${t.i1}">Voir</button></div>`;
     }).join('')}</div>
-    <p class="bloc-note">En bleu sur la carte. « Voir » cadre la carte sur le segment ; touche son nom pour son historique.</p>`;
+    <p class="bloc-note">En bleu sur la carte. « Voir » cadre la carte sur le segment ; touche son nom pour son historique.</p>`);
+  suivreReplis(bloc);
 }
 
 let minuterie = 0;
