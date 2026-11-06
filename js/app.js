@@ -21,7 +21,7 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.23.0 · menus repliables';
+export const VERSION_APPLI = '0.24.0 · cartes claires';
 
 const $ = (id) => document.getElementById(id);
 const el = {

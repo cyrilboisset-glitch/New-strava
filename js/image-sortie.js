@@ -207,7 +207,7 @@ function pastille(ctx, x, y, n, r = 22) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 }
 
-/** Carte : tuiles OSM assombries, tracé orange liseré de blanc, départ / arrivée, photos */
+/** Carte : tuiles OSM claires, tracé orange liseré de blanc, départ / arrivée, photos */
 async function dessinerCarte(ctx, trace, x, y, w, h, rayon, reperes) {
   ctx.save();
   arrondi(ctx, x, y, w, h, rayon); ctx.clip();
@@ -216,9 +216,8 @@ async function dessinerCarte(ctx, trace, x, y, w, h, rayon, reperes) {
     const cadre = cadrer(trace, w, h, Math.round(Math.min(w, h) * 0.08));
     const liste = tuiles(cadre, w, h);
     const imgs = await Promise.all(liste.map((t) => chargerTuile(`https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`)));
-    ctx.filter = 'invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9) saturate(0.55)';
+    // carte claire (comme dans l'appli), même sur le fond sombre de l'image
     liste.forEach((t, k) => { if (imgs[k]) ctx.drawImage(imgs[k], x + t.gauche, y + t.haut, 256, 256); });
-    ctx.filter = 'none';
     const p = cadre.points.map(([a, b]) => [x + a, y + b]);
     const chemin = () => { ctx.beginPath(); p.forEach(([a, b], k) => (k ? ctx.lineTo(a, b) : ctx.moveTo(a, b))); };
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';

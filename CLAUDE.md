@@ -374,6 +374,11 @@ l'instant »** — à proposer quand il voudra :
   (« 2e sur 3 · record 59:59 » ou « 🏆 meilleur temps sur 3 »), Segments sur
   ce tracé (« 3 segments · 1 pas encore fait »). « Mes parcours » retiré de
   Progrès (Cyril : pas utile) ; `regrouperParcours` reste dans parcours.js.
+- **v0.24.0 (6 nov. 2026) : cartes toujours claires**, demande de Cyril
+  (« même en mode sombre les cartes restent en mode clair »). Plus aucun filtre
+  sur les tuiles OSM : aperçus (`.carte-fond .tuiles`), cartes Leaflet (détail,
+  segments, tracés) et carte de l'image à partager. Ce qui est écrit plus haut
+  sur les « tuiles assombries » ne vaut plus.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
