@@ -8,7 +8,14 @@ const TRAITS = {
   musculation: '<path d="M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10"/>',
   entrainement: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
   autre: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  tout: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
 };
+
+// Famille d'activité (clé de familleSortie, ou « tout ») -> icône
+const PAR_FAMILLE = { 'sport-2': 'velo', 'sport-1': 'course', 'sport-11': 'marche', 'sport-17': 'randonnee', 'sport-5': 'natation', 'sport-10': 'entrainement', musculation: 'musculation', tout: 'tout' };
+export function iconeFamille(cle, taille = 22) {
+  return `<svg class="icone-sport" viewBox="0 0 24 24" width="${taille}" height="${taille}" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${TRAITS[PAR_FAMILLE[cle] ?? 'autre']}</svg>`;
+}
 
 const PAR_SPORT = { 2: 'velo', 21: 'velo', 1: 'course', 11: 'marche', 17: 'randonnee', 5: 'natation', 10: 'entrainement' };
 

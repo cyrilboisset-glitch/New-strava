@@ -379,6 +379,16 @@ l'instant »** — à proposer quand il voudra :
   sur les tuiles OSM : aperçus (`.carte-fond .tuiles`), cartes Leaflet (détail,
   segments, tracés) et carte de l'image à partager. Ce qui est écrit plus haut
   sur les « tuiles assombries » ne vaut plus.
+- **v0.25.0 (6 nov. 2026) : boutons ronds de l'accueil**, choix de Cyril
+  (maquettes proposées) : les grands menus « Activité » et « Synchro » sont
+  remplacés par deux boutons ronds à côté du titre. Activité : icône de la
+  famille choisie (`iconeFamille`, icones.js ; « Tout » = 4 carrés), petite
+  flèche, `<select id="choix-activite">` invisible par-dessus (choix natif
+  d'Android, aria-label « Type d'activité : Vélo (617) »). Synchro : flèches
+  qui tournent (tournent pendant la synchro), pastille d'état en haut à droite,
+  ouvre le menu Synchro (`#menu-synchro`, inchangé). Le bouton ⟳ de synchro
+  directe (`#btn-synchro-haut`) n'existe plus : « Synchroniser maintenant » est
+  dans le menu. `.outils` supprimé.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

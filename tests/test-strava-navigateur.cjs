@@ -792,6 +792,11 @@ async function texteToast(page) {
   verif('totaux du mois de mars sans la musculation', cumuls[2] === '1 sortie · 25,0 km · 59 min · 0 m D+', JSON.stringify(cumuls));
   verif('totaux de février sans la marche', cumuls[3] === '1 sortie · 0,1 km · 1 min · 0 m D+', JSON.stringify(cumuls));
   await page.screenshot({ path: path.join(CAPTURES, 'strava-2-tri-velo.png') });
+  // Boutons ronds de l'accueil : icône du vélo choisie, nom complet pour le lecteur d'écran, pastille sur ⟳
+  verif('bouton Activité : icône du vélo, libellé « Vélo (4) »', (await page.innerHTML('#icone-activite')).includes('<circle cx="6" cy="16"')
+    && (await page.getAttribute('#choix-activite', 'aria-label')) === "Type d'activité : Vélo (4)");
+  verif('bouton Synchro : pastille d\'état dans le bouton ⟳', !!(await page.$('#btn-menu-synchro .pastille')) && (await page.$$('.outils')).length === 0);
+  await page.locator('header.barre').screenshot({ path: path.join(CAPTURES, 'accueil-boutons.png') });
   await page.reload();
   await page.waitForSelector('#choix-activite option:nth-child(2)', { state: 'attached' });
   verif('tri gardé après réouverture', (await filtres())[1] === 'Vélo 4*' && (await page.$$('.sortie')).length === 4, JSON.stringify(await filtres()));
