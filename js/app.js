@@ -21,7 +21,7 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.20.0 · départ de jour, risque de pluie';
+export const VERSION_APPLI = '0.21.0 · aperçu des tracés';
 
 const $ = (id) => document.getElementById(id);
 const el = {

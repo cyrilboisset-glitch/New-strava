@@ -569,7 +569,15 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 }
 .repere-trace.depart span { background: #2e9e4f; color: #fff; border-color: #fff; }
 .repere-trace.arrivee span { background: #15171b; color: #fff; border-color: #fff; }
-.trace-ligne { align-items: center; }
+.trace-ligne { display: flex; align-items: center; gap: 10px; }
+.trace-ligne .passage-nom { flex: 1; min-width: 0; }
+/* Mes tracés : une carte par tracé avec son aperçu sur fond OpenStreetMap */
+.traces-liste { display: flex; flex-direction: column; gap: 14px; }
+.trace-carte { padding-top: 12px; border-top: 1px solid var(--ligne); }
+.traces-liste > .trace-carte:first-child { border-top: 0; padding-top: 0; }
+.trace-apercu { display: block; width: 100%; margin: 10px 0 0; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 12px; overflow: hidden; }
+.trace-apercu .apercu { margin: 0; border: 1px solid var(--ligne); border-radius: 12px; }
+.trace-apercu:focus-visible { outline: 2px solid var(--accent-trait); outline-offset: 2px; }
 .trace-actions { display: flex; gap: 6px; }
 #trace-3d { margin-top: 8px; }
 #bloc-vent { margin-top: 14px; }

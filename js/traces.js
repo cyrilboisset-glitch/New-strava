@@ -7,7 +7,7 @@ import {
 } from './routage.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { telecharger } from './sauvegarde.js';
-import { retirerCarte } from './carte-statique.js';
+import { retirerCarte, htmlCarteStatique } from './carte-statique.js';
 import { nombre, km, duree, chrono, echapper, fmtDate } from './format.js';
 import { lireSegments, lirePassages } from './segments.js';
 import { bboxCompatible, trouverPassages } from './segments-calc.js';
@@ -44,10 +44,20 @@ export { retirerCarte };
 export async function lireIndexTraces() { return (await lireReglage('traces')) ?? []; }
 export async function lireTrace(id) { return lireReglage(`trace:${id}`); }
 
+// Aperçu de la liste : au plus 160 points [lat, lon] du tracé (comme la trace simplifiée des sorties)
+export function apercuTrace(coords, max = 160) {
+  if (!coords?.length) return [];
+  const pas = Math.max(1, Math.ceil(coords.length / max));
+  const res = coords.filter((_, i) => i % pas === 0).map((c) => [Math.round(c[0] * 1e5) / 1e5, Math.round(c[1] * 1e5) / 1e5]);
+  const fin = coords[coords.length - 1];
+  if ((coords.length - 1) % pas) res.push([Math.round(fin[0] * 1e5) / 1e5, Math.round(fin[1] * 1e5) / 1e5]);
+  return res;
+}
+
 async function enregistrerTrace(t) {
   await ecrireReglage(`trace:${t.id}`, t);
   const index = (await lireIndexTraces()).filter((x) => x.id !== t.id);
-  index.unshift({ id: t.id, nom: t.nom, distanceM: t.distanceM, denivelePosM: t.denivelePosM, departMs: t.departMs ?? null, modifieLe: t.modifieLe });
+  index.unshift({ id: t.id, nom: t.nom, distanceM: t.distanceM, denivelePosM: t.denivelePosM, departMs: t.departMs ?? null, modifieLe: t.modifieLe, apercu: apercuTrace(t.coords) });
   await ecrireReglage('traces', index);
 }
 
@@ -656,15 +666,27 @@ async function exporter(partager) {
 async function afficherListe(page, profil) {
   const bloc = page.querySelector('#mes-traces');
   const index = await lireIndexTraces();
+  // tracés enregistrés avant les aperçus : aperçu calculé une fois et gardé dans l'index
+  let complete = false;
+  for (const t of index) {
+    if (t.apercu) continue;
+    t.apercu = apercuTrace((await lireTrace(t.id))?.coords);
+    complete = true;
+  }
+  if (complete) await ecrireReglage('traces', index);
   bloc.innerHTML = `<h2 class="bloc-titre">Mes tracés</h2>
-    ${index.length ? `<div class="passages">${index.map((t) => `
-      <div class="passage trace-ligne" data-id="${t.id}">
-        <span class="passage-nom">${echapper(t.nom)}<small>${km(t.distanceM)} km${t.denivelePosM != null ? ` · ${nombre(t.denivelePosM)} m D+` : ''} · ${t.departMs ? `départ prévu ${fmtDate.format(t.departMs)} à ${fmtHeureCourte(t.departMs)}` : fmtDate.format(t.modifieLe)}</small></span>
-        <span class="trace-actions">
-          <button class="btn secondaire petit" type="button" data-t="ouvrir">Ouvrir</button>
-          <button class="btn secondaire petit" type="button" data-t="gpx" aria-label="Exporter le GPX">GPX</button>
-          <button class="btn secondaire petit danger" type="button" data-t="supprimer" aria-label="Supprimer">✕</button>
-        </span></div>`).join('')}</div>` : '<p class="aide">Aucun tracé enregistré pour l\'instant.</p>'}`;
+    ${index.length ? `<div class="traces-liste">${index.map((t) => `
+      <div class="trace-carte" data-id="${t.id}">
+        <div class="trace-ligne">
+          <span class="passage-nom">${echapper(t.nom)}<small>${km(t.distanceM)} km${t.denivelePosM != null ? ` · ${nombre(t.denivelePosM)} m D+` : ''} · ${t.departMs ? `départ prévu ${fmtDate.format(t.departMs)} à ${fmtHeureCourte(t.departMs)}` : fmtDate.format(t.modifieLe)}</small></span>
+          <span class="trace-actions">
+            <button class="btn secondaire petit" type="button" data-t="ouvrir">Ouvrir</button>
+            <button class="btn secondaire petit" type="button" data-t="gpx" aria-label="Exporter le GPX">GPX</button>
+            <button class="btn secondaire petit danger" type="button" data-t="supprimer" aria-label="Supprimer">✕</button>
+          </span>
+        </div>
+        ${t.apercu?.length > 1 ? `<button class="trace-apercu" type="button" data-t="ouvrir" aria-label="Ouvrir le tracé ${echapper(t.nom)}">${htmlCarteStatique(t.apercu, { hauteur: 150 })}</button>` : ''}
+      </div>`).join('')}</div>` : '<p class="aide">Aucun tracé enregistré pour l\'instant.</p>'}`;
   bloc.onclick = async (e) => {
     const b = e.target.closest('[data-t]');
     if (!b) return;

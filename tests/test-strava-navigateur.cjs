@@ -880,6 +880,19 @@ async function texteToast(page) {
   await page.click('[data-a="enregistrer"]');
   verif('tracé enregistré', (await texteToast(page)).includes('Boucle « test » & co'));
   verif('liste « Mes tracés »', (await page.textContent('#mes-traces')).includes('Boucle « test » & co'));
+  verif('Mes tracés : aperçu du tracé sur fond de carte', !!(await page.$('#mes-traces .trace-apercu .apercu.carte-fond path.apercu-trace')) && (await page.$$('#mes-traces .trace-apercu img.tuile')).length > 0);
+  // Tracé enregistré avant les aperçus (index sans « apercu ») : aperçu calculé au premier affichage et gardé
+  await page.evaluate(async () => {
+    const db = await import('./js/db.js');
+    await db.ecrireReglage('traces', (await db.lireReglage('traces')).map(({ apercu, ...t }) => t));
+  });
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.click('#onglet-traces');
+  await page.waitForSelector('#mes-traces .trace-apercu path.apercu-trace');
+  verif('ancien tracé : aperçu rattrapé et gardé dans l\'index', await page.evaluate(async () => ((await (await import('./js/db.js')).lireReglage('traces'))[0].apercu?.length ?? 0) > 10));
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.locator('#mes-traces .trace-carte').first().screenshot({ path: path.join(CAPTURES, 'traces-apercu.png') });
   const [dlGpx] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="gpx"]')]);
   const cheminGpx = path.join(CAPTURES, 'trace-test.gpx');
   await dlGpx.saveAs(cheminGpx);

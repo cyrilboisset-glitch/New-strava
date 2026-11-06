@@ -343,6 +343,11 @@ l'instant »** — à proposer quand il voudra :
   plus de la probabilité ; `pluieQuand` (heure, km), `mmMax`, `risquePluie`
   (faible < 20 %, possible, probable ≥ 50 %). Tableau : 🌙 et ligne pâlie pour
   la nuit, pluie colorée.
+- **v0.21.0 (6 nov. 2026) : aperçu des tracés**, demande de Cyril (« comme
+  pour mes sorties »). « Mes tracés » : une carte par tracé avec
+  `htmlCarteStatique` (fond OSM) ; l'aperçu (≤ 160 points, `apercuTrace`) est
+  gardé dans l'index `traces` (champ `apercu`), rattrapé au premier affichage
+  pour les tracés plus anciens ; toucher l'aperçu = Ouvrir.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
