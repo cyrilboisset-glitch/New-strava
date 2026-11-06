@@ -103,6 +103,9 @@ export function lireOpenMeteo(json, points) {
     if (!h || !Array.isArray(h.time)) throw new Error('réponse météo inattendue');
     return {
       lat: points?.[k]?.lat ?? loc.latitude, lon: points?.[k]?.lon ?? loc.longitude,
+      // altitude à laquelle Open-Meteo a donné la température : celle qu'on lui a envoyée,
+      // sinon celle de sa grille (champ `elevation` de la réponse)
+      ele: points?.[k]?.ele ?? loc.elevation ?? null,
       heures: h.time.map((t) => t * 1000),
       temp: h.temperature_2m, vent: h.wind_speed_10m, de: h.wind_direction_10m,
       rafales: h.wind_gusts_10m ?? [], pluie: h.precipitation_probability ?? [],
@@ -139,6 +142,28 @@ export function meteoA(serie, t) {
     rafales: lerp(serie.rafales[i], serie.rafales[j], f),
     pluie: Math.max(serie.pluie[i] ?? 0, serie.pluie[j] ?? 0),
   };
+}
+
+// ---- Température : altitude et vent ressenti -------------------------------------
+
+/** Baisse de la température avec l'altitude : 6,5 °C par 1 000 m (atmosphère type OACI) */
+export const GRADIENT_TEMP_C_PAR_M = 0.0065;
+
+/** Température à l'altitude eleM, connue à l'altitude eleSerieM */
+export function tempAltitude(tempC, eleSerieM, eleM) {
+  if (tempC == null || eleSerieM == null || eleM == null) return tempC;
+  return tempC - GRADIENT_TEMP_C_PAR_M * (eleM - eleSerieM);
+}
+
+/**
+ * Température ressentie avec le vent relatif (vitesse du vélo + vent de face), formule
+ * du refroidissement éolien (Environnement Canada / Météo-France), valable à 10 °C et
+ * moins et à partir de 4,8 km/h ; au-dessus, la température elle-même.
+ */
+export function ressenti(tempC, ventKmh) {
+  if (tempC == null || tempC > 10 || !(ventKmh >= 4.8)) return tempC;
+  const v = ventKmh ** 0.16;
+  return 13.12 + 0.6215 * tempC - 11.37 * v + 0.3965 * tempC * v;
 }
 
 // ---- Modèle de puissance (appli vent) ---------------------------------------------
@@ -199,25 +224,38 @@ const SANS_PREVISION = 'pas de prévision pour toute la sortie (16 jours au plus
 /**
  * Parcourt `ech` (dans l'ordre de marche) à partir de debutMs, avec le vent
  * prévu au moment du passage.
- * @returns {{dureeS, finMs, lignes: {distanceM, t, dos, temp, pluie}[], dosFin, dosTout, pluieMax, tempMin, tempMax, ventMoy, ventDe}}
+ * Température : celle d'Open-Meteo au point de prévision le plus proche, corrigée de
+ * l'écart d'altitude (6,5 °C par 1 000 m) ; ressenti avec la vitesse et le vent de face.
+ * @returns {{dureeS, finMs, lignes: {distanceM, t, dos, temp, ressenti, ele, pente, pluie}[], dosFin, dosTout, pluieMax,
+ *   tempMin, tempMax, ventMoy, ventDe, temperatures}}
  */
 export function simuler(ech, series, debutMs, platW, masseKg) {
   let t = debutMs;
   const lignes = [];
   for (let k = 0; k < ech.length; k++) {
     const p = ech[k];
-    const w = meteoA(plusProche(series, p), t);
+    const serie = plusProche(series, p);
+    const w = meteoA(serie, t);
     if (!w) throw new Error(SANS_PREVISION);
     const dos = ventDansLeDos(w.vent, w.de, p.cap);
-    lignes.push({ distanceM: p.distanceM, t, dos, temp: w.temp, pluie: w.pluie, vent: w.vent, de: w.de });
-    if (k === ech.length - 1) break;
+    const temp = tempAltitude(w.temp, serie.ele, p.ele);
+    const ligne = { distanceM: p.distanceM, t, dos, temp, ressenti: temp, ele: p.ele, pente: 0, pluie: w.pluie, vent: w.vent, de: w.de };
+    lignes.push(ligne);
+    if (k === ech.length - 1) {
+      if (k > 0) { ligne.ressenti = ressenti(temp, lignes[k - 1].airKmh); ligne.pente = lignes[k - 1].pente; }
+      break;
+    }
     const q = ech[k + 1];
     const dM = q.distanceM - p.distanceM;
     if (dM <= 0) continue;
     const pente = Math.max(-0.25, Math.min(0.25, ((q.ele ?? 0) - (p.ele ?? 0)) / dM));
+    const ventDeFaceMs = (-PART_VENT_CYCLISTE * dos) / 3.6;
     const v = vitesseAvecVent(puissanceSelonPente(platW, pente), {
-      masseKg, pente, ventDeFaceMs: (-PART_VENT_CYCLISTE * dos) / 3.6, rho: densiteAir(p.ele, w.temp),
+      masseKg, pente, ventDeFaceMs, rho: densiteAir(p.ele, temp),
     });
+    ligne.pente = pente;
+    ligne.airKmh = Math.max(0, v + ventDeFaceMs) * 3.6;
+    ligne.ressenti = ressenti(temp, ligne.airKmh);
     t += (dM / v) * 1000;
   }
   const L = ech[ech.length - 1].distanceM;
@@ -233,8 +271,28 @@ export function simuler(ech, series, debutMs, platW, masseKg) {
     pluieMax: Math.max(...lignes.map((l) => l.pluie ?? 0)),
     tempMin: Math.min(...lignes.map((l) => l.temp)),
     tempMax: Math.max(...lignes.map((l) => l.temp)),
+    temperatures: resumeTemperatures(lignes),
     ventMoy: Math.hypot(vx, vy) / lignes.length,
     ventDe: (deg(Math.atan2(vx, vy)) + 360) % 360,
+  };
+}
+
+/**
+ * Températures à retenir : départ, arrivée, point le plus haut, point le plus froid et
+ * ressenti le plus froid (souvent dans une descente).
+ */
+export function resumeTemperatures(lignes) {
+  const avecAlt = lignes.filter((l) => l.ele != null);
+  const haut = avecAlt.length ? avecAlt.reduce((a, l) => (l.ele > a.ele ? l : a)) : null;
+  const froid = lignes.reduce((a, l) => (l.temp < a.temp ? l : a));
+  const ressentiMin = lignes.reduce((a, l) => (l.ressenti < a.ressenti ? l : a));
+  const point = (l) => (l ? { temp: l.temp, ele: l.ele, distanceM: l.distanceM, t: l.t } : null);
+  return {
+    depart: point(lignes[0]),
+    arrivee: point(lignes[lignes.length - 1]),
+    haut: haut && lignes[0].ele != null && haut.ele - lignes[0].ele >= 50 ? point(haut) : null,
+    froid: point(froid),
+    ressentiMin: { ...point(ressentiMin), ressenti: ressentiMin.ressenti, descente: ressentiMin.pente <= -0.03 },
   };
 }
 

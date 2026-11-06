@@ -107,9 +107,11 @@ async function texteToast(page) {
     const fin = Date.parse(`${u.searchParams.get('end_date')}T23:00:00Z`) / 1000;
     const time = []; for (let t = debut; t <= fin; t += 3600) time.push(t);
     const h = (t) => new Date(t * 1000).getUTCHours();
-    const lieu = { hourly: { time, temperature_2m: time.map(() => 10), wind_speed_10m: time.map((t) => (h(t) < 12 ? 25 : 8)),
-      wind_direction_10m: time.map(() => 45), wind_gusts_10m: time.map(() => 30), precipitation_probability: time.map((t) => (h(t) === 15 || h(t) === 16 ? 80 : 0)) } };
-    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(n === 1 ? lieu : Array(n).fill(lieu)) });
+    // température comme Open-Meteo à l'altitude demandée : 15 °C au niveau de la mer, −6,5 °C par 1 000 m
+    const alts = (u.searchParams.get('elevation') ?? '').split(',').map(Number);
+    const lieu = (k) => ({ elevation: alts[k], hourly: { time, temperature_2m: time.map(() => 15 - 0.0065 * (alts[k] || 0)), wind_speed_10m: time.map((t) => (h(t) < 12 ? 25 : 8)),
+      wind_direction_10m: time.map(() => 45), wind_gusts_10m: time.map(() => 30), precipitation_probability: time.map((t) => (h(t) === 15 || h(t) === 16 ? 80 : 0)) } });
+    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(n === 1 ? lieu(0) : Array.from({ length: n }, (_, k) => lieu(k))) });
   });
   // Faux OpenStreetMap : commune « Ville <lat × 100> » ; col « Col du Test » à la longitude 5,7, vers 45,07
   const demandesLieux = [];
@@ -907,6 +909,12 @@ async function texteToast(page) {
   const heureConseil = Number(conseil.match(/Pars à (\d+) h/)?.[1]);
   verif('meilleure heure : vent faible, sans pluie (13 h, 14 h, 15 h, 18 h, 19 h ou 20 h)', [13, 14, 15, 18, 19, 20].includes(heureConseil), conseil);
   verif('conseil : vent moyen du nord-est', conseil.includes('du nord-est'), conseil);
+  // Températures : départ à 200 m (15 − 1,3 = 13,7 °C), point haut au milieu de la boucle (3 % de montée)
+  verif('météo : altitude des points envoyée', (urlMeteo.searchParams.get('elevation') ?? '').split(',').length === urlMeteo.searchParams.get('latitude').split(',').length);
+  const temps = await page.$$eval('.vent-temperatures .temp-cases > div', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+  const altHaut = Number((temps[1] ?? '').match(/· ([\d\s ]+) m/)?.[1].replace(/\s/g, ''));
+  verif('températures : départ 14 °C (200 m), point haut corrigé de l\'altitude, arrivée 14 °C', temps.length === 3 && /^Départ ?14 °C.*200 m/.test(temps[0])
+    && new RegExp(`^Point haut ?${Math.round(15 - 0.0065 * altHaut)} °C`).test(temps[1]) && altHaut > 300 && /^Arrivée ?14 °C/.test(temps[2]), JSON.stringify(temps));
   // Couleurs du vent sur la 3D
   await page.check('#couleurs-vent');
   await page.click('[data-segments="vue-trace"] button[data-valeur="3d"]');

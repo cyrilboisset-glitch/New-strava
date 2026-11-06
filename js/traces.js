@@ -548,6 +548,28 @@ function appliquerCouleursVent() {
 
 const signe = (v) => (Math.round(v) > 0 ? `+${Math.round(v)}` : Math.round(v) < 0 ? `−${Math.abs(Math.round(v))}` : '0');
 
+// Températures de l'heure choisie (dans le sens conseillé à cette heure), corrigées de l'altitude
+const degres = (t) => `${Math.round(t) === 0 ? 0 : Math.round(t)} °C`;
+function blocTemperatures(h) {
+  const tp = h?.choix?.temperatures;
+  if (!tp) return '';
+  const alt = (p) => (p.ele != null ? ` · ${nombre(p.ele)} m` : '');
+  const cases = [
+    ['Départ', tp.depart, `${fmtHeureCourte(tp.depart.t)}${alt(tp.depart)}`],
+    tp.haut ? ['Point haut', tp.haut, `km ${nombre(tp.haut.distanceM / 1000, 1)} · ${fmtHeureCourte(tp.haut.t)}${alt(tp.haut)}`] : null,
+    ['Arrivée', tp.arrivee, `${fmtHeureCourte(tp.arrivee.t)}${alt(tp.arrivee)}`],
+  ].filter(Boolean);
+  const r = tp.ressentiMin;
+  const froidRessenti = r && r.ressenti < r.temp - 1
+    ? `<p class="aide">Ressenti le plus froid : <b>${degres(r.ressenti)}</b> au km ${nombre(r.distanceM / 1000, 1)}${r.descente ? ', dans une descente' : ''} (${degres(r.temp)} avec la vitesse et le vent de face).</p>`
+    : '';
+  return `<div class="vent-temperatures">
+      <p class="vent-temp-titre">Températures à ${fmtHeureCourte(h.debutMs)}${h.sens === 'inverse' ? ' (sens inverse)' : ''}</p>
+      <div class="temp-cases">${cases.map(([nom, p, detail]) => `<div><span class="stat-label">${nom}</span><span class="temp-val">${degres(p.temp)}</span><small>${detail}</small></div>`).join('')}</div>
+      ${froidRessenti}
+    </div>`;
+}
+
 function afficherVent(page) {
   const bloc = page.querySelector('#vent-resultat');
   if (!bloc) return;
@@ -567,6 +589,7 @@ function afficherVent(page) {
         vent ${c.dosFin >= 0 ? 'dans le dos' : 'de face'} sur la fin (${signe(c.dosFin)} km/h).</p>
       <p class="aide">Vent moyen ${Math.round(c.ventMoy)} km/h du ${pointCardinal(c.ventDe)} · ${Math.round(c.tempMin)} à ${Math.round(c.tempMax)} °C${c.pluieMax >= 20 ? ` · pluie ${Math.round(c.pluieMax)} %` : ''}.</p>
       ${m.sens === 'inverse' ? '<button class="btn secondaire petit" type="button" data-a="sens-vent">⇄ Mettre le tracé dans ce sens</button>' : ''}
+      ${blocTemperatures(choisie ?? m)}
     </div>
     <div class="tableau-defile"><table class="tours vent-tableau">
       <thead><tr><th>Départ</th><th>Sens</th><th>Durée</th><th>Vent fin</th><th>Pluie</th><th>°C</th></tr></thead>
@@ -576,7 +599,7 @@ function afficherVent(page) {
           <td><span class="pastille-vent" style="background:${couleurVent(h.choix.dosFin)}"></span>${signe(h.choix.dosFin)}</td>
           <td>${Math.round(h.choix.pluieMax)} %</td><td>${Math.round(h.choix.tempMin)}–${Math.round(h.choix.tempMax)}</td></tr>`).join('')}</tbody>
     </table></div>
-    <p class="bloc-note">Touche une heure pour voir son vent sur la 3D (couleurs dans le sens du tracé tel qu'il est dessiné).</p>`;
+    <p class="bloc-note">Touche une heure pour voir son vent et ses températures. Températures au moment de ton passage, corrigées de l'altitude du tracé (6,5 °C de moins par 1 000 m entre les points de prévision) ; ressenti avec ta vitesse et le vent de face (formule du refroidissement éolien, à 10 °C et moins).</p>`;
 }
 
 async function enregistrer(page, profil) {

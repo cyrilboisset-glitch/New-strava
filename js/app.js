@@ -21,7 +21,7 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.18.0 · FTP réglée automatiquement';
+export const VERSION_APPLI = '0.19.0 · températures selon l\'altitude';
 
 const $ = (id) => document.getElementById(id);
 const el = {

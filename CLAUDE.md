@@ -320,6 +320,27 @@ l'instant »** — à proposer quand il voudra :
   automatiquement » dans Profil (réglage `ftpAuto`, oui par défaut ; cochée =
   vérification tout de suite) ; hausses gardées dans `ftpHausses` (dernière
   affichée). Les deux réglages sont dans la sauvegarde.
+- **v0.19.0 (6 nov. 2026) : températures selon l'altitude** (Tracés, bloc
+  vent), demande de Cyril (« l'altitude est très importante pour les
+  températures »). Open-Meteo reçoit déjà l'altitude des ~30 points
+  (`elevation`) ; en plus, chaque point du tracé (tous les 100 m) prend la
+  température du point de prévision le plus proche corrigée de l'écart
+  d'altitude : −6,5 °C / 1 000 m (`tempAltitude`, atmosphère type OACI).
+  Ressenti = refroidissement éolien (Environnement Canada, ≤ 10 °C, ≥ 4,8 km/h)
+  avec vitesse + vent de face (`ressenti`). Affichage pour l'heure choisie :
+  départ, point haut (si ≥ 50 m au-dessus du départ), arrivée (heure de passage,
+  altitude) et ressenti le plus froid (`resumeTemperatures`). Tenue conseillée
+  d'Appli-vent toujours pas reprise.
+- **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
+  Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
+  cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
+  en notification ≤ 40 caractères relayée sur le BiNavi et à la voix). Étape 1
+  (moteur Dart, 88 tests) faite, étapes 2 à 6 à faire. Suivi-direct (Flutter +
+  Firebase + page web) prévoit d'être fusionné dans Vélo Coach. Conseil donné à
+  Cyril : Vélo Coach + Suivi-direct ensemble pour pendant la sortie (une appli
+  web ne garde ni le Bluetooth ni le GPS écran éteint) ; « Mes sorties » reste
+  l'appli d'avant / après, reliée par des fichiers (FTP, poids, GPX du tracé ->
+  coach ; journal de sortie -> Mes sorties). En attente de sa réponse.
 - **Liste des tâches à faire (demandée par Cyril le 4 nov. 2026), dans
   l'ordre, après l'étape 4 (création de parcours GPX)** — ne rien
   commencer sans son accord :
