@@ -20,6 +20,7 @@ import { records, ftpApresSortie } from './stats.js';
 import { htmlCourbePuissance, RECORDS_AFFICHES } from './progres.js';
 import { gpxDepuisSortie, nomFichierGpx } from './routage.js';
 import { telecharger } from './sauvegarde.js';
+import { htmlBoutonImage, htmlBlocImage, installerImageSortie } from './partage-sortie.js';
 
 const COLONNES_COURBE = 300; // points dessinés par courbe (moyenne par colonne)
 
@@ -452,7 +453,9 @@ export async function afficherDetail(page, id, toast = () => {}) {
       ${s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM) ? `<span class="chiffre">${nombre(s.denivelePosM)}<small>m D+</small></span>` : ''}
     </div>
     ${familleSortie(s).cle === 'sport-2' || s.veloId ? htmlChoixVelo(velos, s) : ''}
+    <div class="partage-sortie">${htmlBoutonImage()}</div>
   </section>
+  ${htmlBlocImage()}
   ${avecGps ? `
   <div class="segments vues" role="group" data-segments="vue">
     <button type="button" data-valeur="carte" aria-pressed="${modeVue === 'carte'}">Carte</button>
@@ -533,6 +536,8 @@ export async function afficherDetail(page, id, toast = () => {}) {
     telecharger(fichier, fichier.name);
     toast(`${fichier.name} enregistré dans Téléchargements.`);
   });
+  // Image à partager sur les réseaux (format, photos de la sortie, carte, chiffres, nom de l'appli)
+  installerImageSortie(page, { s, pts, nbRecords, estimee, toast });
   page.querySelector('#choix-velo')?.addEventListener('change', async (e) => {
     await completerSortie(s.id, () => ({ veloId: e.target.value || null }));
   });

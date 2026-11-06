@@ -155,6 +155,36 @@ ${lignes}
 `;
 }
 
+/**
+ * Lecture d'un GPX de parcours (trace <trkpt> ou itinéraire <rtept>, heures facultatives)
+ * pour la bibliothèque de tracés.
+ * @returns {{nom: string|null, coords: [lat, lon, ele|null][], distanceM, denivelePosM}}
+ */
+export function lireGpxParcours(texte) {
+  const attr = (a, n) => { const m = a.match(new RegExp(`\\b${n}\\s*=\\s*["']([^"']+)["']`)); return m ? Number(m[1]) : NaN; };
+  const points = (balise) => {
+    const res = [];
+    const re = new RegExp(`<${balise}\\b([^>]*?)(?:/>|>([\\s\\S]*?)</${balise}>)`, 'gi');
+    let m;
+    while ((m = re.exec(texte))) {
+      const la = attr(m[1], 'lat'); const lo = attr(m[1], 'lon');
+      if (!Number.isFinite(la) || !Number.isFinite(lo)) continue;
+      const e = m[2]?.match(/<ele>\s*([-\d.]+)\s*<\/ele>/i);
+      res.push([la, lo, e ? Number(e[1]) : null]);
+    }
+    return res;
+  };
+  let coords = points('trkpt');
+  if (coords.length < 2) coords = points('rtept');
+  if (coords.length < 2) throw new Error('pas de trace ni d\'itinéraire dans ce fichier');
+  // nom : celui de la trace (ou de l'itinéraire), sinon celui des métadonnées
+  const bloc = texte.match(/<(trk|rte)\b[\s\S]*?<(trkseg|trkpt|rtept)\b/i)?.[0] ?? '';
+  const nomBrut = (bloc.match(/<name>([\s\S]*?)<\/name>/i) ?? texte.match(/<metadata>[\s\S]*?<name>([\s\S]*?)<\/name>/i))?.[1];
+  const nom = nomBrut ? nomBrut.replace(/<!\[CDATA\[|\]\]>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim() || null : null;
+  const dn = denivele(coords);
+  return { nom, coords, distanceM: longueurTrace(coords), denivelePosM: dn.avecAltitude ? dn.plus : null };
+}
+
 /** Nom de fichier sûr : « Boucle du Vercors » -> « boucle-du-vercors.gpx » */
 export function nomFichierGpx(nom) {
   const base = nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
