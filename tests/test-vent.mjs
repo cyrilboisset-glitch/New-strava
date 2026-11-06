@@ -3,6 +3,7 @@
 import {
   cap, pointCardinal, ventDansLeDos, echantillonner, inverser, urlOpenMeteo, lireOpenMeteo, meteoA,
   puissanceSelonPente, vitesseAvecVent, simuler, comparerSens, planifier, couleurVent, chargerMeteo,
+  tempAltitude, ressenti,
 } from '../js/vent.js';
 
 let echecs = 0;
@@ -90,6 +91,30 @@ let msg = '';
 try { await chargerMeteo([{ lat: 45, lon: 6 }], t0, t0, async () => { throw new TypeError('Failed to fetch'); }); } catch (e) { msg = e.message; }
 egal('sans réseau : message clair', msg, 'pas de réseau ou service météo injoignable');
 egal('couleurs du vent', [couleurVent(-20), couleurVent(-5), couleurVent(0), couleurVent(5), couleurVent(20)], ['#b2182b', '#ef8a62', '#bababa', '#67a9cf', '#2166ac']);
+
+// Température et altitude : 6,5 °C par 1 000 m
+proche('altitude : 10 °C à 200 m -> 3,5 °C à 1 200 m', tempAltitude(10, 200, 1200), 3.5, 1e-9);
+egal('altitude inconnue : pas de correction', tempAltitude(10, null, 1200), 10);
+// Ressenti (refroidissement éolien) : 0 °C à 50 km/h ≈ −8 °C ; au-dessus de 10 °C, pas de ressenti
+proche('ressenti : 0 °C et 50 km/h de vent relatif -> −8,1 °C', ressenti(0, 50), -8.1, 0.1);
+egal('ressenti : 15 °C -> 15 °C ; sans vent -> la température', [ressenti(15, 40), ressenti(5, 2)], [15, 5]);
+
+// Col : aller-retour de 10 km, montée à 8 % jusqu'à 1 000 m au km 5 (départ à 600 m) ;
+// prévision donnée pour un seul point à 600 m, 12 °C, vent nul
+const col = [];
+for (let k = 0; k <= 100; k++) {
+  const x = k <= 50 ? k : 100 - k; // km 0 -> 5 -> 0 (aller-retour sur la même route)
+  col.push([45 + (x * 100) / 111195, 6, 600 + x * 8]);
+}
+const serieCol = [{ lat: 45, lon: 6, ele: 600, heures: Array.from({ length: 72 }, (_, h) => t0 + h * 3600e3),
+  temp: Array(72).fill(12), vent: Array(72).fill(0), de: Array(72).fill(0), rafales: Array(72).fill(0), pluie: Array(72).fill(0) }];
+const simCol = simuler(echantillonner(col, 100), serieCol, t0 + 9 * 3600e3, 150, 106);
+const tc = simCol.temperatures;
+egal('col : 12 °C au départ (600 m), 9,4 °C au sommet (1 000 m, km 5), 12 °C à l\'arrivée',
+  [Math.round(tc.depart.temp * 10) / 10, Math.round(tc.haut.temp * 10) / 10, Math.round(tc.haut.ele), Math.round(tc.haut.distanceM / 100) / 10, Math.round(tc.arrivee.temp * 10) / 10],
+  [12, 9.4, 1000, 5, 12]);
+egal('col : ressenti le plus froid dans la descente, sous la température', tc.ressentiMin.descente && tc.ressentiMin.ressenti < tc.ressentiMin.temp && tc.ressentiMin.distanceM > 5000, true);
+egal('col : sans altitude au point de prévision (grille), pas de correction', simuler(echantillonner(col, 100), [{ ...serieCol[0], ele: null }], t0 + 9 * 3600e3, 150, 106).temperatures.haut.temp, 12);
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);
