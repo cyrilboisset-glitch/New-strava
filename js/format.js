@@ -42,3 +42,27 @@ export const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 export function echapper(t) {
   return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+// ---- Menus repliables (segments, même parcours) -------------------------------------
+// Ouvert / fermé gardé pendant que l'appli est ouverte (d'une sortie à l'autre).
+const repliOuverts = new Set();
+
+/** <details> avec un titre et un résumé ; `cle` : nom du menu (ouvert ou non) */
+export function htmlRepli(cle, titre, resume, contenu, forcerOuvert = false) {
+  return `<details class="repli" data-repli="${cle}"${repliOuverts.has(cle) || forcerOuvert ? ' open' : ''}>
+    <summary><span class="repli-titre">${titre}</span><span class="repli-resume">${resume}</span>
+      <svg class="chevron" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+    <div class="repli-contenu">${contenu}</div>
+  </details>`;
+}
+
+/** Retient l'état des menus repliables d'un bloc (l'événement « toggle » ne remonte pas) */
+export function suivreReplis(bloc) {
+  if (bloc.dataset.replis) return;
+  bloc.dataset.replis = '1';
+  bloc.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (!d.classList?.contains('repli')) return;
+    if (d.open) repliOuverts.add(d.dataset.repli); else repliOuverts.delete(d.dataset.repli);
+  }, true);
+}

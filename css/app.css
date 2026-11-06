@@ -754,3 +754,14 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .apercu-image { margin: 8px 0 12px; display: flex; justify-content: center; }
 .apercu-image canvas { width: 100%; max-width: 420px; height: auto; border-radius: 12px; box-shadow: var(--ombre); }
 .apercu-image.en-cours { min-height: 120px; align-items: center; }
+
+/* Menus repliables : segments, même parcours (titre + résumé, détail au toucher) */
+.repli > summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; -webkit-tap-highlight-color: transparent; min-height: 32px; }
+.repli > summary::-webkit-details-marker { display: none; }
+.repli-titre { font-weight: 700; font-size: 16px; }
+.repli-resume { flex: 1; min-width: 0; text-align: right; font-size: 14px; color: var(--texte-2); }
+.repli > summary .chevron { flex: none; color: var(--texte-2); transition: transform 0.2s ease; }
+.repli[open] > summary .chevron { transform: rotate(180deg); }
+.repli-contenu { margin-top: 10px; }
+.repli[open] > .repli-contenu { animation: entree-fondu 0.2s ease; }
+@media (prefers-reduced-motion: reduce) { .repli > summary .chevron { transition: none; } .repli[open] > .repli-contenu { animation: none; } }

@@ -12,7 +12,7 @@ import { memeParcoursQue } from './parcours.js';
 import { toutesLesSorties } from './db.js';
 import { htmlChoixVelo } from './velos.js';
 import { familleSortie } from './sortie.js';
-import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue } from './format.js';
+import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue, htmlRepli, suivreReplis } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './carte-statique.js';
 import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties } from './segments.js';
@@ -361,10 +361,11 @@ function htmlMemeParcours(s, groupe) {
       <span class="passage-temps">${chrono(x.dureeChronoS ?? 0)}${etiquette}</span>
       <span class="passage-mesures">${mesures}</span></a>`;
   }).join('');
-  return `<h2 class="bloc-titre">Même parcours</h2>
+  const resume = rang === 1 ? `🏆 meilleur temps sur ${groupe.length}` : `${rang}e sur ${groupe.length} · record ${chrono(groupe[0].dureeChronoS ?? 0)}`;
+  return htmlRepli('meme-parcours', 'Même parcours', resume, `
     <p class="parcours-resume">Fait <b>${groupe.length} fois</b> · cette sortie : <b>${rang === 1 ? 'meilleur temps' : `${rang}e sur ${groupe.length}`}</b></p>
     <div class="passages">${lignes}</div>
-    <p class="bloc-note">Sorties reconnues automatiquement : même départ, même arrivée, même tracé (à 150 m près), distance à 6 % près. Classement au temps en mouvement.</p>`;
+    <p class="bloc-note">Sorties reconnues automatiquement : même départ, même arrivée, même tracé (à 150 m près), distance à 6 % près. Classement au temps en mouvement.</p>`);
 }
 
 // ---- Page ----------------------------------------------------------------------------
@@ -519,6 +520,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
       const groupe = memeParcoursQue(s, toutes);
       if (groupe.length < 2 || !blocParcours.isConnected) return;
       blocParcours.innerHTML = htmlMemeParcours(s, groupe);
+      suivreReplis(blocParcours);
       blocParcours.hidden = false;
     }).catch((e) => console.warn('Même parcours', e));
   }

@@ -66,6 +66,17 @@ async function attendre(page, f, arg, ms = 20000) {
   throw new Error(`attente dépassée : ${f.toString().slice(0, 120)}`);
 }
 
+// Ouvre le menu repliable d'un bloc (segments, même parcours) s'il est fermé
+async function ouvrirRepli(page, bloc) {
+  // la page peut être redessinée entre-temps : on réessaie jusqu'à trouver le menu ouvert
+  await page.waitForFunction((b) => {
+    const d = document.querySelector(`${b} details.repli`);
+    if (!d) return false;
+    if (!d.open) d.querySelector('summary').click();
+    return d.open;
+  }, bloc, { timeout: 15000, polling: 200 });
+}
+
 async function texteToast(page) {
   await page.waitForSelector('#toast:not([hidden])', { timeout: 30000 });
   const t = await page.textContent('#toast');
@@ -295,7 +306,10 @@ async function texteToast(page) {
   await page.click('[data-segments="vue"] button[data-valeur="carte"]');
 
   // Segments : création à la main sur « Col du test » (du km 10 au km 20 environ)
-  await page.waitForSelector('#bloc-segments-sortie .bloc-titre');
+  await page.waitForSelector('#bloc-segments-sortie details.repli', { state: 'attached' });
+  verif('segments : menu replié par défaut, résumé « Aucun segment »', await page.$eval('#bloc-segments-sortie details.repli', (d) => !d.open)
+    && (await page.textContent('#bloc-segments-sortie summary')).includes('Aucun segment'));
+  await ouvrirRepli(page, '#bloc-segments-sortie');
   verif('segments : aucun au départ', (await page.textContent('#bloc-segments-sortie')).includes('Aucun segment sur cette sortie'));
   verif('pas de montée ni de sprint détectés (1,2 %, 200 W)', !(await page.$('#bloc-segments-sortie .proposition')));
   await page.click('#bloc-segments-sortie .creation summary');
@@ -413,7 +427,9 @@ async function texteToast(page) {
   await attendre(page, async (id) => (await (await import('./js/segments.js')).lireSegments()).some((g) => g.sortieOrigine === id && g.nom === 'Montée du col du Test'), idMontee);
   verif('nom de la montée avec les lieux : col trouvé en haut (OpenStreetMap)', true);
   await page.goto(URL_APPLI + '#sortie=' + encodeURIComponent(idMontee));
+  await ouvrirRepli(page, '#bloc-segments-sortie');
   await page.waitForSelector('#bloc-segments-sortie .passage-suivi');
+  verif('segments : résumé avec le nombre de segments', /2 segments/.test(await page.textContent('#bloc-segments-sortie summary')), await page.textContent('#bloc-segments-sortie summary'));
   const suivis = (await page.textContent('#bloc-segments-sortie .passages')).replace(/\s+/g, ' ');
   verif('détail : montée et sprint suivis d\'office, plus rien à « Suivre »', suivis.includes('Montée du col du Test') && suivis.includes('Sprint') && !(await page.$('#bloc-segments-sortie .proposition')), suivis);
   verif('premier passage : pas de coupe', !(await page.$('#page-detail .coupe-pr')));
@@ -469,7 +485,9 @@ async function texteToast(page) {
   await page.click(`a.sortie[href="#sortie=${encodeURIComponent(idBis)}"]`);
   await page.waitForSelector('#page-detail .detail-nom .coupe-pr');
   verif('détail : coupe 3 à côté du nom', (await page.textContent('#page-detail .detail-nom .coupe-pr')).replace(/\s+/g, '') === '🏆3');
+  await ouvrirRepli(page, '#bloc-segments-sortie');
   await page.waitForSelector('#bloc-segments-sortie .passage-suivi');
+  verif('segments : résumé avec les records (🏆 3)', /🏆 3 records/.test(await page.textContent('#bloc-segments-sortie summary')), await page.textContent('#bloc-segments-sortie summary'));
   verif('détail : record perso sur la montée', /Montée du col du Test.*Record perso/.test((await page.textContent('#bloc-segments-sortie')).replace(/\s+/g, ' ')));
   await page.waitForFunction(() => !document.documentElement.dataset.transition);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -872,6 +890,13 @@ async function texteToast(page) {
   await texteToast(page);
   await page.click('a.sortie:has-text("Sans capteur")');
   await page.waitForSelector('#bloc-meme-parcours:not([hidden])', { timeout: 10000 });
+  const resumeMeme = (await page.textContent('#bloc-meme-parcours summary')).replace(/\s+/g, ' ');
+  verif('même parcours : replié, classement dans le résumé (2e sur 3, record 59:59)', await page.$eval('#bloc-meme-parcours details.repli', (d) => !d.open)
+    && /2e sur 3 · record 59:59/.test(resumeMeme), resumeMeme);
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.locator('#bloc-meme-parcours').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(CAPTURES, 'replis-fermes.png') });
+  await ouvrirRepli(page, '#bloc-meme-parcours');
   const memeTxt = (await page.textContent('#bloc-meme-parcours')).replace(/\s+/g, ' ');
   // temps en mouvement : avec pause 3 599 s (1er), les deux autres 3 600 s
   verif('même parcours : fait 3 fois', memeTxt.includes('Fait 3 fois'), memeTxt);
@@ -884,9 +909,8 @@ async function texteToast(page) {
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
   await page.click('#onglet-progres');
-  await page.waitForSelector('#bloc-parcours');
-  const mesParcours = (await page.textContent('#bloc-parcours')).replace(/\s+/g, ' ');
-  verif('Progrès : mes parcours (fait 3 fois)', mesParcours.includes('fait 3 fois'), mesParcours);
+  await page.waitForSelector('#bloc-bilans');
+  verif('Progrès : plus de « Mes parcours »', !(await page.$('#bloc-parcours')) && !(await page.textContent('#page-progres')).includes('Mes parcours'));
   await page.click('#onglet-sorties');
   await page.waitForSelector('#accueil:not([hidden])');
   await page.waitForFunction(() => !document.documentElement.dataset.transition);
@@ -1065,7 +1089,9 @@ async function texteToast(page) {
   });
   await page.click('[data-a="nouveau"]');
   await page.click('#mes-traces [data-t="ouvrir"]');
+  await ouvrirRepli(page, '#segments-trace');
   await page.waitForSelector('#segments-trace .passage', { timeout: 10000 });
+  verif('segments du tracé : résumé « 1 segment · 1 pas encore fait »', (await page.textContent('#segments-trace summary')).includes('1 segment · 1 pas encore fait'));
   const segTrace = (await page.textContent('#segments-trace')).replace(/\s+/g, ' ');
   verif('segments sur le tracé : nom, position, pas encore fait, temps estimé', /Montée du tracé\s*km [\d,]+ → [\d,]+.*Pas encore fait.*Temps estimé à \d+ W/.test(segTrace), segTrace);
   verif('segment en bleu sur la carte du tracé', !!(await page.$('#carte-trace .trait-segment')));

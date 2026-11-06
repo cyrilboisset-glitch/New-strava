@@ -21,7 +21,7 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.22.0 · image à partager, import de GPX';
+export const VERSION_APPLI = '0.23.0 · menus repliables';
 
 const $ = (id) => document.getElementById(id);
 const el = {
