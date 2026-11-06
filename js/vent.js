@@ -83,7 +83,7 @@ export function urlOpenMeteo(points, debutMs, finMs) {
   const q = new URLSearchParams({
     latitude: points.map((p) => f(p.lat)).join(','),
     longitude: points.map((p) => f(p.lon)).join(','),
-    hourly: 'temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability',
+    hourly: 'temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability,precipitation',
     wind_speed_unit: 'kmh',
     timezone: 'GMT',
     timeformat: 'unixtime',
@@ -108,7 +108,7 @@ export function lireOpenMeteo(json, points) {
       ele: points?.[k]?.ele ?? loc.elevation ?? null,
       heures: h.time.map((t) => t * 1000),
       temp: h.temperature_2m, vent: h.wind_speed_10m, de: h.wind_direction_10m,
-      rafales: h.wind_gusts_10m ?? [], pluie: h.precipitation_probability ?? [],
+      rafales: h.wind_gusts_10m ?? [], pluie: h.precipitation_probability ?? [], mm: h.precipitation ?? [],
     };
   });
 }
@@ -141,8 +141,39 @@ export function meteoA(serie, t) {
     de: (deg(Math.atan2(x, y)) + 360) % 360,
     rafales: lerp(serie.rafales[i], serie.rafales[j], f),
     pluie: Math.max(serie.pluie[i] ?? 0, serie.pluie[j] ?? 0),
+    mm: Math.max(serie.mm?.[i] ?? 0, serie.mm?.[j] ?? 0), // pluie prévue sur l'heure (mm)
   };
 }
+
+// ---- Soleil : lever et coucher (sans réseau) --------------------------------------
+
+/**
+ * Lever et coucher du soleil (bord supérieur, réfraction comprise : −0,833°) au jour
+ * de `jourMs`, par l'équation du lever du soleil (algorithme de la NOAA simplifié,
+ * précision de l'ordre de la minute aux latitudes de la France).
+ * @returns {{leverMs: number, coucherMs: number} | null}  null : jour ou nuit polaire
+ */
+export function soleil(lat, lon, jourMs) {
+  const d = new Date(jourMs);
+  const midi = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12);
+  const n = Math.round(midi / 86400000 + 2440587.5 - 2451545.0);
+  const jEtoile = n - lon / 360;
+  const M = (357.5291 + 0.98560028 * jEtoile) % 360;
+  const C = 1.9148 * Math.sin(rad(M)) + 0.02 * Math.sin(rad(2 * M)) + 0.0003 * Math.sin(rad(3 * M));
+  const lambda = (M + C + 180 + 102.9372) % 360;
+  const jTransit = 2451545.0 + jEtoile + 0.0053 * Math.sin(rad(M)) - 0.0069 * Math.sin(rad(2 * lambda));
+  const sinDecl = Math.sin(rad(lambda)) * Math.sin(rad(23.4397));
+  const cosDecl = Math.cos(Math.asin(sinDecl));
+  const cosW = (Math.sin(rad(-0.833)) - Math.sin(rad(lat)) * sinDecl) / (Math.cos(rad(lat)) * cosDecl);
+  if (cosW < -1 || cosW > 1) return null;
+  const w = deg(Math.acos(cosW));
+  const versMs = (j) => (j - 2440587.5) * 86400000;
+  return { leverMs: Math.round(versMs(jTransit - w / 360)), coucherMs: Math.round(versMs(jTransit + w / 360)) };
+}
+
+/** Risque de pluie selon la probabilité (%) : faible, possible, probable */
+export const risquePluie = (pct) => (pct >= SEUIL_PLUIE_PCT ? 'probable' : pct >= 20 ? 'possible' : 'faible');
+export const SEUIL_PLUIE_PCT = 50; // au-dessus : pluie probable, heure écartée du conseil
 
 // ---- Température : altitude et vent ressenti -------------------------------------
 
@@ -240,6 +271,7 @@ export function simuler(ech, series, debutMs, platW, masseKg) {
     const dos = ventDansLeDos(w.vent, w.de, p.cap);
     const temp = tempAltitude(w.temp, serie.ele, p.ele);
     const ligne = { distanceM: p.distanceM, t, dos, temp, ressenti: temp, ele: p.ele, pente: 0, pluie: w.pluie, vent: w.vent, de: w.de };
+    ligne.mm = w.mm;
     lignes.push(ligne);
     if (k === ech.length - 1) {
       if (k > 0) { ligne.ressenti = ressenti(temp, lignes[k - 1].airKmh); ligne.pente = lignes[k - 1].pente; }
@@ -269,6 +301,9 @@ export function simuler(ech, series, debutMs, platW, masseKg) {
     dosFin: moyenneSur(lignes, 'dos', (2 * L) / 3, L),
     dosTout: moyenneSur(lignes, 'dos', 0, L),
     pluieMax: Math.max(...lignes.map((l) => l.pluie ?? 0)),
+    // moment et endroit où la pluie est la plus probable, et la plus forte prévue (mm sur l'heure)
+    pluieQuand: (() => { const l = lignes.reduce((a, x) => ((x.pluie ?? 0) > (a.pluie ?? 0) ? x : a)); return { distanceM: l.distanceM, t: l.t, pct: l.pluie ?? 0 }; })(),
+    mmMax: Math.max(...lignes.map((l) => l.mm ?? 0)),
     tempMin: Math.min(...lignes.map((l) => l.temp)),
     tempMax: Math.max(...lignes.map((l) => l.temp)),
     temperatures: resumeTemperatures(lignes),
@@ -304,23 +339,36 @@ export function comparerSens(trace, inverse) {
 }
 
 /**
- * Pour chaque heure de départ : les deux sens, le sens conseillé, et la
- * meilleure heure (la plus courte avec le vent, en évitant la pluie probable).
+ * Pour chaque heure de départ : les deux sens, le sens conseillé, le jour (partir
+ * après le lever du soleil, rentrer avant son coucher) et la meilleure heure.
+ * Meilleure heure, dans cet ordre : de jour d'abord, puis sans pluie probable
+ * (< 50 %), puis la moins pluvieuse, puis la plus courte avec le vent.
+ * Si un seul sens rentre avant la nuit, c'est lui qui est conseillé.
  * @param {number[]} departsMs
  */
 export function planifier(coords, series, departsMs, platW, masseKg) {
   const ech = echantillonner(coords, 100);
   const inv = inverser(ech);
+  const [lat0, lon0] = coords[0];
   const heures = departsMs.map((debut) => {
     const trace = simuler(ech, series, debut, platW, masseKg);
     const inverse = simuler(inv, series, debut, platW, masseKg);
+    const jour = soleil(lat0, lon0, debut);
+    const deNuit = (sim) => !!jour && (debut < jour.leverMs || sim.finMs > jour.coucherMs);
     const c = comparerSens(trace, inverse);
-    return { debutMs: debut, trace, inverse, sens: c.meilleur, net: c.net, choix: c.meilleur === 'trace' ? trace : inverse };
+    let sens = c.meilleur;
+    // un seul sens rentre avant la nuit : on le prend, même avec un peu moins de vent dans le dos
+    if (deNuit(sens === 'trace' ? trace : inverse) && !deNuit(sens === 'trace' ? inverse : trace)) sens = sens === 'trace' ? 'inverse' : 'trace';
+    const choix = sens === 'trace' ? trace : inverse;
+    return {
+      debutMs: debut, trace, inverse, sens, net: c.net && sens === c.meilleur, choix, jour,
+      nuit: deNuit(choix), avantLever: !!jour && debut < jour.leverMs, apresCoucher: !!jour && choix.finMs > jour.coucherMs,
+    };
   });
-  const seches = heures.filter((h) => h.choix.pluieMax < 50);
-  const parmi = seches.length ? seches : heures;
-  const meilleure = parmi.reduce((m, h) => (h.choix.dureeS < m.choix.dureeS ? h : m), parmi[0]);
-  return { heures, meilleure };
+  const cle = (h) => [h.nuit ? 1 : 0, h.choix.pluieMax >= SEUIL_PLUIE_PCT ? 1 : 0, h.choix.pluieMax >= SEUIL_PLUIE_PCT ? h.choix.pluieMax : 0, h.choix.dureeS];
+  const avant = (a, b) => { const x = cle(a); const y = cle(b); for (let k = 0; k < x.length; k++) if (x[k] !== y[k]) return x[k] < y[k]; return false; };
+  const meilleure = heures.reduce((m, h) => (avant(h, m) ? h : m), heures[0]);
+  return { heures, meilleure, aucuneDeJour: heures.every((h) => h.nuit) };
 }
 
 // Couleurs du vent : rouge (de face) -> gris (travers) -> bleu (dans le dos)

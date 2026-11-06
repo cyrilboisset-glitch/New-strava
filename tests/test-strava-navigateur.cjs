@@ -907,7 +907,13 @@ async function texteToast(page) {
   const conseil = (await page.textContent('.vent-conseil')).replace(/\s+/g, ' ');
   // heure de Paris = UTC + 1 : vent faible dès 13 h ; pluie à 16 h et 17 h
   const heureConseil = Number(conseil.match(/Pars à (\d+) h/)?.[1]);
-  verif('meilleure heure : vent faible, sans pluie (13 h, 14 h, 15 h, 18 h, 19 h ou 20 h)', [13, 14, 15, 18, 19, 20].includes(heureConseil), conseil);
+  // 18 h à 20 h : retour après la nuit tombée (coucher vers 17 h en novembre) -> écartées
+  verif('meilleure heure : vent faible, sans pluie, de jour (13 h, 14 h ou 15 h)', [13, 14, 15].includes(heureConseil), conseil);
+  verif('conseil : lever, coucher, retour avant la nuit ; risque de pluie', /☀ Lever \d+ h \d+ · coucher 1[67] h \d+ : retour vers .* avant la nuit/.test(conseil) && /🌧 Pluie : risque (faible|possible)/.test(conseil), conseil);
+  const lignesNuit = await page.$$eval('.vent-tableau tbody tr', (els) => els.map((e) => [e.textContent.trim().split(/\s+/).slice(0, 2).join(' '), e.classList.contains('nuit'), e.querySelector('td:nth-child(5)').className]));
+  const ligneDe = (h) => lignesNuit.find(([t]) => t.startsWith(`${h} h`));
+  verif('tableau : 6 h et 20 h de nuit (🌙), 10 h de jour ; 16 h et 17 h pluie probable', ligneDe(6)[1] && ligneDe(20)[1] && !ligneDe(10)[1]
+    && ligneDe(16)[2] === 'pluie-probable' && ligneDe(17)[2] === 'pluie-probable' && ligneDe(10)[2] === 'pluie-faible', JSON.stringify(lignesNuit));
   verif('conseil : vent moyen du nord-est', conseil.includes('du nord-est'), conseil);
   // Températures : départ à 200 m (15 − 1,3 = 13,7 °C), point haut au milieu de la boucle (3 % de montée)
   verif('météo : altitude des points envoyée', (urlMeteo.searchParams.get('elevation') ?? '').split(',').length === urlMeteo.searchParams.get('latitude').split(',').length);

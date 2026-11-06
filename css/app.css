@@ -717,3 +717,12 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .temp-cases > div { display: flex; flex-direction: column; }
 .temp-val { font-family: var(--police-chiffres); font-weight: 600; font-size: 24px; line-height: 1.1; }
 .temp-cases small { font-size: 12px; color: var(--texte-3); }
+
+/* Tracés : nuit et pluie */
+.vent-tableau tr.nuit td { opacity: 0.5; }
+.vent-tableau tr.nuit.choisie td { opacity: 0.8; }
+.pluie-possible { color: #c27c0e; font-weight: 600; }
+.pluie-probable { color: #e5484d; font-weight: 700; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pluie-possible { color: #f2c230; } }
+:root[data-theme="dark"] .pluie-possible { color: #f2c230; }
+.vent-conseil .alerte { color: #e5484d; }

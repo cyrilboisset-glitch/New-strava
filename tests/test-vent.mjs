@@ -3,7 +3,7 @@
 import {
   cap, pointCardinal, ventDansLeDos, echantillonner, inverser, urlOpenMeteo, lireOpenMeteo, meteoA,
   puissanceSelonPente, vitesseAvecVent, simuler, comparerSens, planifier, couleurVent, chargerMeteo,
-  tempAltitude, ressenti,
+  tempAltitude, ressenti, soleil, risquePluie,
 } from '../js/vent.js';
 
 let echecs = 0;
@@ -84,7 +84,7 @@ egal('meilleure heure : 14 h (vent faible, pas de pluie)', new Date(plan.meilleu
 
 // Open-Meteo : adresse et lecture
 const url = urlOpenMeteo([{ lat: 45.1885, lon: 5.7245, ele: 212 }, { lat: 45.2, lon: 5.75, ele: 300 }], t0 + 9 * 3600e3, t0 + 12 * 3600e3);
-egal('adresse Open-Meteo', url.startsWith('https://api.open-meteo.com/v1/forecast?latitude=45.1885,45.2000&longitude=5.7245,5.7500&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability&wind_speed_unit=kmh&timezone=GMT&timeformat=unixtime&start_date=2026-11-06&end_date=2026-11-06') && url.endsWith('&elevation=212,300'), true);
+egal('adresse Open-Meteo', url.startsWith('https://api.open-meteo.com/v1/forecast?latitude=45.1885,45.2000&longitude=5.7245,5.7500&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability,precipitation&wind_speed_unit=kmh&timezone=GMT&timeformat=unixtime&start_date=2026-11-06&end_date=2026-11-06') && url.endsWith('&elevation=212,300'), true);
 const lu = lireOpenMeteo([{ latitude: 45.19, longitude: 5.72, hourly: { time: [1762412400, 1762416000], temperature_2m: [8, 9], wind_speed_10m: [12, 14], wind_direction_10m: [200, 210], wind_gusts_10m: [20, 22], precipitation_probability: [10, 30] } }], [{ lat: 45.1885, lon: 5.7245 }]);
 egal('lecture Open-Meteo', [lu[0].heures[0], lu[0].vent[1], lu[0].de[0], lu[0].lat], [1762412400000, 14, 200, 45.1885]);
 let msg = '';
@@ -115,6 +115,38 @@ egal('col : 12 °C au départ (600 m), 9,4 °C au sommet (1 000 m, km 5), 12 °C
   [12, 9.4, 1000, 5, 12]);
 egal('col : ressenti le plus froid dans la descente, sous la température', tc.ressentiMin.descente && tc.ressentiMin.ressenti < tc.ressentiMin.temp && tc.ressentiMin.distanceM > 5000, true);
 egal('col : sans altitude au point de prévision (grille), pas de correction', simuler(echantillonner(col, 100), [{ ...serieCol[0], ele: null }], t0 + 9 * 3600e3, 150, 106).temperatures.haut.temp, 12);
+
+// Soleil : valeurs connues pour Paris (heure de Paris), à la minute près
+const hParis = (ms) => new Date(Math.round(ms / 60000) * 60000).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' });
+const ete = soleil(48.8566, 2.3522, Date.UTC(2026, 5, 21, 12));
+const hiver = soleil(48.8566, 2.3522, Date.UTC(2026, 11, 21, 12));
+egal('soleil à Paris le 21 juin : 5 h 47 et 21 h 58', [hParis(ete.leverMs), hParis(ete.coucherMs)], ['05:47', '21:58']);
+egal('soleil à Paris le 21 déc. : 8 h 41 et 16 h 56', [hParis(hiver.leverMs), hParis(hiver.coucherMs)], ['08:41', '16:56']);
+egal('nuit polaire : pas de lever', soleil(80, 0, Date.UTC(2026, 11, 21, 12)), null);
+
+// Partir et rentrer de jour : le 6 nov. près de Grenoble, lever ≈ 6 h 22 UTC, coucher ≈ 16 h 19 UTC.
+// Vent nul à 6 h et 15 h UTC (les plus rapides), fort sinon : 6 h (avant le lever) et 15 h
+// (retour vers 16 h 22, après le coucher) sont écartés ; on garde la plus rapide de jour.
+const ventNuit = serieFictive({ de: 0, vent: 25 });
+ventNuit[0].vent = ventNuit[0].heures.map((_, h) => (h === 6 || h === 15 || h === 16 ? 0 : 25));
+const planNuit = planifier(coords, ventNuit, [6, 9, 12, 15].map((h) => t0 + h * 3600e3), 150, 106);
+egal('nuit : 6 h avant le lever, 15 h retour après le coucher, 9 h et 12 h de jour',
+  planNuit.heures.map((h) => [new Date(h.debutMs).getUTCHours(), h.avantLever, h.apresCoucher]), [[6, true, false], [9, false, false], [12, false, false], [15, false, true]]);
+egal('nuit : meilleure heure de jour (9 h ou 12 h), pas 6 h ni 15 h malgré le vent nul', [9, 12].includes(new Date(planNuit.meilleure.debutMs).getUTCHours()), true);
+egal('nuit : au moins une heure de jour', planNuit.aucuneDeJour, false);
+const toutNuit = planifier(coords, ventNuit, [3, 18].map((h) => t0 + h * 3600e3), 150, 106);
+egal('que des départs de nuit : signalé', toutNuit.aucuneDeJour, true);
+
+// Pluie : 60 % à 10 h UTC -> 9 h écartée (probable), sinon la moins pluvieuse
+egal('risque de pluie', [risquePluie(5), risquePluie(30), risquePluie(60)], ['faible', 'possible', 'probable']);
+const ventPluie = serieFictive({ de: 0, vent: 20, pluie: (h) => (h === 10 ? 60 : h === 13 ? 30 : 0) });
+ventPluie[0].mm = ventPluie[0].heures.map((_, h) => (h === 10 ? 1.8 : 0));
+const simPluie = simuler(ech, ventPluie, t0 + 9 * 3600e3, 150, 106);
+// entre 9 h et 10 h, on prend la pire des deux heures (prudence) : le risque apparaît dès 9 h
+egal('pluie : 60 % au plus, entre 9 h et 10 h UTC, 1,8 mm sur l\'heure', [simPluie.pluieMax, [9, 10].includes(new Date(simPluie.pluieQuand.t).getUTCHours()), simPluie.mmMax], [60, true, 1.8]);
+const planPluie = planifier(coords, ventPluie, [9, 11, 12].map((h) => t0 + h * 3600e3), 150, 106);
+egal('pluie : 9 h (60 %) et 11 h, 12 h (30 % vers 13 h) -> la moins pluvieuse ou la plus rapide sans pluie probable',
+  planPluie.meilleure.choix.pluieMax < 50, true);
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);

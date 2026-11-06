@@ -12,7 +12,7 @@ import { nombre, km, duree, chrono, echapper, fmtDate } from './format.js';
 import { lireSegments, lirePassages } from './segments.js';
 import { bboxCompatible, trouverPassages } from './segments-calc.js';
 import { proposerNomTrace } from './lieux.js';
-import { chargerMeteo, planifier, echantillonner, couleurVent, CLASSES_VENT, pointCardinal } from './vent.js';
+import { chargerMeteo, planifier, echantillonner, couleurVent, CLASSES_VENT, pointCardinal, risquePluie, SEUIL_PLUIE_PCT } from './vent.js';
 
 const CENTRE_DEFAUT = [45.188, 5.725]; // Grenoble
 const PUISSANCE_DEFAUT_W = 150; // comme le temps estimé de Parcours 3D
@@ -570,6 +570,25 @@ function blocTemperatures(h) {
     </div>`;
 }
 
+// Jour : lever, coucher, marge au retour ; avertissement si départ ou retour de nuit
+function texteJour(h) {
+  if (!h?.jour) return '';
+  const { leverMs, coucherMs } = h.jour;
+  const marge = (coucherMs - h.choix.finMs) / 1000;
+  const etat = h.avantLever ? `<b class="alerte">départ avant le lever du soleil</b>`
+    : h.apresCoucher ? `<b class="alerte">retour après la nuit tombée</b> (vers ${fmtHeureCourte(h.choix.finMs)})`
+      : `retour vers ${fmtHeureCourte(h.choix.finMs)}, ${duree(marge)} avant la nuit`;
+  return `☀ Lever ${fmtHeureCourte(leverMs)} · coucher ${fmtHeureCourte(coucherMs)} : ${etat}.`;
+}
+
+// Pluie : risque (probabilité), quand et où, et la plus forte prévue (mm sur l'heure)
+function textePluie(c) {
+  const r = risquePluie(c.pluieMax);
+  const ou = c.pluieMax >= 20 && c.pluieQuand ? `, vers ${fmtHeureCourte(c.pluieQuand.t)} au km ${nombre(c.pluieQuand.distanceM / 1000, 0)}` : '';
+  const mm = c.mmMax >= 0.1 ? `, jusqu'à ${nombre(c.mmMax, 1)} mm sur l'heure` : '';
+  return `🌧 Pluie : risque <b class="pluie-${r}">${r}</b> (${Math.round(c.pluieMax)} % au plus${ou}${mm}).`;
+}
+
 function afficherVent(page) {
   const bloc = page.querySelector('#vent-resultat');
   if (!bloc) return;
@@ -584,22 +603,25 @@ function afficherVent(page) {
   const choisie = heureChoisie();
   bloc.innerHTML = `
     <div class="vent-conseil">
-      ${choisie && choisie !== m && choisie.debutMs === dateDepart(vent.jour, ed.heure) ? `<p>À ${fmtHeureCourte(choisie.debutMs)} (ton heure) : ${duree(choisie.choix.dureeS)}, ${choisie.sens === 'trace' ? 'dans le sens du tracé' : 'dans le sens inverse'}, vent ${signe(choisie.choix.dosFin)} km/h sur la fin.</p>` : ''}
+      ${choisie && choisie !== m && choisie.debutMs === dateDepart(vent.jour, ed.heure) ? `<p>À ${fmtHeureCourte(choisie.debutMs)} (ton heure) : ${duree(choisie.choix.dureeS)}, ${choisie.sens === 'trace' ? 'dans le sens du tracé' : 'dans le sens inverse'}, vent ${signe(choisie.choix.dosFin)} km/h sur la fin${choisie.nuit ? ` — <b class="alerte">${choisie.avantLever ? 'départ avant le lever du soleil' : 'retour après la nuit tombée'}</b>` : ''}${choisie.choix.pluieMax >= SEUIL_PLUIE_PCT ? ` — <b class="alerte">pluie probable (${Math.round(choisie.choix.pluieMax)} %)</b>` : ''}.</p>` : ''}
+      ${vent.plan.aucuneDeJour ? `<p class="aide erreur">Aucun départ proposé ne permet de partir après le lever du soleil et de rentrer avant la nuit : la sortie dure environ ${duree(c.dureeS)}. Raccourcis le tracé, ou prévois un éclairage.</p>` : ''}
       <p><b>Pars à ${fmtHeureCourte(m.debutMs)}, ${sensTexte}</b> : ${duree(c.dureeS)} avec le vent prévu,
         vent ${c.dosFin >= 0 ? 'dans le dos' : 'de face'} sur la fin (${signe(c.dosFin)} km/h).</p>
-      <p class="aide">Vent moyen ${Math.round(c.ventMoy)} km/h du ${pointCardinal(c.ventDe)} · ${Math.round(c.tempMin)} à ${Math.round(c.tempMax)} °C${c.pluieMax >= 20 ? ` · pluie ${Math.round(c.pluieMax)} %` : ''}.</p>
+      <p class="aide">${texteJour(m)}</p>
+      <p class="aide">${textePluie(c)}</p>
+      <p class="aide">Vent moyen ${Math.round(c.ventMoy)} km/h du ${pointCardinal(c.ventDe)} · ${Math.round(c.tempMin)} à ${Math.round(c.tempMax)} °C.</p>
       ${m.sens === 'inverse' ? '<button class="btn secondaire petit" type="button" data-a="sens-vent">⇄ Mettre le tracé dans ce sens</button>' : ''}
       ${blocTemperatures(choisie ?? m)}
     </div>
     <div class="tableau-defile"><table class="tours vent-tableau">
       <thead><tr><th>Départ</th><th>Sens</th><th>Durée</th><th>Vent fin</th><th>Pluie</th><th>°C</th></tr></thead>
       <tbody>${vent.plan.heures.map((h) => `
-        <tr data-heure="${h.debutMs}" class="${h === m ? 'meilleure' : ''}${h === choisie ? ' choisie' : ''}${h.debutMs === dateDepart(vent.jour, ed.heure) ? ' perso' : ''}">
-          <td>${fmtHeureCourte(h.debutMs)}</td><td>${h.sens === 'trace' ? 'tracé' : 'inverse ⇄'}</td><td>${duree(h.choix.dureeS)}</td>
+        <tr data-heure="${h.debutMs}" class="${h === m ? 'meilleure' : ''}${h === choisie ? ' choisie' : ''}${h.debutMs === dateDepart(vent.jour, ed.heure) ? ' perso' : ''}${h.nuit ? ' nuit' : ''}"${h.nuit ? ` title="${h.avantLever ? 'Départ avant le lever du soleil' : 'Retour après la nuit tombée'}"` : ''}>
+          <td>${fmtHeureCourte(h.debutMs)}${h.nuit ? ' 🌙' : ''}</td><td>${h.sens === 'trace' ? 'tracé' : 'inverse ⇄'}</td><td>${duree(h.choix.dureeS)}</td>
           <td><span class="pastille-vent" style="background:${couleurVent(h.choix.dosFin)}"></span>${signe(h.choix.dosFin)}</td>
-          <td>${Math.round(h.choix.pluieMax)} %</td><td>${Math.round(h.choix.tempMin)}–${Math.round(h.choix.tempMax)}</td></tr>`).join('')}</tbody>
+          <td class="pluie-${risquePluie(h.choix.pluieMax)}">${Math.round(h.choix.pluieMax)} %</td><td>${Math.round(h.choix.tempMin)}–${Math.round(h.choix.tempMax)}</td></tr>`).join('')}</tbody>
     </table></div>
-    <p class="bloc-note">Touche une heure pour voir son vent et ses températures. Températures au moment de ton passage, corrigées de l'altitude du tracé (6,5 °C de moins par 1 000 m entre les points de prévision) ; ressenti avec ta vitesse et le vent de face (formule du refroidissement éolien, à 10 °C et moins).</p>`;
+    <p class="bloc-note">🌙 : départ avant le lever du soleil ou retour après son coucher (heures calculées au départ du tracé) ; ces heures ne sont jamais conseillées s'il en reste une de jour. Pluie : probabilité au moment de ton passage, faible sous 20 %, probable dès 50 % (heure écartée du conseil). Touche une heure pour voir son vent et ses températures. Températures au moment de ton passage, corrigées de l'altitude du tracé (6,5 °C de moins par 1 000 m entre les points de prévision) ; ressenti avec ta vitesse et le vent de face (formule du refroidissement éolien, à 10 °C et moins).</p>`;
 }
 
 async function enregistrer(page, profil) {
