@@ -331,6 +331,18 @@ l'instant »** — à proposer quand il voudra :
   départ, point haut (si ≥ 50 m au-dessus du départ), arrivée (heure de passage,
   altitude) et ressenti le plus froid (`resumeTemperatures`). Tenue conseillée
   d'Appli-vent toujours pas reprise.
+- **v0.20.0 (6 nov. 2026) : départ de jour et risque de pluie** (Tracés),
+  demande de Cyril (« partir et rentrer avant la nuit, aussi les risques de
+  pluie »). `soleil(lat, lon, jour)` (vent.js) : lever / coucher par l'équation
+  du lever du soleil (NOAA simplifiée, −0,833°), sans réseau, au départ du
+  tracé ; vérifié à la minute sur Paris (21 juin 5 h 47 / 21 h 58, 21 déc.
+  8 h 41 / 16 h 56). `planifier` : chaque heure a `avantLever`, `apresCoucher`,
+  `nuit` ; si un seul sens rentre de jour, c'est lui ; meilleure heure = de jour
+  d'abord, puis pluie < 50 %, puis la moins pluvieuse, puis la plus courte ;
+  `aucuneDeJour` -> avertissement. Pluie : Open-Meteo `precipitation` (mm) en
+  plus de la probabilité ; `pluieQuand` (heure, km), `mmMax`, `risquePluie`
+  (faible < 20 %, possible, probable ≥ 50 %). Tableau : 🌙 et ligne pâlie pour
+  la nuit, pluie colorée.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
