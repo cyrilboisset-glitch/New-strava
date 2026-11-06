@@ -265,7 +265,8 @@ async function texteToast(page) {
   const auCurseur = await page.$$eval('.courbe-valeur', (els) => els.map((e) => e.textContent));
   verif('valeurs au curseur', JSON.stringify(auCurseur) === JSON.stringify(['280 m', '30,0 km/h', '200 W', '140 bpm', '90 tr/min']), JSON.stringify(auCurseur));
   verif('curseur visible sur toutes les courbes', (await page.$$('.curseur:not([hidden])')).length === 5);
-  verif('point du curseur sur la carte', await page.evaluate(() => [...document.querySelectorAll('#carte-parcours path.leaflet-interactive')].length >= 4));
+  verif('thème sombre : carte du détail claire (sans filtre)', await page.evaluate(() => getComputedStyle(document.querySelector('#carte-parcours .leaflet-tile-pane')).filter === 'none'));
+  verif('point du curseur sur la carte',await page.evaluate(() => [...document.querySelectorAll('#carte-parcours path.leaflet-interactive')].length >= 4));
   const detail = (await page.textContent('#page-detail')).replace(/\s+/g, ' ');
   for (const m of ['5 s 200 W', '1 min 200 W', '20 min 200 W', '1 h 200 W', 'Puissance normalisée200 W', "Facteur d'intensité0,85", 'TSS72',
     'Z3 Tempo178–212 W 1 h 00100 %', 'Z5 Maximum> 135 bpm 1 h 00100 %', 'FTP de 236 W', 'FC max de 150 bpm (la plus haute relevée']) {
@@ -856,6 +857,9 @@ async function texteToast(page) {
   const srcTuiles = await page.$$eval('a.sortie .carte-fond img.tuile', (els) => els.map((e) => e.getAttribute('src')));
   verif('aperçu sur fond de carte (tuiles OSM)', srcTuiles.length >= 1 && srcTuiles.every((u) => /^https:\/\/tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/.test(u)), JSON.stringify(srcTuiles));
   verif('mention © OpenStreetMap', (await page.textContent('a.sortie .attribution')) === '© OpenStreetMap');
+  // Thème sombre (le test tourne en sombre) : cartes claires quand même, sans filtre
+  verif('thème sombre : aperçus de carte sans filtre (clairs)', await page.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches
+    && getComputedStyle(document.querySelector('a.sortie .carte-fond .tuiles')).filter === 'none'));
 
   // Puissance estimée : même route sans capteur, une semaine plus tard
   await page.setInputFiles('#champ-fichier', { name: 'sans-capteur.gpx', mimeType: 'application/gpx+xml',

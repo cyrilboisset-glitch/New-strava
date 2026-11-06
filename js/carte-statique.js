@@ -1,7 +1,7 @@
 // Petite carte fixe (aperçu d'une sortie ou d'un segment) : tuiles
 // OpenStreetMap posées sous le tracé, sans Leaflet (léger dans une liste).
 // Seules les tuiles de la zone sont demandées à internet ; sans réseau, le
-// fond quadrillé reste visible. En thème sombre, les tuiles sont assombries.
+// fond quadrillé reste visible. Tuiles toujours claires, même en thème sombre.
 
 const TUILE = 256;
 const ZOOM_MAXI = 16;
