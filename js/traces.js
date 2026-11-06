@@ -3,7 +3,7 @@
 import { lireReglage, ecrireReglage, toutesLesSorties } from './db.js';
 import { lireProfil } from './profil.js';
 import {
-  PROFILS, calculerRoute, denivele, tempsEstimeS, gpxDepuisTrace, nomFichierGpx, distanceM,
+  PROFILS, calculerRoute, denivele, tempsEstimeS, gpxDepuisTrace, nomFichierGpx, distanceM, lireGpxParcours,
 } from './routage.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { telecharger } from './sauvegarde.js';
@@ -276,7 +276,7 @@ async function centreInitial() {
 async function ouvrir(id) {
   const t = await lireTrace(id);
   if (!t) return;
-  Object.assign(ed, { id: t.id, nom: t.nom, nomPropose: '', profil: t.profil, points: t.points, route: { coords: t.coords, distanceM: t.distanceM, denivelePosM: t.denivelePosM }, erreur: '' });
+  Object.assign(ed, { id: t.id, nom: t.nom, nomPropose: '', profil: t.profil, points: t.points, route: { coords: t.coords, distanceM: t.distanceM, denivelePosM: t.denivelePosM }, erreur: '', importe: !!t.importe });
   // départ prévu : l'heure est reprise ; le jour aussi s'il est dans les 7 jours qui viennent
   ed.heure = t.departMs ? heureDe(t.departMs) : '';
   oublierVent();
@@ -354,6 +354,8 @@ async function afficherSegmentsTrace(page, profil) {
 let minuterie = 0;
 function recalculer(page, profil) {
   clearTimeout(minuterie);
+  // tracé importé : dès qu'on touche aux points, l'itinéraire est recalculé (le GPX d'origine est remplacé)
+  if (ed.importe) { ed.importe = false; toastFn('Tracé importé modifié : itinéraire recalculé entre ses points.'); }
   dessiner(page, profil, true);
   minuterie = setTimeout(async () => {
     const n = ++ed.calcul;
@@ -395,6 +397,7 @@ function dessiner(page, profil, enCalcul = false) {
   else if (ed.points.length === 1) etat.textContent = 'Départ placé : touche la carte pour le point suivant.';
   else if (enCalcul) etat.textContent = 'Calcul de l\'itinéraire…';
   else if (ed.erreur) etat.textContent = `Calcul impossible : ${ed.erreur}. Choisis « Ligne droite » pour tracer sans réseau.`;
+  else if (ed.importe) etat.textContent = 'Tracé importé d\'un GPX. Déplacer ou ajouter un point recalcule l\'itinéraire.';
   else etat.textContent = `${ed.points.length} points · ${PROFILS[ed.profil]}`;
   etat.classList.toggle('erreur', !!ed.erreur && !enCalcul);
 
@@ -641,7 +644,7 @@ async function enregistrer(page, profil) {
   const dn = denivele(ed.route.coords);
   const t = {
     id: ed.id ?? `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-    nom, profil: ed.profil, points: ed.points, coords: ed.route.coords,
+    nom, profil: ed.profil, points: ed.points, coords: ed.route.coords, importe: !!ed.importe,
     distanceM: ed.route.distanceM, denivelePosM: ed.route.denivelePosM ?? (dn.avecAltitude ? dn.plus : null),
     departMs: dateDepart(vent.jour, ed.heure), modifieLe: Date.now(),
   };
@@ -663,6 +666,31 @@ async function exporter(partager) {
   toastFn(`${fichier.name} enregistré dans Téléchargements.`);
 }
 
+// Bibliothèque : GPX existants (d'un ami, d'un site, d'une autre appli) enregistrés comme tracés
+async function importerGpx(fichiers) {
+  const ids = [];
+  const erreurs = [];
+  for (const f of fichiers) {
+    try {
+      const g = lireGpxParcours(await f.text());
+      const id = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      const nom = g.nom || f.name.replace(/\.gpx$/i, '').replace(/[-_]+/g, ' ').trim() || 'Tracé importé';
+      const pt = (c) => [c[0], c[1]];
+      await enregistrerTrace({
+        id, nom, profil: ed.profil, importe: true,
+        points: [pt(g.coords[0]), pt(g.coords[g.coords.length - 1])], coords: g.coords,
+        distanceM: g.distanceM, denivelePosM: g.denivelePosM, departMs: null, modifieLe: Date.now(),
+      });
+      ids.push(id);
+    } catch (err) {
+      erreurs.push(`${f.name} : ${err.message}`);
+    }
+  }
+  if (ids.length) toastFn(`${ids.length} tracé${ids.length > 1 ? 's' : ''} importé${ids.length > 1 ? 's' : ''}.${erreurs.length ? ` Pas lu : ${erreurs.join(' ; ')}.` : ''}`);
+  else if (erreurs.length) toastFn(`GPX illisible : ${erreurs.join(' ; ')}.`);
+  return ids;
+}
+
 async function afficherListe(page, profil) {
   const bloc = page.querySelector('#mes-traces');
   const index = await lireIndexTraces();
@@ -674,7 +702,8 @@ async function afficherListe(page, profil) {
     complete = true;
   }
   if (complete) await ecrireReglage('traces', index);
-  bloc.innerHTML = `<h2 class="bloc-titre">Mes tracés</h2>
+  bloc.innerHTML = `<div class="mes-traces-tete"><h2 class="bloc-titre">Mes tracés</h2>
+      <label class="btn secondaire petit">Importer un GPX<input type="file" id="importer-gpx" accept=".gpx,application/gpx+xml" multiple hidden></label></div>
     ${index.length ? `<div class="traces-liste">${index.map((t) => `
       <div class="trace-carte" data-id="${t.id}">
         <div class="trace-ligne">
@@ -687,6 +716,14 @@ async function afficherListe(page, profil) {
         </div>
         ${t.apercu?.length > 1 ? `<button class="trace-apercu" type="button" data-t="ouvrir" aria-label="Ouvrir le tracé ${echapper(t.nom)}">${htmlCarteStatique(t.apercu, { hauteur: 150 })}</button>` : ''}
       </div>`).join('')}</div>` : '<p class="aide">Aucun tracé enregistré pour l\'instant.</p>'}`;
+  bloc.querySelector('#importer-gpx').onchange = async (e) => {
+    const fichiers = [...e.target.files];
+    e.target.value = '';
+    const ids = await importerGpx(fichiers);
+    if (!ids.length) return;
+    await afficherListe(page, profil);
+    bloc.querySelector(`[data-id="${ids[0]}"] [data-t="ouvrir"]`)?.click();
+  };
   bloc.onclick = async (e) => {
     const b = e.target.closest('[data-t]');
     if (!b) return;

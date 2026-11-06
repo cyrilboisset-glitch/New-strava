@@ -95,6 +95,8 @@ js/puissance-estimee.js     Puissance estimée sans capteur (vitesse, pente, mas
 js/routage.js               Création de parcours (sans navigateur) : BRouter, GPX, D+, temps estimé
 js/traces.js                Onglet Tracés : carte d'édition, profil, 3D, vent, enregistrer / exporter / partager
 js/lieux.js                 Noms proposés (tracés, segments) avec les lieux OpenStreetMap (Nominatim, Overpass)
+js/image-sortie.js          Image à partager (sans navigateur : formats, chiffres, EXIF, place des photos ; dessin canvas)
+js/partage-sortie.js        Panneau « Partager en image » du détail : format, photos, aperçu, partage
 js/vent.js                  Vent (repris d'Appli-vent) : Open-Meteo, vent dans l'axe, temps avec le vent, sens, heures
 js/fichier.js               Relecture du fichier d'origine (FIT/GPX/TCX, .gz)
 js/format.js                Mise en forme (nombres, durées, dates)
@@ -115,6 +117,7 @@ tests/test-vue3d.mjs        Trace 3D : longueur, pentes, curseur, boucle
 tests/test-segments.mjs     Segments : temps (aussi à 8 s), sens, écart, détour, tours, montées, sprints
 tests/test-vent.mjs         Vent : caps, interpolation, temps avec le vent, sens conseillé, meilleure heure
 tests/test-lieux.mjs        Noms proposés : « de / du / d' », tracés, segments, Nominatim / Overpass, cache
+tests/test-image.mjs        Image : formats, chiffres, EXIF (date, décalage, GPS), photo placée (TZ=Europe/Paris)
 tests/test-routage.mjs      Tracés : adresse et réponse BRouter, GPX, D+, temps à puissance constante
 tests/test-estimation.mjs   Puissance estimée (150 W à plat / 257 W à 1,2 %), même parcours, tuiles
 tests/test-strava-navigateur.cjs  Fausse archive Strava importée dans l'appli
@@ -348,6 +351,21 @@ l'instant »** — à proposer quand il voudra :
   `htmlCarteStatique` (fond OSM) ; l'aperçu (≤ 160 points, `apercuTrace`) est
   gardé dans l'index `traces` (champ `apercu`), rattrapé au premier affichage
   pour les tracés plus anciens ; toucher l'aperçu = Ouvrir.
+- **v0.22.0 (6 nov. 2026)**, demandes de Cyril : 1) **import de GPX** dans
+  Tracés (« Importer un GPX », plusieurs fichiers) : `lireGpxParcours` (routage.js,
+  trkpt sinon rtept, altitude facultative, nom de la trace / des métadonnées /
+  du fichier) ; enregistré tel quel (`importe: true`, points = départ et
+  arrivée) ; toucher aux points recalcule l'itinéraire BRouter (message).
+  2) **image de la sortie à partager** (pas de réseau social dans l'appli) :
+  bouton « 📷 Partager en image » sous l'en-tête du détail. Formats : portrait
+  1080×1350 (Instagram / Facebook), story 1080×1920 (marges hautes et basses pour
+  les boutons d'Instagram), carré 1080×1080, paysage 1200×630. Contenu : titre,
+  date, carte OSM assombrie (tuiles chargées en `crossOrigin` : OSM sert le CORS ;
+  sans tuiles, fond uni) avec le tracé, chiffres (6 au plus), records 🏆, photos
+  (4 au plus, la 1re en grand avec la carte en médaillon, vignettes en portrait /
+  story), pastilles numérotées sur la carte selon l'heure EXIF (ou la position),
+  marque « Mes sorties » + adresse. Partage par le menu d'Android (Web Share),
+  sinon téléchargement JPEG. Les photos ne sont pas gardées.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

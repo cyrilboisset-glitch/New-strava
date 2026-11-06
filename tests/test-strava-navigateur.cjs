@@ -155,7 +155,7 @@ async function texteToast(page) {
     r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
       body: JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { 'track-length': String(Math.round(d)), 'filtered ascend': String(Math.round((d / 2) * 0.03)) }, geometry: { type: 'LineString', coordinates: coords } }] }) });
   });
-  await ctx.route(/tile\.openstreetmap\.org/, (r) => { tuilesDemandees.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', body: fausseTuile() }); });
+  await ctx.route(/tile\.openstreetmap\.org/, (r) => { tuilesDemandees.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: fausseTuile() }); });
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|tile\.openstreetmap/.test(m.text() + (m.location()?.url ?? ''))) erreursConsole.push(m.text()); });
   page.on('pageerror', (e) => { erreursConsole.push(e.message); if (process.env.PILE) console.log('PILE', e.stack); });
@@ -513,6 +513,73 @@ async function texteToast(page) {
     && puiss.includes('Cette sortie') && puiss.includes('Record') && !!(await page.$('#bloc-puissances .courbe-puissance path.ligne-recent')), puiss);
   verif('détail : FTP estimée après la sortie (≥ 95 % de 200 W = 190 W)', /FTP estimée après cette sortie : (19\d|2\d\d) W/.test(puiss), puiss);
   await page.locator('#bloc-puissances').screenshot({ path: path.join(CAPTURES, 'detail-puissances.png') });
+
+  // Image à partager : 4 formats, photo placée par son heure (EXIF), enregistrement en JPEG
+  await page.click('#btn-image-sortie');
+  await page.waitForSelector('#bloc-image canvas.image-sortie', { timeout: 15000 });
+  const taille = async () => page.$eval('#bloc-image canvas.image-sortie', (c) => [c.width, c.height]);
+  verif('image : portrait 1080×1350 par défaut', JSON.stringify(await taille()) === '[1080,1350]', JSON.stringify(await taille()));
+  const couleursImage = async () => page.$eval('#bloc-image canvas.image-sortie', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let trace = 0; let accent = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] > 230 && d[i + 1] > 80 && d[i + 1] < 130 && d[i + 2] < 50) trace++; // orange #ff6a13
+      if (d[i] > 180 && d[i] < 215 && d[i + 1] > 225 && d[i + 2] < 80) accent++; // vert-jaune #c8f031 (logo)
+    }
+    return { trace, accent };
+  });
+  const coul = await couleursImage();
+  verif('image : tracé orange sur la carte et logo de l\'appli', coul.trace > 500 && coul.accent > 500, JSON.stringify(coul));
+  for (const [f, dim] of [['story', '[1080,1920]'], ['carre', '[1080,1080]'], ['paysage', '[1200,630]']]) {
+    await page.click(`[data-segments="format-image"] button[data-valeur="${f}"]`);
+    await page.waitForFunction((d) => { const c = document.querySelector('#bloc-image canvas.image-sortie'); return c && JSON.stringify([c.width, c.height]) === d; }, dim, { timeout: 15000 });
+    verif(`image : format ${f} ${dim}`, true);
+    if (f === 'story') await page.locator('#bloc-image canvas.image-sortie').screenshot({ path: path.join(CAPTURES, 'image-story.png') });
+    if (f === 'paysage') await page.locator('#bloc-image canvas.image-sortie').screenshot({ path: path.join(CAPTURES, 'image-paysage.png') });
+  }
+  await page.click('[data-segments="format-image"] button[data-valeur="portrait"]');
+  // Photo : vrai JPEG fabriqué dans la page, avec une date EXIF « 2025:05:10 09:30:00 » (heure de Paris)
+  // -> 30 min après le départ (9 h) à 30 km/h : km 15
+  const jpeg = Buffer.from(await page.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 800; c.height = 600;
+    const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 800, 600); g.addColorStop(0, '#3a7bd5'); g.addColorStop(1, '#00d2ff');
+    x.fillStyle = g; x.fillRect(0, 0, 800, 600); x.fillStyle = '#fff'; x.font = '80px sans-serif'; x.fillText('PHOTO', 260, 330);
+    const b = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9));
+    return [...new Uint8Array(await b.arrayBuffer())];
+  }));
+  const exif = (() => {
+    const t = []; const u16 = (v) => t.push(v & 255, v >> 8); const u32 = (v) => t.push(v & 255, (v >> 8) & 255, (v >> 16) & 255, v >>> 24);
+    t.push(0x49, 0x49); u16(42); u32(8);
+    u16(1); u16(0x8769); u16(4); u32(1); u32(26); u32(0);
+    u16(1); u16(0x9003); u16(2); u32(20); u32(44); u32(0);
+    for (const ch of '2025:05:10 09:30:00\0') t.push(ch.charCodeAt(0));
+    const app1 = [0x45, 0x78, 0x69, 0x66, 0, 0, ...t];
+    return [0xff, 0xe1, (app1.length + 2) >> 8, (app1.length + 2) & 255, ...app1];
+  })();
+  const photo = Buffer.concat([jpeg.subarray(0, 2), Buffer.from(exif), jpeg.subarray(2)]);
+  await page.setInputFiles('#photos-image', { name: 'photo-col.jpg', mimeType: 'image/jpeg', buffer: photo });
+  await page.waitForSelector('#bloc-image .photo-vignette');
+  const vignette = (await page.textContent('#bloc-image .photo-vignette')).replace(/\s+/g, ' ');
+  verif('photo placée par son heure : km 15', vignette.includes('1. km 15,0'), vignette);
+  await page.waitForFunction(() => !document.querySelector('#bloc-image .apercu-image.en-cours'), null, { timeout: 15000 });
+  const bleuPhoto = await page.$eval('#bloc-image canvas.image-sortie', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 120 && d[i + 2] > 200 && d[i + 1] > 110) n++;
+    return n;
+  });
+  verif('image : la photo est dans l\'image', bleuPhoto > 50000, String(bleuPhoto));
+  await page.locator('#bloc-image canvas.image-sortie').screenshot({ path: path.join(CAPTURES, 'image-portrait.png') });
+  const [dlImage] = await Promise.all([page.waitForEvent('download'), page.click('[data-image="enregistrer"]')]);
+  const cheminImage = path.join(CAPTURES, 'image-sortie.jpg');
+  await dlImage.saveAs(cheminImage);
+  const octetsImage = fs.readFileSync(cheminImage);
+  verif('image enregistrée en JPEG', dlImage.suggestedFilename() === '2025-05-10-col-du-test-portrait.jpg' && octetsImage[0] === 0xff && octetsImage[1] === 0xd8 && octetsImage.length > 30000,
+    `${dlImage.suggestedFilename()} ${octetsImage.length}`);
+  await texteToast(page);
+  await page.click('#bloc-image .photo-retirer');
+  verif('photo retirée', !(await page.$('#bloc-image .photo-vignette')));
 
   // Retour : la liste revient à la même place
   await page.click('#btn-retour');
@@ -1009,6 +1076,18 @@ async function texteToast(page) {
     const db = await import('./js/db.js');
     await db.ecrireReglage('segments', ((await db.lireReglage('segments')) ?? []).filter((g) => g.id !== 'seg-trace'));
   });
+  // Importer un GPX existant dans la bibliothèque de tracés
+  const gpxImporte = `<?xml version="1.0"?><gpx><trk><name>Tour du lac (ami)</name><trkseg>${Array.from({ length: 40 }, (_, k) =>
+    `<trkpt lat="${(45.3 + k * 0.002).toFixed(4)}" lon="${(5.9 + Math.sin(k / 6) * 0.01).toFixed(4)}"><ele>${300 + k * 5}</ele></trkpt>`).join('')}</trkseg></trk></gpx>`;
+  await page.setInputFiles('#importer-gpx', [{ name: 'tour-du-lac.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from(gpxImporte) },
+    { name: 'vide.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from('<gpx></gpx>') }]);
+  const toastImport = await texteToast(page);
+  verif('import GPX : 1 tracé importé, le fichier vide signalé', toastImport.includes('1 tracé importé') && toastImport.includes('vide.gpx'), toastImport);
+  await page.waitForFunction(() => document.getElementById('nom-trace').value === 'Tour du lac (ami)', null, { timeout: 5000 });
+  verif('import GPX : ouvert dans l\'éditeur, distance et D+ du fichier', (await page.textContent('#trace-etat')).includes('importé d\'un GPX')
+    && /Dénivelé\s*195/.test((await page.textContent('#trace-resume')).replace(/\s+/g, ' ')) && (await page.textContent('#mes-traces')).includes('Tour du lac (ami)'),
+  (await page.textContent('#trace-resume')).replace(/\s+/g, ' '));
+  verif('import GPX : aperçu dans la liste', !!(await page.$('#mes-traces .trace-carte:first-child .trace-apercu path.apercu-trace')));
   await page.click('#onglet-sorties');
   await page.waitForSelector('#accueil:not([hidden])');
 

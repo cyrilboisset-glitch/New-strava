@@ -2,7 +2,7 @@
 // temps estimé. Valeurs calculées à la main. Lancer : node tests/test-routage.mjs
 import {
   urlBRouter, lireReponseBRouter, traceDroite, denivele, vitessePourPuissance, tempsEstimeS,
-  gpxDepuisTrace, nomFichierGpx, calculerRoute, longueurTrace,
+  gpxDepuisTrace, nomFichierGpx, calculerRoute, longueurTrace, lireGpxParcours,
 } from '../js/routage.js';
 import { lireGpx } from '../js/trace.js';
 
@@ -76,6 +76,20 @@ try { await calculerRoute([[45, 5], [45.1, 5]], 'fastbike', async () => { throw 
 egal('sans réseau : message clair', msg, 'pas de réseau ou service de calcul de route injoignable');
 egal('profil « ligne droite » : pas de réseau', (await calculerRoute([[45, 5], [45.01, 5]], 'droit', () => { throw new Error('appel interdit'); })).coords.length, 2);
 proche('longueur d\'une trace', longueurTrace([[45, 5], [45 + 500 / 111195, 5], [45 + 1500 / 111195, 5]]), 1500, 0.5);
+
+// Import de GPX (bibliothèque de tracés) : trace, itinéraire, nom, altitude, erreurs
+const gTrace = lireGpxParcours(`<?xml version="1.0"?><gpx><metadata><name>Méta</name></metadata><trk><name><![CDATA[Col & lac]]></name><trkseg>
+<trkpt lat="45.1" lon="5.1"><ele>200</ele><time>2026-01-01T08:00:00Z</time></trkpt>
+<trkpt lon='5.1' lat='45.11'><ele>260</ele></trkpt><trkpt lat="45.12" lon="5.1"><ele>250.5</ele></trkpt></trkseg></trk></gpx>`);
+egal('GPX trace : 3 points, nom de la trace, altitudes', [gTrace.coords.length, gTrace.nom, gTrace.coords[1], gTrace.denivelePosM], [3, 'Col & lac', [45.11, 5.1, 260], 60]);
+proche('GPX trace : 2,2 km', gTrace.distanceM, 2223.9, 1);
+const gRoute = lireGpxParcours('<gpx><metadata><name>Sortie &amp; café</name></metadata><rte><rtept lat="45" lon="5"/><rtept lat="45.01" lon="5"/></rte></gpx>');
+egal('GPX itinéraire (rtept) sans altitude, nom des métadonnées', [gRoute.coords.length, gRoute.nom, gRoute.coords[0][2], gRoute.denivelePosM], [2, 'Sortie & café', null, null]);
+let erreurGpx = '';
+try { lireGpxParcours('<gpx><wpt lat="45" lon="5"/></gpx>'); } catch (e) { erreurGpx = e.message; }
+egal('GPX sans trace : message clair', erreurGpx, "pas de trace ni d'itinéraire dans ce fichier");
+const allerRetour = lireGpxParcours(gpxDepuisTrace('Aller', [[45, 5, 100], [45.02, 5, 150]]));
+egal('relit les GPX exportés par l\'appli', [allerRetour.nom, allerRetour.coords.length, allerRetour.denivelePosM], ['Aller', 2, 50]);
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);
