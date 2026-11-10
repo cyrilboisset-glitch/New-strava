@@ -540,14 +540,22 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .passage.actuelle { background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 10px; padding-left: 8px; padding-right: 8px; }
 
 /* ---- Tracés (création de parcours) ---- */
-.carte-trace { height: 52vh; min-height: 300px; margin: 6px -16px 0; border-top: 1px solid var(--ligne); border-bottom: 1px solid var(--ligne); background: var(--surface-2); z-index: 0; }
-.outils-trace { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.carte-plein { position: relative; margin: 6px -16px 0; }
+/* carte sur tout l'écran : sous la barre du haut (~70 px) et au-dessus des onglets (~64 px) */
+.carte-trace { height: calc(100dvh - 150px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height: 360px; border-top: 1px solid var(--ligne); border-bottom: 1px solid var(--ligne); background: var(--surface-2); z-index: 0; }
+.outils-trace { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 500; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.outils-trace > * { pointer-events: auto; }
+.outils-trace .menu-bouton { align-self: flex-start; width: 210px; box-shadow: 0 4px 14px rgba(0,0,0,.28); }
+.outils-trace .btn { box-shadow: 0 3px 10px rgba(0,0,0,.28); }
+.etat-flottant { position: absolute; left: 10px; right: 10px; bottom: 78px; z-index: 500; margin: 0; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--surface) 92%, transparent); box-shadow: 0 4px 14px rgba(0,0,0,.25); font-size: 13px; pointer-events: none; }
+.bouton-creer { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 501; min-height: 52px; padding: 0 26px; border-radius: 999px; font-size: 16px; font-weight: 700;
+  box-shadow: 0 10px 22px rgba(0,0,0,.38), 0 2px 0 rgba(255,255,255,.35) inset, 0 -3px 0 rgba(0,0,0,.18) inset; }
+.bouton-creer:active { transform: translateX(-50%) translateY(2px); box-shadow: 0 4px 10px rgba(0,0,0,.35); }
 .outils-boutons { display: flex; gap: 6px; flex-wrap: wrap; }
 .choix-profil select {
   appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: var(--texte);
   font: inherit; font-weight: 700; font-size: 15px; padding: 0; width: 100%; cursor: pointer;
 }
-#trace-etat { margin: 10px 2px; }
 #trace-etat.erreur { color: var(--danger); }
 #trace-resume .stats { margin: 4px 0 8px; }
 .profil-trace { position: relative; height: 130px; margin-top: 8px; touch-action: pan-y; cursor: crosshair; border-bottom: 1px solid var(--ligne); }
