@@ -16,12 +16,12 @@ import { iconeSport, iconeFamille } from './icones.js';
 import { htmlBandeauObjectifs } from './objectifs.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
-  importerFichiers, dossierPossible, choisirDossier, dossierMemorise,
+  importerFichiers, dossierPossible, selecteurFichiersPossible, choisirDansTelechargements, choisirDossier, dossierMemorise,
   etatAutorisation, demanderAutorisation, synchroniserDossier,
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.31.0 · objectifs sur l\'accueil';
+export const VERSION_APPLI = '0.32.0 · import depuis Téléchargements';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -373,7 +373,7 @@ function toast(texte) {
 function occuper(oui) {
   occupe = oui;
   if (!oui && rechargerApres) { location.reload(); return; }
-  for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnChanger, $('btn-restaurer-menu')]) b.disabled = oui;
+  for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnChanger, $('btn-restaurer-menu'), $('btn-telechargements')]) b.disabled = oui;
   el.btnMenuSynchro.classList.toggle('occupe', oui);
   el.btnMenuSynchro.classList.toggle('tourne', oui);
 }
@@ -463,13 +463,24 @@ el.btnDossier.addEventListener('click', async () => {
   try {
     dossier = await choisirDossier();
   } catch (e) {
-    if (e.name !== 'AbortError') toast(`Dossier non accessible : ${e.message}`);
+    if (e.name === 'SecurityError') toast("Android interdit au navigateur de relier ce dossier (Téléchargements, racine…). Utilisez « Importer depuis Téléchargements », ou faites déposer le zip de Gadgetbridge dans un autre dossier (par exemple Documents).");
+    else if (e.name !== 'AbortError') toast(`Dossier non accessible : ${e.message}`);
     return;
   }
   await afficherEtatDossier();
   await synchroniser({ forcer: true });
 });
 el.btnChanger.addEventListener('click', () => el.btnDossier.click());
+// Téléchargements : le navigateur ne laisse pas relier ce dossier, mais on peut y choisir le zip
+$('btn-telechargements').hidden = !selecteurFichiersPossible;
+$('btn-telechargements').addEventListener('click', async () => {
+  let fichiers;
+  try { fichiers = await choisirDansTelechargements(); } catch (e) {
+    if (e.name !== 'AbortError') toast(`Téléchargements non accessible : ${e.message}`);
+    return;
+  }
+  await importerDepuis(fichiers);
+});
 el.btnSynchro.addEventListener('click', () => synchroniser());
 el.btnImporter.addEventListener('click', () => el.champ.click());
 el.champ.addEventListener('change', async () => {
