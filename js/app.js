@@ -11,6 +11,7 @@ import { afficherProgres, htmlFiltres } from './progres.js';
 import { afficherSegment, mettreAJourPassages, suivreRecherche, recordsDesSorties } from './segments.js';
 import { afficherTraces, fermerTraces } from './traces.js';
 import { brancherCache } from './lieux.js';
+import { htmlMannequin, nettoyer as nettoyerMuscles, resumeMuscles } from './mannequin.js';
 import { iconeSport, iconeFamille } from './icones.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
@@ -19,9 +20,10 @@ import {
 } from './import.js';
 
 
+export const VERSION_APPLI = '0.26.0 · mannequin des muscles';
+
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.25.1 · fichier unique';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -76,6 +78,7 @@ function carteSortie(s, profil, nbRecords = 0) {
     ${stats.length ? `<div class="stats">${stats.map(([l, v]) => `<div><span class="stat-label">${l}</span><span class="stat-val">${v}</span></div>`).join('')}</div>` : ''}
     ${effort.length ? `<div class="effort">${effort.join('')}</div>` : ''}
     ${apercu(s.trace)}
+    ${!s.trace?.length && Object.keys(nettoyerMuscles(s.muscles)).length ? `<div class="sortie-muscles" title="${echapper(resumeMuscles(s.muscles))}">${htmlMannequin(s.muscles, { classe: 'mini' })}</div>` : ''}
   </a>`;
 }
 

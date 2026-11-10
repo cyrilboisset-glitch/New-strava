@@ -95,6 +95,7 @@ js/puissance-estimee.js     Puissance estimée sans capteur (vitesse, pente, mas
 js/routage.js               Création de parcours (sans navigateur) : BRouter, GPX, D+, temps estimé
 js/traces.js                Onglet Tracés : carte d'édition, profil, 3D, vent, enregistrer / exporter / partager
 js/lieux.js                 Noms proposés (tracés, segments) avec les lieux OpenStreetMap (Nominatim, Overpass)
+js/mannequin.js             Mannequin des muscles (SVG face / dos, états, bloc du détail)
 js/image-sortie.js          Image à partager (sans navigateur : formats, chiffres, EXIF, place des photos ; dessin canvas)
 js/partage-sortie.js        Panneau « Partager en image » du détail : format, photos, aperçu, partage
 js/vent.js                  Vent (repris d'Appli-vent) : Open-Meteo, vent dans l'axe, temps avec le vent, sens, heures
@@ -117,6 +118,7 @@ tests/test-vue3d.mjs        Trace 3D : longueur, pentes, curseur, boucle
 tests/test-segments.mjs     Segments : temps (aussi à 8 s), sens, écart, détour, tours, montées, sprints
 tests/test-vent.mjs         Vent : caps, interpolation, temps avec le vent, sens conseillé, meilleure heure
 tests/test-lieux.mjs        Noms proposés : « de / du / d' », tracés, segments, Nominatim / Overpass, cache
+tests/test-mannequin.mjs    Mannequin : états, nettoyage, zones dessinées, accessibilité
 tests/test-image.mjs        Image : formats, chiffres, EXIF (date, décalage, GPS), photo placée (TZ=Europe/Paris)
 tests/test-routage.mjs      Tracés : adresse et réponse BRouter, GPX, D+, temps à puissance constante
 tests/test-estimation.mjs   Puissance estimée (150 W à plat / 257 W à 1,2 %), même parcours, tuiles
@@ -402,6 +404,19 @@ l'instant »** — à proposer quand il voudra :
   d'installation PWA. Test : `tests/test-fichier-unique.cjs` (file:// dans
   Chromium). NON vérifié sur Android (Chrome y ouvre les fichiers en content://,
   où le stockage peut ne pas tenir).
+- **v0.26.0 (10 nov. 2026) : mannequin des muscles** (tâche n° 1 de la liste),
+  demande de Cyril après avoir vu l'appli Zepp (FIT et TCX d'une séance de
+  musculation lus : **seulement durée, FC et calories**, ni exercices ni muscles ni
+  notes de mouvement ; ces infos restent chez Zepp). `js/mannequin.js` : SVG dessiné à
+  la main, face et dos, 14 zones (trapèzes, épaules, pectoraux, biceps, triceps,
+  avant-bras, abdos, obliques, dos, bas du dos, fessiers, quadriceps, ischios,
+  mollets) ; un toucher : principal (rouge #d9453d) -> secondaire (orange #f2b035)
+  -> rien. Gardé dans `sortie.muscles` ({ pecs: 'p', triceps: 's' }, dans la
+  sauvegarde). Détail : menu « Muscles travaillés » (musculation, entraînement,
+  autres ; pas vélo / course / marche / rando / natation), ouvert d'office pour une
+  musculation sans muscles ; liste : petit mannequin sur la carte d'une séance sans
+  trace. Le mannequin de Musculation-appli (11 zones en ellipses) n'est pas repris tel
+  quel : dessin plus fin, style Zepp (choix de Cyril).
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
