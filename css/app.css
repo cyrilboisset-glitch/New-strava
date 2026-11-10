@@ -831,7 +831,7 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .onglets { box-shadow: 0 -6px 18px rgb(0 0 0 / 18%); }
 
 /* ---- Menu Activité : seulement des icônes ---- */
-.menu-icones { width: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding: 6px; touch-action: none; }
+.menu-icones { width: 60px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding: 6px; touch-action: none; }
 .menu-icone-item {
   display: grid; place-items: center; width: 48px; height: 48px; border: 0; border-radius: 14px;
   background: transparent; color: var(--texte); cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -943,3 +943,11 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .menu-icone-item.survol { background: var(--surface-2); }
 .menu-icone-item.survol.actif { background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); }
 @media (prefers-reduced-motion: reduce) { .menu-icone-nom { transition: none; } }
+
+/* Geste en un mouvement : le panneau garde sa largeur, seule la ligne sous le doigt s'élargit (vers la gauche) */
+.bouton-activite { touch-action: none; }
+.menu-icone-item { flex: none; position: relative; }
+.menu-icone-item.survol {
+  background: var(--surface-2); box-shadow: 0 4px 14px rgb(0 0 0 / 35%), inset 0 0 0 1px var(--ligne); z-index: 1;
+}
+.menu-icone-item.survol.actif { background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); box-shadow: 0 4px 14px rgb(0 0 0 / 35%), inset 0 0 0 1.5px var(--accent-trait); }
