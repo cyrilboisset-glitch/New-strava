@@ -462,6 +462,19 @@ l'instant »** — à proposer quand il voudra :
   `rafraichirListe()` (exportée) qui ne refait que les cartes dont le HTML a changé
   (toutes les cartes ont `data-id`) ; si l'ordre ou le nombre change, reconstruction.
   Ne pas remettre `afficherListe()` après un calcul en arrière-plan.
+- **v0.31.0 (10 nov. 2026) : objectifs sur l'accueil + musculation**, demande de Cyril.
+  Bandeau d'anneaux sous la barre du haut de l'accueil (`#objectifs-accueil` /
+  `#objectifs-rail`, `.objectif-mini`, 132 px, défilement horizontal avec accroche) : un
+  toucher ouvre Progrès (la gestion — ajout, modification, suppression — reste dans
+  Progrès) ; sans objectif : carte « Créer un objectif ». Refait seulement si son HTML
+  change (position du glissement gardée), à chaque `appliquerDonnees` de la liste. Les
+  arcs se remplissent à l'apparition (animation CSS `anneau-remplit` sur
+  `stroke-dasharray` avec `--c`, coupée si mouvement réduit), aussi dans Progrès.
+  Nouveau `js/objectifs.js` (anneau, valeurs, bandeau, `sortiesObjectif`). Nouveaux types
+  d'objectif : `seances` (nombre de séances de musculation) et `tempsmuscu` (cible saisie
+  en heures, ex. 2,5 = 2 h 30) dans `TYPES_OBJECTIF` / `avancementObjectif` (stats.js) ;
+  ils comptent les sorties de la famille `musculation` (le reste : vélo). Rythme des
+  séances : « à faire d'ici le … » au lieu de « par jour ».
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

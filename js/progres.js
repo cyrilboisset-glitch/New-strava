@@ -2,6 +2,7 @@
 // records de puissance (avec courbe de puissance).
 import { toutesLesSorties, lireReglage, ecrireReglage } from './db.js';
 import { familleSortie } from './sortie.js';
+import { UNITES_OBJECTIF, OBJECTIFS_MUSCU, sortiesObjectif, valeurObjectif, anneau } from './objectifs.js';
 import { lireProfil, calculerEffortsManquants, wKg } from './profil.js';
 import {
   bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J,
@@ -44,17 +45,12 @@ let edition = null; // objectif en cours de saisie : null, 'nouveau' ou son id
 
 // ---- Objectifs ---------------------------------------------------------------------
 
-const UNITES_OBJECTIF = { distance: 'km', denivele: 'm', ftp: 'W' };
 const fmtJourMois = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
 
 function libelleObjectif(o, a) {
   if (o.periode === 'annee') return `${TYPES_OBJECTIF[o.type]} · ${new Date(a.debutMs).getFullYear()}`;
   if (o.periode === 'mois') return `${TYPES_OBJECTIF[o.type]} · ${fmtMoisLong.format(a.debutMs)}`;
   return `${TYPES_OBJECTIF[o.type]} · semaine du ${fmtJourMois.format(a.debutMs)} au ${fmtJourMois.format(a.finMs - 86400000)}`;
-}
-
-function valeurObjectif(type, v) {
-  return type === 'distance' ? `${nombre(v, v > 0 && v < 100 ? 1 : 0)} km` : type === 'denivele' ? `${nombre(v)} m` : `${nombre(v)} W`;
 }
 
 function formulaireObjectif(o) {
@@ -73,21 +69,11 @@ function formulaireObjectif(o) {
   </form>`;
 }
 
-// Anneau : arc extérieur rouge = où j'en suis, arc intérieur bleu = où je devrais en être
-function anneau(partFait, partAttendu) {
-  const arc = (r, part, classe) => {
-    const c = 2 * Math.PI * r;
-    const l = Math.max(0, Math.min(1, part)) * c;
-    return `<circle class="anneau-fond" cx="60" cy="60" r="${r}"/>${l > 0.5 ? `<circle class="${classe}" cx="60" cy="60" r="${r}" stroke-dasharray="${l.toFixed(2)} ${c.toFixed(2)}" transform="rotate(-90 60 60)"/>` : ''}`;
-  };
-  return `<svg class="anneau" viewBox="0 0 120 120" aria-hidden="true">${arc(52, partFait, 'anneau-fait')}${partAttendu != null ? arc(39, partAttendu, 'anneau-attendu') : ''}</svg>`;
-}
-
-function blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs) {
+function blocObjectifs(objectifs, toutes, profil, maintenantMs) {
   const ordre = (o) => Object.keys(TYPES_OBJECTIF).indexOf(o.type) * 3 + Object.keys(PERIODES_OBJECTIF).indexOf(o.periode);
   const lignes = [...objectifs].sort((a, b) => ordre(a) - ordre(b)).map((o) => {
     if (edition === o.id) return formulaireObjectif(o);
-    const a = avancementObjectif(o, sortiesVelo, maintenantMs, { ftpW: profil.ftpW });
+    const a = avancementObjectif(o, sortiesObjectif(o.type, toutes), maintenantMs, { ftpW: profil.ftpW });
     const pct = Math.round(a.part * 100);
     const atteint = a.fait >= a.cible;
     let detail;
@@ -99,9 +85,12 @@ function blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs) {
       ].filter(Boolean).join(' · ');
     } else if (!atteint) {
       const semaines = a.joursRestants / 7;
-      const rythme = o.periode === 'semaine' || semaines < 1
-        ? `${valeurObjectif(o.type, a.reste / Math.max(1, Math.ceil(a.joursRestants)))} par jour`
-        : `${valeurObjectif(o.type, a.reste / semaines)} par semaine`;
+      // musculation : pas « par jour » (0,3 séance…) mais « d'ici la fin de la période »
+      const rythme = OBJECTIFS_MUSCU.includes(o.type) && (o.periode === 'semaine' || semaines < 1)
+        ? `à faire d'ici le ${fmtJourMois.format(a.finMs - 86400000)}`
+        : o.periode === 'semaine' || semaines < 1
+          ? `${valeurObjectif(o.type, a.reste / Math.max(1, Math.ceil(a.joursRestants)))} par jour`
+          : `${valeurObjectif(o.type, a.reste / semaines)} par semaine`;
       const ecart = Math.abs(a.ecart) < a.cible * 0.005 ? 'Pile dans le rythme'
         : `${a.ecart > 0 ? 'En avance' : 'En retard'} de ${valeurObjectif(o.type, Math.abs(a.ecart))}`;
       detail = `${ecart} · reste ${valeurObjectif(o.type, a.reste)}, soit ${rythme}`;
@@ -129,9 +118,9 @@ function blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs) {
   }).join('');
   return `<section class="carte bloc" id="bloc-objectifs">
     <h2 class="bloc-titre">Mes objectifs</h2>
-    ${lignes ? `<div class="objectifs">${lignes}</div>` : (edition ? '' : '<p class="aide">Aucun objectif pour l\'instant : distance ou dénivelé sur la semaine, le mois ou l\'année, ou une FTP à atteindre.</p>')}
+    ${lignes ? `<div class="objectifs">${lignes}</div>` : (edition ? '' : '<p class="aide">Aucun objectif pour l\'instant : distance ou dénivelé, séances ou temps de musculation sur la semaine, le mois ou l\'année, ou une FTP à atteindre.</p>')}
     ${edition === 'nouveau' ? formulaireObjectif(null) : '<button class="btn secondaire" type="button" data-obj="ajouter">+ Ajouter un objectif</button>'}
-    ${objectifs.length ? '<p class="bloc-note">Sorties vélo de la semaine (du lundi), du mois ou de l\'année en cours. Arc rouge : où tu en es ; arc bleu : où tu devrais en être en avançant régulièrement (pour la FTP : de ta FTP du début de la période jusqu\'à l\'objectif).</p>' : ''}
+    ${objectifs.length ? '<p class="bloc-note">Sorties vélo (ou séances de musculation) de la semaine (du lundi), du mois ou de l\'année en cours. Arc rouge : où tu en es ; arc bleu : où tu devrais en être en avançant régulièrement (pour la FTP : de ta FTP du début de la période jusqu\'à l\'objectif).</p>' : ''}
   </section>`;
 }
 
@@ -385,12 +374,11 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
 
   let calcul = '';
   let objectifs = (await lireReglage('objectifs')) ?? [];
-  const sortiesVelo = toutes.filter((s) => familleSortie(s).cle === 'sport-2');
   edition = null;
   const rendre = () => {
     page.innerHTML = `
     ${familles.size > 1 ? `<nav class="filtres" aria-label="Type d'activité">${filtresHtml}</nav>` : ''}
-    ${blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs)}
+    ${blocObjectifs(objectifs, toutes, profil, maintenantMs)}
     ${blocBilans(sorties, maintenantMs)}
     ${blocForme(toutes, profil, maintenantMs)}
     ${blocRecords(sorties, maintenantMs, calcul, profil.poidsKg)}`;
@@ -401,7 +389,7 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
   // Objectifs : ajout, modification, suppression (réglage « objectifs »)
   const garderObjectifs = async (liste) => { objectifs = liste; await ecrireReglage('objectifs', liste); };
   const rendreObjectifs = () => {
-    page.querySelector('#bloc-objectifs').outerHTML = blocObjectifs(objectifs, sortiesVelo, profil, maintenantMs);
+    page.querySelector('#bloc-objectifs').outerHTML = blocObjectifs(objectifs, toutes, profil, maintenantMs);
     page.querySelector('.objectif-form input[name="cible"]')?.focus();
   };
   page.onsubmit = async (e) => {

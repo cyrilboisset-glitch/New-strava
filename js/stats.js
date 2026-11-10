@@ -133,7 +133,7 @@ export function records(sorties, durees, depuisMs = -Infinity) {
 
 // ---- Objectifs (semaine, mois ou année en cours) --------------------------------------
 
-export const TYPES_OBJECTIF = { distance: 'Distance', denivele: 'Dénivelé', ftp: 'FTP' };
+export const TYPES_OBJECTIF = { distance: 'Distance', denivele: 'Dénivelé', ftp: 'FTP', seances: 'Séances de muscu', tempsmuscu: 'Temps de muscu' };
 export const PERIODES_OBJECTIF = { semaine: 'Semaine', mois: 'Mois', annee: 'Année' };
 
 /**
@@ -169,6 +169,9 @@ export function avancementObjectif(obj, sorties, maintenantMs = Date.now(), { ft
   let departFtpW = null;
   if (obj.type === 'distance') { fait = dans.reduce((a, s) => a + (s.distanceM ?? 0), 0) / 1000; attendu = cible * partEcoulee; }
   else if (obj.type === 'denivele') { fait = dans.reduce((a, s) => a + (s.denivelePosM ?? 0), 0); attendu = cible * partEcoulee; }
+  // musculation : `sorties` ne contient que les séances ; le temps est compté en heures
+  else if (obj.type === 'seances') { fait = dans.length; attendu = cible * partEcoulee; }
+  else if (obj.type === 'tempsmuscu') { fait = dans.reduce((a, s) => a + (s.dureeChronoS ?? 0), 0) / 3600; attendu = cible * partEcoulee; }
   else {
     const maintenant = estimerFtp(sorties, maintenantMs);
     fait = maintenant?.ftpW ?? 0;

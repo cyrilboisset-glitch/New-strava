@@ -13,6 +13,7 @@ import { afficherTraces, fermerTraces } from './traces.js';
 import { brancherCache } from './lieux.js';
 import { htmlMannequin, nettoyer as nettoyerMuscles, resumeMuscles } from './mannequin.js';
 import { iconeSport, iconeFamille } from './icones.js';
+import { htmlBandeauObjectifs } from './objectifs.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
   importerFichiers, dossierPossible, choisirDossier, dossierMemorise,
@@ -20,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.30.0 · liste plus rapide';
+export const VERSION_APPLI = '0.31.0 · objectifs sur l\'accueil';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -176,6 +177,24 @@ async function chargerListe() {
   return { version, toutes, profil, records };
 }
 
+// Bandeau des objectifs (anneaux) : refait seulement si son contenu change (la position du
+// glissement est gardée, les anneaux ne se remplissent qu'à l'apparition ou au changement)
+let bandeauHtml = '';
+async function afficherBandeau() {
+  let objectifs = [];
+  try { objectifs = (await lireReglage('objectifs')) ?? []; } catch { /* sans objectif */ }
+  const section = $('objectifs-accueil');
+  const rail = $('objectifs-rail');
+  if (!liste.toutes.length && !objectifs.length) { section.hidden = true; return; }
+  const html = htmlBandeauObjectifs(objectifs, liste.toutes, liste.profil, Date.now());
+  section.hidden = false;
+  if (html === bandeauHtml) return;
+  bandeauHtml = html;
+  const x = rail.scrollLeft;
+  rail.innerHTML = html;
+  rail.scrollLeft = x;
+}
+
 function appliquerDonnees({ version, toutes, profil, records }) {
   el.vide.hidden = toutes.length > 0;
   afficherFiltres(toutes); // peut remettre le filtre sur « tout »
@@ -187,6 +206,7 @@ function appliquerDonnees({ version, toutes, profil, records }) {
     if (!groupes.has(cle)) groupes.set(cle, []);
     groupes.get(cle).push(s);
   }
+  afficherBandeau().catch((e) => console.warn('Objectifs', e));
   liste.cumuls = new Map([...groupes].map(([cle, l]) => {
     const dist = l.reduce((a, s) => a + (s.distanceM ?? 0), 0);
     const temps = l.reduce((a, s) => a + (s.dureeChronoS ?? 0), 0);

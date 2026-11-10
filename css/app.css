@@ -888,3 +888,33 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 
 /* Fin de la liste : le reste arrive en descendant */
 #liste-suite { padding: 18px 0 24px; text-align: center; color: var(--texte-3); font-size: 13px; }
+
+/* ---- Objectifs sur l'accueil : anneaux à faire glisser ---- */
+.objectifs-accueil { margin: 4px -16px 0; }
+.objectifs-rail {
+  display: flex; gap: 12px; overflow-x: auto; padding: 8px 16px 14px; scroll-snap-type: x proximity;
+  scroll-padding: 0 16px; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+}
+.objectifs-rail::-webkit-scrollbar { display: none; }
+.objectif-mini {
+  flex: none; width: 132px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 12px 8px 12px; border-radius: var(--rayon); border: 1px solid var(--ligne); background-color: var(--surface);
+  background-image: linear-gradient(180deg, color-mix(in srgb, #fff 7%, transparent), transparent 70%);
+  box-shadow: var(--ombre), inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent;
+}
+.objectif-mini:active { background-color: var(--surface-2); }
+.objectif-mini .objectif-cercle { width: 92px; margin: 0 0 8px; }
+.objectif-mini .objectif-centre b { font-size: 22px; }
+.objectif-mini.atteint .objectif-centre b { color: #f2c230; }
+.objectif-mini-nom { font-weight: 700; font-size: 14px; line-height: 1.2; }
+.objectif-mini-sous { font-size: 12px; color: var(--texte-3); text-transform: capitalize; }
+.objectif-mini-val { margin-top: 4px; font-size: 12px; color: var(--texte-2); font-variant-numeric: tabular-nums; }
+.objectif-mini-val b { color: var(--texte); }
+.objectif-mini.vide { justify-content: center; min-height: 150px; border-style: dashed; }
+.objectif-plus { font-size: 34px; line-height: 1; color: var(--accent-trait); margin-bottom: 6px; }
+/* Les arcs se remplissent à l'apparition */
+@keyframes anneau-remplit { from { stroke-dasharray: 0 var(--c); } }
+.anneau-fait, .anneau-attendu { animation: anneau-remplit 1s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.anneau-attendu { animation-delay: 0.15s; }
+@media (prefers-reduced-motion: reduce) { .anneau-fait, .anneau-attendu { animation: none; } }
