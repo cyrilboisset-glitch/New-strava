@@ -783,25 +783,27 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .lecteur-seul { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---- Mannequin des muscles (style Zepp) ---- */
+.mannequin { background: #14161a; border-radius: 18px; padding: 12px 10px 10px; box-shadow: var(--ombre-carte, 0 6px 16px rgba(0,0,0,.18)); }
 .mq-vues { display: flex; justify-content: center; gap: 4px; }
 .mq-vue { margin: 0; flex: 1; max-width: 220px; text-align: center; }
-.mq-vue figcaption { font-size: 12px; color: var(--texte-3); margin-top: 2px; }
-.mq { width: 100%; height: auto; display: block; --mq-base: #e4e6ea; --mq-contour: #8d939d; --mq-zone: #f3f4f6; --mq-p: #d9453d; --mq-s: #f2b035; }
-.mq-contour path, .mq-contour ellipse, .mq-contour rect { fill: none; stroke: var(--mq-contour); stroke-width: 3; stroke-linejoin: round; }
+.mq-vue figcaption { font-size: 12px; color: #8d939d; margin-top: 2px; }
+.mq { width: 100%; height: auto; display: block; --mq-base: #23262c; --mq-contour: #f2f3f5; --mq-zone: #c3c7ce; --mq-p: #d9453d; --mq-s: #f2b035; }
+.mq-contour path, .mq-contour ellipse, .mq-contour rect { fill: none; stroke: var(--mq-contour); stroke-width: 2; stroke-linejoin: round; }
 .mq-corps path, .mq-corps ellipse, .mq-corps rect { fill: var(--mq-base); stroke: none; }
-.mz path { fill: var(--mq-zone); stroke: var(--mq-contour); stroke-width: 1.1; stroke-linejoin: round; transition: fill 0.2s ease; }
+.mz path { fill: var(--mq-zone); stroke: #14161a; stroke-width: 1; stroke-linejoin: round; transition: fill 0.2s ease; }
 .mz[data-etat="p"] path { fill: var(--mq-p); }
 .mz[data-etat="s"] path { fill: var(--mq-s); }
 .mannequin.interactif .mz { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.mannequin.interactif .mz:hover path { stroke: var(--texte); }
+.mannequin.interactif .mz:hover path { stroke: #fff; }
 .mannequin.interactif .mz:focus-visible { outline: none; }
 .mannequin.interactif .mz:focus-visible path { stroke: var(--accent-trait); stroke-width: 2.4; }
-.mq-legende { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; list-style: none; margin: 10px 0 4px; padding: 0; font-size: 13px; color: var(--texte-2); }
+.mq-legende { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; list-style: none; margin: 10px 0 4px; padding: 0; font-size: 13px; color: #c9ccd2; }
 .mq-legende li { display: flex; align-items: center; gap: 6px; }
 .mq-puce { width: 11px; height: 11px; border-radius: 50%; background: #c9ccd2; flex: none; }
 .mq-puce.p { background: #d9453d; } .mq-puce.s { background: #f2b035; }
 .mq-p { color: #d9453d; } .mq-s { color: #c98a10; }
-.mq-resume { margin: 8px 0 0; font-size: 14px; color: var(--texte-2); text-align: center; }
+.mannequin .mq-p { color: #ff6a5f; } .mannequin .mq-s { color: #f7b93e; }
+.mq-resume { margin: 8px 0 0; font-size: 14px; color: #c9ccd2; text-align: center; }
 .muscles-contenu .btn { display: block; margin: 8px auto 0; }
 .mannequin.mini .mq-vue figcaption { display: none; }
 @media (prefers-reduced-motion: reduce) { .mz path { transition: none; } }
