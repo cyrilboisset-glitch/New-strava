@@ -20,7 +20,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.26.0 · mannequin des muscles';
+export const VERSION_APPLI = '0.27.0 · charte anthracite, tracés plein écran';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));

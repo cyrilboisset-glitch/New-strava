@@ -32,7 +32,7 @@
   --trace-carte: #e8590c;     /* trace sur le fond OSM (clair dans les deux thèmes) */
   --forme: #2563eb;           /* CTL */
   --fatigue: #d6336c;         /* ATL */
-  --ombre: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 5%);
+  --ombre: 0 2px 3px rgb(20 32 46 / 10%), 0 10px 24px rgb(20 32 46 / 12%);
   --rayon: 16px;
   --police-chiffres: 'Barlow Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
   color-scheme: light;
@@ -40,31 +40,31 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --fond: #0e1014;
-    --surface: #171a20;
-    --surface-2: #1f232b;
-    --ligne: #2a2f39;
-    --texte: #eef1f5;
-    --texte-2: #a7afbc;
-    --texte-3: #737c8a;
-    --accent: #c8f031;
-    --accent-texte: #12140c;
-    --accent-trait: #c8f031;
+    --fond: #2a2f38;
+    --surface: #363c47;
+    --surface-2: #414855;
+    --ligne: #4b5361;
+    --texte: #f3f5f8;
+    --texte-2: #b9c0cc;
+    --texte-3: #8f98a7;
+    --accent: #ff8a3d;
+    --accent-texte: #1b1206;
+    --accent-trait: #ff8a3d;
     --puissance: #a995ff;
     --cardio: #ff6b7a;
     --danger: #ff7b6b;
     --altitude: #8b93a1;
     --forme: #4d8ef7;
     --fatigue: #e8588a;
-    --ombre: none;
+    --ombre: 0 2px 3px rgb(0 0 0 / 25%), 0 12px 26px rgb(0 0 0 / 30%);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --fond: #0e1014; --surface: #171a20; --surface-2: #1f232b; --ligne: #2a2f39;
-  --texte: #eef1f5; --texte-2: #a7afbc; --texte-3: #737c8a;
-  --accent: #c8f031; --accent-texte: #12140c; --accent-trait: #c8f031;
-  --puissance: #a995ff; --cardio: #ff6b7a; --danger: #ff7b6b; --altitude: #8b93a1; --forme: #4d8ef7; --fatigue: #e8588a; --ombre: none;
+  --fond: #2a2f38; --surface: #363c47; --surface-2: #414855; --ligne: #4b5361;
+  --texte: #f3f5f8; --texte-2: #b9c0cc; --texte-3: #8f98a7;
+  --accent: #ff8a3d; --accent-texte: #1b1206; --accent-trait: #ff8a3d;
+  --puissance: #a995ff; --cardio: #ff6b7a; --danger: #ff7b6b; --altitude: #8b93a1; --forme: #4d8ef7; --fatigue: #e8588a; --ombre: 0 2px 3px rgb(0 0 0 / 25%), 0 12px 26px rgb(0 0 0 / 30%);
   color-scheme: dark;
 }
 
@@ -516,7 +516,7 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
   min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid rgb(255 255 255 / 18%);
   background: rgb(14 19 27 / 78%); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
-.v3d-boutons button[aria-pressed="true"] { background: #c8f031; color: #12140c; border-color: #c8f031; }
+.v3d-boutons button[aria-pressed="true"] { background: var(--accent); color: var(--accent-texte); border-color: var(--accent); }
 .v3d-legende { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; gap: 3px; flex-wrap: wrap; pointer-events: none; }
 .v3d-legende span { padding: 1px 6px; border-radius: 5px; font-size: 10.5px; font-weight: 700; color: #13202b; }
 .v3d-legende span:first-child, .v3d-legende span:nth-child(n+6) { color: #fff; }
@@ -810,3 +810,22 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 
 .sortie-muscles { margin: 12px 0 0; padding: 8px 0 4px; border-top: 1px solid var(--ligne); }
 .sortie-muscles .mq-vue { max-width: 90px; }
+
+/* ---- Charte « Anthracite adouci » : volume des fenêtres et des boutons ---- */
+.carte, .sortie, .menu-panneau {
+  background-image: linear-gradient(180deg, color-mix(in srgb, #fff 7%, transparent), transparent 70%);
+  box-shadow: var(--ombre), inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+}
+.btn.principal, .bouton-creer {
+  background-image: linear-gradient(180deg, color-mix(in srgb, #fff 28%, transparent), transparent 55%);
+  box-shadow: 0 6px 14px rgb(0 0 0 / 28%), inset 0 1px 0 rgb(255 255 255 / 40%), inset 0 -3px 0 rgb(0 0 0 / 18%);
+  border-color: color-mix(in srgb, #000 15%, var(--accent));
+}
+.btn.secondaire {
+  background-color: var(--surface);
+  background-image: linear-gradient(180deg, color-mix(in srgb, #fff 8%, transparent), transparent 60%);
+  box-shadow: 0 3px 8px rgb(0 0 0 / 18%), inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+}
+.btn:not(:disabled):not(.bouton-creer):active { transform: translateY(1px); box-shadow: 0 1px 3px rgb(0 0 0 / 25%); }
+.icone-btn { box-shadow: 0 3px 8px rgb(0 0 0 / 20%), inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent); }
+.onglets { box-shadow: 0 -6px 18px rgb(0 0 0 / 18%); }

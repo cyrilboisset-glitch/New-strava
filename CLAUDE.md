@@ -417,6 +417,17 @@ l'instant »** — à proposer quand il voudra :
   musculation sans muscles ; liste : petit mannequin sur la carte d'une séance sans
   trace. Le mannequin de Musculation-appli (11 zones en ellipses) n'est pas repris tel
   quel : dessin plus fin, style Zepp (choix de Cyril).
+- **v0.27.0 (10 nov. 2026)**, demandes de Cyril : 1) mannequin redessiné proche de
+  la capture Zepp (panneau sombre, contour blanc, abdos en 8 blocs, cuisses en
+  deux parties, trapèzes / dorsaux plus anatomiques) ; 2) **position de la page
+  gardée au retour** pour toute l'appli (`defilements` par numéro d'entrée de
+  l'historique, `remettreDefilement` dans app.js, `history.scrollRestoration =
+  'manual'`) : retour d'un segment = la sortie reste au bloc Segments ; 3) charte
+  **« Anthracite adouci »** choisie par Cyril (sombre plus clair : fond #2a2f38,
+  cartes #363c47, accent cuivre #ff8a3d) + volume (dégradés, ombres, relief des
+  boutons) ; le thème clair garde ses couleurs avec les mêmes ombres ; 4) Tracés
+  **plein écran** : carte sur toute la hauteur, outils flottants en haut, état en
+  bas, bouton « ⬇ Créer le GPX » rond en relief toujours visible (`.bouton-creer`).
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
