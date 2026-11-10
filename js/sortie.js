@@ -1,5 +1,4 @@
 // Résumé d'une sortie à partir d'un FIT décodé : ce qu'affiche la liste.
-import { valeursTrace } from './couleurs-trace.js';
 
 const SPORTS = {
   0: 'Activité', 1: 'Course à pied', 2: 'Vélo', 5: 'Natation', 10: 'Entraînement',
@@ -95,6 +94,5 @@ export function resumerSortie(fit, nomFichier) {
     nbPoints: recs.length,
     nbTours: fit.laps.length,
     trace: traceSimplifiee(recs),
-    traceValeurs: valeursTrace(recs),
   };
 }

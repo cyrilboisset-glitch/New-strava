@@ -3,8 +3,8 @@
 import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages } from './db.js';
 import { familleSortie } from './sortie.js';
 import { chargeSortie } from './analyse.js';
-import { lireProfil, calculerValeursTraceManquantes, calculerEstimationsManquantes, calculerEffortsManquants, reglerFtpAuto } from './profil.js';
-import { htmlCarteStatique, groupeTrace } from './carte-statique.js';
+import { lireProfil, calculerEstimationsManquantes, calculerEffortsManquants, reglerFtpAuto } from './profil.js';
+import { htmlCarteStatique } from './carte-statique.js';
 import { afficherDetail, fermerDetail } from './detail.js';
 import { afficherReglages } from './reglages.js';
 import { afficherProgres, htmlFiltres } from './progres.js';
@@ -13,7 +13,6 @@ import { afficherTraces, fermerTraces } from './traces.js';
 import { brancherCache } from './lieux.js';
 import { htmlMannequin, nettoyer as nettoyerMuscles, resumeMuscles } from './mannequin.js';
 import { iconeSport, iconeFamille } from './icones.js';
-import { MODES, MODE_DEFAUT, morceauxMode, modeDisponible } from './couleurs-trace.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
   importerFichiers, dossierPossible, choisirDossier, dossierMemorise,
@@ -21,7 +20,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.29.0 · tracé coloré, grande carte';
+export const VERSION_APPLI = '0.29.1 · couleurs du tracé dans le détail';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -49,38 +48,8 @@ function apercu(trace) {
   return htmlCarteStatique(trace);
 }
 
-// Grande carte de la liste : tracé coloré selon le mode choisi (puces sur la carte)
+// Grande carte de la liste (le tracé coloré est réservé au détail : plus léger)
 const CARTE_L = 360; const CARTE_H = 250;
-let modeTrace = MODE_DEFAUT;
-let contexteCouleurs = {};
-const sortiesAffichees = new Map();
-
-function morceauxPour(s) {
-  const v = s.traceValeurs;
-  if (!v || !s.trace?.length || modeTrace === 'uni') return null;
-  const col = v[modeTrace];
-  if (!col || col.length !== s.trace.length) return null;
-  return morceauxMode(v, modeTrace, contexteCouleurs);
-}
-
-function pucesTrace(s) {
-  return MODES.map((m) => {
-    const dispo = modeDisponible(s.traceValeurs, m.cle, contexteCouleurs);
-    return `<button type="button" class="puce-trace${m.cle === modeTrace ? ' on' : ''}${dispo ? '' : ' indispo'}" data-mode="${m.cle}" aria-pressed="${m.cle === modeTrace}">${m.nom}</button>`;
-  }).join('');
-}
-
-function recolorerListe() {
-  for (const a of el.liste.querySelectorAll('.sortie-grande')) {
-    const s = sortiesAffichees.get(a.dataset.id);
-    const g = a.querySelector('.trace-groupe');
-    if (s && g) g.outerHTML = groupeTrace(s.trace, CARTE_L, CARTE_H, morceauxPour(s));
-    for (const b of a.querySelectorAll('.puce-trace')) {
-      b.classList.toggle('on', b.dataset.mode === modeTrace);
-      b.setAttribute('aria-pressed', String(b.dataset.mode === modeTrace));
-    }
-  }
-}
 
 // ---- Liste -----------------------------------------------------------------
 
@@ -107,12 +76,10 @@ function carteSortie(s, profil, nbRecords = 0) {
       ${nbRecords ? coupeRecords(nbRecords) : ''}`;
   // avec un tracé : grande carte, titre posé dessus, puces pour colorer le tracé
   if (s.trace?.length > 1) {
-    sortiesAffichees.set(s.id, s);
     return `
   <a class="sortie sortie-grande" href="#sortie=${encodeURIComponent(s.id)}" data-id="${echapper(s.id)}">
     <div class="sortie-carte">
-      ${htmlCarteStatique(s.trace, { largeur: CARTE_L, hauteur: CARTE_H, morceaux: morceauxPour(s) })}
-      <div class="puces-trace" role="group" aria-label="Couleur du tracé">${pucesTrace(s)}</div>
+      ${htmlCarteStatique(s.trace, { largeur: CARTE_L, hauteur: CARTE_H })}
       <div class="sortie-voile sortie-entete">${entete}</div>
     </div>
     ${stats.length ? `<div class="stats">${stats.map(([l, v]) => `<div><span class="stat-label">${l}</span><span class="stat-val">${v}</span></div>`).join('')}</div>` : ''}
@@ -174,18 +141,6 @@ async function changerFiltre(cle) {
   try { await ecrireReglage('filtre', filtre); } catch { /* sans importance */ }
 }
 
-// Puces de la grande carte : changent la couleur du tracé de toutes les cartes (sans ouvrir la sortie)
-el.liste.addEventListener('click', async (e) => {
-  const b = e.target.closest('.puce-trace');
-  if (!b) return;
-  e.preventDefault();
-  e.stopPropagation();
-  if (b.dataset.mode === modeTrace) return;
-  modeTrace = b.dataset.mode;
-  recolorerListe();
-  try { await ecrireReglage('modeTrace', modeTrace); } catch { /* sans importance */ }
-});
-
 el.menuActivite.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-cle]');
   if (!b) return;
@@ -200,8 +155,6 @@ el.menuActivite.addEventListener('click', async (e) => {
 async function afficherListe() {
   const toutes = await toutesLesSorties();
   const profil = await lireProfil(toutes);
-  contexteCouleurs = { ftpW: profil.ftpW, fcMaxBpm: profil.fcMaxBpm };
-  sortiesAffichees.clear();
   const records = await recordsDesSorties().catch(() => new Map());
   el.vide.hidden = toutes.length > 0;
   afficherFiltres(toutes);
@@ -424,10 +377,6 @@ function chercherSegments() {
   mettreAJourPassages().then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
     .catch((e) => console.warn('Segments', e));
   // puissance estimée des sorties sans capteur, puis liste à jour (TSS)
-  // couleurs du tracé des sorties déjà importées : valeurs aux points de la trace (liste mise à jour au fur et à mesure)
-  calculerValeursTraceManquantes(() => { if (pageActuelle === 'sorties') afficherListe(); })
-    .then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
-    .catch((e) => console.warn('Couleurs du tracé', e));
   calculerEstimationsManquantes().then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
     .catch((e) => console.warn('Estimations', e));
   // efforts (meilleures puissances) des nouvelles sorties : records et FTP à jour après chaque sortie
@@ -629,7 +578,6 @@ function miseAJourAuto() {
 async function demarrer() {
   $('version').textContent = `v${VERSION_APPLI}`;
   try { filtre = (await lireReglage('filtre')) ?? 'tout'; } catch { /* filtre par défaut */ }
-  try { modeTrace = (await lireReglage('modeTrace')) ?? MODE_DEFAUT; } catch { /* mode par défaut */ }
   // pas de service worker pour le fichier unique ouvert depuis le téléphone (file://, content://)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) miseAJourAuto();
   await afficherListe();
