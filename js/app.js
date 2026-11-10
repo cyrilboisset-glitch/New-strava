@@ -1,6 +1,6 @@
 // Interface : carte de synchronisation + liste des sorties par mois, et
 // navigation vers le détail d'une sortie (#sortie=…) et les réglages (#reglages).
-import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages } from './db.js';
+import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages, versionBase } from './db.js';
 import { familleSortie } from './sortie.js';
 import { chargeSortie } from './analyse.js';
 import { lireProfil, calculerEstimationsManquantes, calculerEffortsManquants, reglerFtpAuto } from './profil.js';
@@ -20,7 +20,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.29.2 · icône Activité centrée';
+export const VERSION_APPLI = '0.30.0 · liste plus rapide';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -88,7 +88,7 @@ function carteSortie(s, profil, nbRecords = 0) {
   }
 
   return `
-  <a class="sortie" href="#sortie=${encodeURIComponent(s.id)}">
+  <a class="sortie" href="#sortie=${encodeURIComponent(s.id)}" data-id="${echapper(s.id)}">
     <div class="sortie-entete">
       ${entete}
     </div>
@@ -152,43 +152,130 @@ el.menuActivite.addEventListener('click', async (e) => {
   cascade(el.liste);
 });
 
-async function afficherListe() {
+// ---- Liste : par morceaux de 30, gardée en mémoire ------------------------------
+// - seules les sorties les plus récentes sont dessinées ; les suivantes arrivent en descendant ;
+// - la liste reste dans la page : revenir sur l'accueil est instantané si rien n'a changé ;
+// - les calculs en arrière-plan ne refont que les cartes dont le contenu a changé.
+const TAILLE_MORCEAU = 30;
+const liste = { version: -1, filtre: null, toutes: [], profil: null, records: new Map(), sorties: [], cumuls: new Map(), nAffiche: 0, cleDerniere: null, htmls: new Map() };
+let jetonListe = 0;
+let observateurListe = null;
+const suite = document.createElement('div');
+suite.id = 'liste-suite';
+suite.hidden = true;
+el.liste.after(suite);
+
+const cleMois = (debut) => { const d = new Date(debut); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+
+/** Lit les données et prépare sorties filtrées / triées et totaux par mois (rien n'est dessiné) */
+async function chargerListe() {
+  const version = versionBase(); // avant la lecture : une écriture pendant la lecture rend la liste « à refaire »
   const toutes = await toutesLesSorties();
   const profil = await lireProfil(toutes);
   const records = await recordsDesSorties().catch(() => new Map());
+  return { version, toutes, profil, records };
+}
+
+function appliquerDonnees({ version, toutes, profil, records }) {
   el.vide.hidden = toutes.length > 0;
-  afficherFiltres(toutes);
-  const sorties = toutes
-    .filter((s) => filtre === 'tout' || familleSortie(s).cle === filtre)
-    .sort((a, b) => b.debut - a.debut);
+  afficherFiltres(toutes); // peut remettre le filtre sur « tout »
+  Object.assign(liste, { version, toutes, profil, records, filtre });
+  liste.sorties = toutes.filter((s) => filtre === 'tout' || familleSortie(s).cle === filtre).sort((a, b) => b.debut - a.debut);
   const groupes = new Map();
-  for (const s of sorties) {
-    const d = new Date(s.debut);
-    const cle = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  for (const s of liste.sorties) {
+    const cle = cleMois(s.debut);
     if (!groupes.has(cle)) groupes.set(cle, []);
     groupes.get(cle).push(s);
   }
-  let html = '';
-  for (const [, liste] of groupes) {
-    const dist = liste.reduce((a, s) => a + (s.distanceM ?? 0), 0);
-    const temps = liste.reduce((a, s) => a + (s.dureeChronoS ?? 0), 0);
-    const dplus = liste.reduce((a, s) => a + (s.denivelePosM ?? 0), 0);
-    const n = liste.length;
-    html += `
+  liste.cumuls = new Map([...groupes].map(([cle, l]) => {
+    const dist = l.reduce((a, s) => a + (s.distanceM ?? 0), 0);
+    const temps = l.reduce((a, s) => a + (s.dureeChronoS ?? 0), 0);
+    const dplus = l.reduce((a, s) => a + (s.denivelePosM ?? 0), 0);
+    return [cle, { titre: majuscule(fmtMois.format(new Date(l[0].debut))), texte: [
+      `${l.length} sortie${l.length > 1 ? 's' : ''}`,
+      dist > 0 ? `${km(dist)} km` : '',
+      duree(temps).replace(/ /g, ' '),
+      dist > 0 ? `${nombre(dplus)} m D+` : '',
+    ].filter(Boolean).join(' · ') }];
+  }));
+}
+
+const carteListe = (s) => carteSortie(s, liste.profil, liste.records.get(s.id));
+
+/** Dessine les `n` sorties suivantes (ajoutées au dernier mois si elles en font partie) */
+function dessinerMorceau(n) {
+  const fin = Math.min(liste.sorties.length, liste.nAffiche + n);
+  const lot = liste.sorties.slice(liste.nAffiche, fin);
+  const suites = []; // suites de sorties du même mois
+  for (const s of lot) {
+    const cle = cleMois(s.debut);
+    const derniere = suites[suites.length - 1];
+    if (derniere?.cle === cle) derniere.l.push(s); else suites.push({ cle, l: [s] });
+  }
+  for (const { cle, l } of suites) {
+    const cartes = l.map((s) => { const h = carteListe(s); liste.htmls.set(s.id, h); return h; }).join('');
+    if (cle === liste.cleDerniere) { el.liste.lastElementChild.insertAdjacentHTML('beforeend', cartes); continue; }
+    const c = liste.cumuls.get(cle);
+    el.liste.insertAdjacentHTML('beforeend', `
     <section class="mois">
       <div class="mois-entete">
-        <h2 class="mois-titre">${majuscule(fmtMois.format(new Date(liste[0].debut)))}</h2>
-        <p class="mois-cumul">${[
-          `${n} sortie${n > 1 ? 's' : ''}`,
-          dist > 0 ? `${km(dist)} km` : '',
-          duree(temps).replace(/ /g, ' '),
-          dist > 0 ? `${nombre(dplus)} m D+` : '',
-        ].filter(Boolean).join(' · ')}</p>
+        <h2 class="mois-titre">${c.titre}</h2>
+        <p class="mois-cumul">${c.texte}</p>
       </div>
-      ${liste.map((s) => carteSortie(s, profil, records.get(s.id))).join('')}
-    </section>`;
+      ${cartes}
+    </section>`);
+    liste.cleDerniere = cle;
   }
-  el.liste.innerHTML = html;
+  liste.nAffiche = fin;
+  const reste = liste.sorties.length - fin;
+  suite.hidden = reste <= 0;
+  suite.textContent = reste > 0 ? `Encore ${nombre(reste)} sortie${reste > 1 ? 's' : ''}…` : '';
+  if (reste > 0 && observateurListe) { observateurListe.unobserve(suite); observateurListe.observe(suite); } // revérifie tout de suite
+}
+
+if ('IntersectionObserver' in window) {
+  observateurListe = new IntersectionObserver((entrees) => {
+    if (entrees.some((e) => e.isIntersecting) && liste.nAffiche < liste.sorties.length) dessinerMorceau(TAILLE_MORCEAU);
+  }, { rootMargin: '900px 0px' });
+  observateurListe.observe(suite);
+} else {
+  suite.addEventListener('click', () => dessinerMorceau(TAILLE_MORCEAU));
+}
+
+/** Refait toute la liste (nombre de sorties déjà affichées conservé pour garder la position) */
+async function afficherListe() {
+  const jeton = ++jetonListe;
+  const donnees = await chargerListe();
+  if (jeton !== jetonListe) return;
+  const memeFiltre = liste.filtre === filtre;
+  const dejaAffichees = liste.nAffiche;
+  appliquerDonnees(donnees);
+  el.liste.innerHTML = '';
+  liste.nAffiche = 0; liste.cleDerniere = null; liste.htmls.clear();
+  dessinerMorceau(Math.max(TAILLE_MORCEAU, memeFiltre ? dejaAffichees : 0));
+}
+
+/** La liste affichée correspond-elle encore aux données ? */
+const listeAJour = () => liste.version === versionBase() && liste.filtre === filtre;
+
+/** Mise à jour discrète (calculs en arrière-plan) : seules les cartes qui ont changé sont refaites */
+export async function rafraichirListe() {
+  const jeton = ++jetonListe;
+  const donnees = await chargerListe();
+  if (jeton !== jetonListe) return;
+  appliquerDonnees(donnees);
+  const cartes = [...el.liste.querySelectorAll('a.sortie[data-id]')];
+  const attendues = liste.sorties.slice(0, liste.nAffiche);
+  if (cartes.length !== attendues.length || attendues.some((s, i) => s.id !== cartes[i].dataset.id)) {
+    jetonListe--; // même numéro : la reconstruction prend la main
+    return afficherListe();
+  }
+  attendues.forEach((s, i) => {
+    const h = carteListe(s);
+    if (h === liste.htmls.get(s.id)) return;
+    liste.htmls.set(s.id, h);
+    cartes[i].outerHTML = h;
+  });
 }
 
 // ---- Carte de synchronisation ----------------------------------------------
@@ -374,10 +461,10 @@ el.champ.addEventListener('change', async () => {
 // Passages sur les segments : nouvelles sorties, ou recherche interrompue (en arrière-plan)
 function chercherSegments() {
   // records perso : la liste se met à jour quand l'analyse a trouvé des passages
-  mettreAJourPassages().then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
+  mettreAJourPassages().then((n) => { if (n && pageActuelle === 'sorties') rafraichirListe(); })
     .catch((e) => console.warn('Segments', e));
   // puissance estimée des sorties sans capteur, puis liste à jour (TSS)
-  calculerEstimationsManquantes().then((n) => { if (n && pageActuelle === 'sorties') afficherListe(); })
+  calculerEstimationsManquantes().then((n) => { if (n && pageActuelle === 'sorties') rafraichirListe(); })
     .catch((e) => console.warn('Estimations', e));
   // efforts (meilleures puissances) des nouvelles sorties : records et FTP à jour après chaque sortie
   // puis réglage automatique de la FTP (seulement à la hausse)
@@ -386,7 +473,7 @@ function chercherSegments() {
     .then((h) => {
       if (!h) return;
       toast(`FTP réglée automatiquement : ${h.avantW} → ${h.ftpW} W (meilleur 20 min du ${fmtJour.format(new Date(h.sortie.debut))}).`);
-      if (pageActuelle === 'sorties') afficherListe();
+      if (pageActuelle === 'sorties') rafraichirListe();
     })
     .catch((e) => console.warn('Efforts / FTP', e));
 }
@@ -549,7 +636,7 @@ async function afficherPage(page, id, avant, sens) {
     await afficherReglages(el.pageReglages, toast);
     remettreDefilement(defilement);
   } else if (avant !== 'sorties') {
-    await afficherListe(); // FTP, tri ou sorties ont pu changer ailleurs
+    if (!listeAJour()) await afficherListe(); // FTP, tri ou sorties ont pu changer ailleurs ; sinon la liste gardée est réaffichée telle quelle
     remettreDefilement(dejaVue ? defilement : (avant === 'detail' ? defilementListe : 0));
     animer(el.accueil, sens);
   }

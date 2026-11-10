@@ -10,6 +10,11 @@ const VERSION = 1;
 
 let promesseBase = null;
 
+// Augmente à chaque écriture (sorties ou réglages) : la liste gardée en mémoire
+// sait ainsi si elle doit être refaite en revenant sur l'accueil
+let versionDonnees = 0;
+export const versionBase = () => versionDonnees;
+
 export function ouvrirBase() {
   if (promesseBase) return promesseBase;
   promesseBase = new Promise((resoudre, rejeter) => {
@@ -51,6 +56,7 @@ export async function sortieExiste(id) {
 export async function enregistrerSortie(resume, octets, fichier = { format: 'fit', gzip: false }) {
   const db = await ouvrirBase();
   const tx = db.transaction(['sorties', 'fichiers'], 'readwrite');
+  versionDonnees++;
   tx.objectStore('sorties').put(resume);
   if (octets) tx.objectStore('fichiers').put({ id: resume.id, octets, ...fichier });
   return new Promise((resoudre, rejeter) => {
@@ -67,7 +73,7 @@ export async function completerSortie(id, maj) {
   const sortie = await requete(store.get(id));
   if (!sortie) return;
   const champs = maj(sortie);
-  if (champs && Object.keys(champs).length) await requete(store.put({ ...sortie, ...champs }));
+  if (champs && Object.keys(champs).length) { await requete(store.put({ ...sortie, ...champs })); versionDonnees++; }
 }
 
 // Mêmes champs changés sur plusieurs sorties, en une transaction
@@ -75,6 +81,7 @@ export async function mettreAJourSorties(ids, champs) {
   if (!ids.length) return;
   const db = await ouvrirBase();
   const tx = db.transaction('sorties', 'readwrite');
+  versionDonnees++;
   const store = tx.objectStore('sorties');
   for (const id of ids) {
     const r = store.get(id);
@@ -101,10 +108,12 @@ export async function lireReglage(cle) {
 }
 
 export async function ecrireReglage(cle, valeur) {
+  versionDonnees++;
   return requete((await magasin('reglages', 'readwrite')).put(valeur, cle));
 }
 
 export async function effacerReglage(cle) {
+  versionDonnees++;
   return requete((await magasin('reglages', 'readwrite')).delete(cle));
 }
 
