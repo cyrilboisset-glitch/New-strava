@@ -20,7 +20,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.27.0 · charte anthracite, tracés plein écran';
+export const VERSION_APPLI = '0.28.0 · menu Activité en icônes';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -30,7 +30,7 @@ const el = {
   titre: $('synchro-titre'), detail: $('synchro-detail'), pastille: $('pastille'),
   progression: $('progression'), btnDossier: $('btn-dossier'), btnSynchro: $('btn-synchro'),
   btnImporter: $('btn-importer'), champ: $('champ-fichier'),
-  btnChanger: $('btn-changer-dossier'), liste: $('liste'), choixActivite: $('choix-activite'), vide: $('vide'), toast: $('toast'),
+  btnChanger: $('btn-changer-dossier'), liste: $('liste'), btnActivite: $('btn-activite'), menuActivite: $('menu-activite'), vide: $('vide'), toast: $('toast'),
   btnMenuSynchro: $('btn-menu-synchro'), menuSynchro: $('menu-synchro'), synchroCourt: $('synchro-court'),
   accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'), pageProgres: $('page-progres'),
   pageSegment: $('page-segment'), pageTraces: $('page-traces'),
@@ -91,24 +91,46 @@ export function coupeRecords(n) {
 function afficherFiltres(toutes) {
   const { familles, choix } = htmlFiltres(toutes, filtre);
   if (filtre !== 'tout' && !familles.has(filtre)) { filtre = 'tout'; return afficherFiltres(toutes); }
-  el.choixActivite.innerHTML = choix.map((f) =>
-    `<option value="${echapper(f.cle)}"${f.cle === filtre ? ' selected' : ''}>${echapper(f.nom)} (${nombre(f.n)})</option>`).join('');
-  el.choixActivite.disabled = familles.size < 2;
+  // menu : une icône par activité (le nom et le nombre restent pour le lecteur d'écran)
+  el.menuActivite.innerHTML = choix.map((f) =>
+    `<button type="button" class="menu-icone-item${f.cle === filtre ? ' actif' : ''}" role="menuitemradio" aria-checked="${f.cle === filtre}" data-cle="${echapper(f.cle)}" aria-label="${echapper(f.nom)} (${nombre(f.n)})" title="${echapper(f.nom)}">${iconeFamille(f.cle, 26)}</button>`).join('');
+  el.btnActivite.disabled = familles.size < 2;
+  if (el.btnActivite.disabled) menuActivite(false);
   // bouton rond : icône de l'activité choisie, nom complet pour le lecteur d'écran
   $('icone-activite').innerHTML = iconeFamille(filtre, 24);
   const choisi = choix.find((f) => f.cle === filtre);
-  el.choixActivite.setAttribute('aria-label', `Type d'activité : ${choisi ? `${choisi.nom} (${choisi.n})` : 'Tout'}`);
-  el.choixActivite.closest('label').title = choisi ? `${choisi.nom} (${choisi.n})` : 'Tout';
+  el.btnActivite.setAttribute('aria-label', `Type d'activité : ${choisi ? `${choisi.nom} (${choisi.n})` : 'Tout'}`);
+  el.btnActivite.title = choisi ? choisi.nom : 'Tout';
 }
+
+let minuterieActivite;
+const activiteOuvert = () => el.btnActivite.getAttribute('aria-expanded') === 'true';
+function menuActivite(oui) {
+  clearTimeout(minuterieActivite);
+  el.btnActivite.setAttribute('aria-expanded', String(oui));
+  if (oui) {
+    el.menuActivite.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => el.menuActivite.classList.add('ouvert')));
+  } else {
+    el.menuActivite.classList.remove('ouvert');
+    minuterieActivite = setTimeout(() => { el.menuActivite.hidden = true; }, 200);
+  }
+}
+el.btnActivite.addEventListener('click', (e) => { e.stopPropagation(); if (!activiteOuvert()) ouvrirMenu(false); menuActivite(!activiteOuvert()); });
+document.addEventListener('click', (e) => { if (activiteOuvert() && !e.target.closest('.menu-activite')) menuActivite(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && activiteOuvert()) { menuActivite(false); el.btnActivite.focus(); } });
 
 async function changerFiltre(cle) {
   filtre = cle;
   try { await ecrireReglage('filtre', filtre); } catch { /* sans importance */ }
 }
 
-el.choixActivite.addEventListener('change', async () => {
-  if (el.choixActivite.value === filtre) return;
-  await changerFiltre(el.choixActivite.value);
+el.menuActivite.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-cle]');
+  if (!b) return;
+  menuActivite(false);
+  if (b.dataset.cle === filtre) return;
+  await changerFiltre(b.dataset.cle);
   await afficherListe();
   window.scrollTo({ top: 0, behavior: mouvementReduit() ? 'auto' : 'smooth' });
   cascade(el.liste);
@@ -200,7 +222,7 @@ function ouvrirMenu(oui) {
   }
 }
 const menuOuvert = () => el.btnMenuSynchro.getAttribute('aria-expanded') === 'true';
-el.btnMenuSynchro.addEventListener('click', (e) => { e.stopPropagation(); ouvrirMenu(!menuOuvert()); });
+el.btnMenuSynchro.addEventListener('click', (e) => { e.stopPropagation(); if (activiteOuvert()) menuActivite(false); ouvrirMenu(!menuOuvert()); });
 el.menuSynchro.addEventListener('click', (e) => { if (e.target.closest('.menu-item')) ouvrirMenu(false); });
 document.addEventListener('click', (e) => { if (menuOuvert() && !e.target.closest('.menu')) ouvrirMenu(false); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOuvert()) { ouvrirMenu(false); el.btnMenuSynchro.focus(); } });
