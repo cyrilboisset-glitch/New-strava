@@ -2,6 +2,7 @@
 import { lireReglage, ecrireReglage, toutesLesSorties, lireFichier, completerSortie } from './db.js';
 import { decoderFichier } from './fichier.js';
 import { pointsDetail, parSeconde, meilleursEfforts, estimerFtp, JOURS_ESTIMATION_FTP, VERSION_EFFORTS, puissanceNormalisee } from './analyse.js';
+import { valeursTrace, VERSION_VALEURS_TRACE } from './couleurs-trace.js';
 import { estimerPuissance, estimationPossible, VERSION_ESTIMATION } from './puissance-estimee.js';
 
 export const FTP_DEFAUT_W = 236; // valeur du BiNavi (zones_target) au 12 oct. 2026
@@ -120,6 +121,32 @@ export function calculerEstimationsManquantes() {
     })().finally(() => { estimationsEnCours = null; });
   }
   return estimationsEnCours;
+}
+
+let valeursEnCours = null;
+/**
+ * Valeurs de la trace (vitesse, puissance, FC, pente, altitude aux ~160 points de la liste)
+ * des sorties importées avant la couleur du tracé. En arrière-plan ; un seul calcul à la fois.
+ * @param {(fait: number, total: number) => void} progression
+ */
+export function calculerValeursTraceManquantes(progression = () => {}) {
+  if (!valeursEnCours) {
+    valeursEnCours = (async () => {
+      const aFaire = (await toutesLesSorties()).filter((s) => s.trace?.length > 1 && s.traceValeurs?.v !== VERSION_VALEURS_TRACE);
+      let fait = 0;
+      for (const s of aFaire) {
+        let valeurs = null;
+        try {
+          const f = await lireFichier(s.id);
+          if (f) valeurs = valeursTrace((await decoderFichier(f)).records);
+        } catch (e) { console.warn('Valeurs de la trace impossibles', s.id, e); }
+        await completerSortie(s.id, () => ({ traceValeurs: valeurs ?? { v: VERSION_VALEURS_TRACE } }));
+        if (++fait % 100 === 0) progression(fait, aFaire.length);
+      }
+      return aFaire.length;
+    })().finally(() => { valeursEnCours = null; });
+  }
+  return valeursEnCours;
 }
 
 export async function calculerEffortsManquants(sorties, progression = () => {}) {

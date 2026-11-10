@@ -45,11 +45,28 @@ export function tuiles({ z, x0, y0 }, L, H) {
   return res;
 }
 
+const chemin = (points) => points.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
+
+/**
+ * Tracé en SVG : d'une seule couleur, ou en morceaux colorés (voir couleurs-trace.js)
+ * sur un contour blanc. `morceaux` : [{ i0, i1, couleur }] (indices des points).
+ */
+export function htmlTrace(points, morceaux = null) {
+  if (!morceaux?.length || morceaux[morceaux.length - 1].i1 >= points.length) return `<g class="trace-groupe"><path class="apercu-trace" d="${chemin(points)}"/></g>`;
+  return `<g class="trace-groupe"><path class="apercu-contour" d="${chemin(points)}"/>${morceaux.map((m) =>
+    `<path class="apercu-morceau" stroke="${m.couleur}" d="${chemin(points.slice(m.i0, m.i1 + 1))}"/>`).join('')}</g>`;
+}
+
+/** Le tracé seul (pour le recolorer sans refaire la carte) */
+export function groupeTrace(trace, L, H, morceaux = null) {
+  return htmlTrace(cadrer(trace, L, H).points, morceaux);
+}
+
 /**
  * HTML de l'aperçu : tuiles + tracé (départ vert, arrivée foncée).
  * @param {[lat, lon][]} trace
  */
-export function htmlCarteStatique(trace, { largeur = 320, hauteur = 150, classe = '' } = {}) {
+export function htmlCarteStatique(trace, { largeur = 320, hauteur = 150, classe = '', morceaux = null } = {}) {
   if (!trace || trace.length < 2) return '';
   const L = largeur; const H = hauteur;
   const cadre = cadrer(trace, L, H);
@@ -57,11 +74,10 @@ export function htmlCarteStatique(trace, { largeur = 320, hauteur = 150, classe 
   const imgs = tuiles(cadre, L, H).map((t) =>
     `<img class="tuile" src="https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png" alt="" loading="lazy" decoding="async"
       style="left:${pct(t.gauche, L)};top:${pct(t.haut, H)};width:${pct(TUILE, L)};height:${pct(TUILE, H)}" onerror="this.remove()">`).join('');
-  const d = cadre.points.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
   const [a, b] = [cadre.points[0], cadre.points[cadre.points.length - 1]];
   return `<div class="apercu carte-fond ${classe}" style="aspect-ratio:${L}/${H}">
     <div class="tuiles" aria-hidden="true">${imgs}</div>
-    <svg viewBox="0 0 ${L} ${H}" aria-hidden="true"><path class="apercu-trace" d="${d}"/>
+    <svg viewBox="0 0 ${L} ${H}" aria-hidden="true">${htmlTrace(cadre.points, morceaux)}
       <circle class="apercu-depart" cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="4.5"/>
       <circle class="apercu-arrivee" cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="4.5"/></svg>
     <span class="attribution">© OpenStreetMap</span></div>`;
