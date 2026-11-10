@@ -15,6 +15,7 @@ import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue, htmlRepli, suivreReplis } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './carte-statique.js';
+import { htmlBlocMuscles, installerMuscles, avecMuscles, nettoyer as nettoyerMuscles } from './mannequin.js';
 import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties } from './segments.js';
 import { records, ftpApresSortie } from './stats.js';
 import { htmlCourbePuissance, RECORDS_AFFICHES } from './progres.js';
@@ -464,6 +465,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
   </div>
   <div class="carte-parcours" id="carte-parcours" role="img" aria-label="Carte du parcours"${modeVue === '3d' ? ' hidden' : ''}></div>
   <div class="vue3d" id="vue3d"${modeVue === '3d' ? '' : ' hidden'}></div>` : ''}
+  ${avecMuscles(familleSortie(s)) ? `<section class="carte bloc" id="bloc-muscles">${htmlBlocMuscles(s, htmlRepli, familleSortie(s).cle === 'musculation' && !Object.keys(nettoyerMuscles(s.muscles)).length)}</section>` : ''}
   ${grilleChiffres(s, charge, pts, estimee)}
   ${courbes.html}
   ${avecGps ? '<section class="carte bloc" id="bloc-segments-sortie"></section>' : ''}
@@ -540,6 +542,12 @@ export async function afficherDetail(page, id, toast = () => {}) {
   });
   // Image à partager sur les réseaux (format, photos de la sortie, carte, chiffres, nom de l'appli)
   installerImageSortie(page, { s, pts, nbRecords, estimee, toast });
+  // Mannequin : muscles travaillés (musculation, entraînement…)
+  const blocMuscles = page.querySelector('#bloc-muscles');
+  if (blocMuscles) {
+    suivreReplis(blocMuscles);
+    installerMuscles(blocMuscles.querySelector('.muscles-contenu'), s, toast);
+  }
   page.querySelector('#choix-velo')?.addEventListener('change', async (e) => {
     await completerSortie(s.id, () => ({ veloId: e.target.value || null }));
   });

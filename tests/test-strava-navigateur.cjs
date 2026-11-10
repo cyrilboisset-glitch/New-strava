@@ -806,6 +806,49 @@ async function texteToast(page) {
   await page.screenshot({ path: path.join(CAPTURES, 'strava-3-tri-musculation.png') });
   verif('pas de défilement horizontal avec les boutons', !(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)));
 
+  // Mannequin : choix des muscles de la séance de musculation
+  await page.click('a.sortie');
+  await page.waitForSelector('#bloc-muscles .mannequin.interactif');
+  verif('mannequin : menu ouvert d\'office (musculation sans muscles), résumé « À choisir »', await page.$eval('#bloc-muscles details', (d) => d.open)
+    && (await page.textContent('#bloc-muscles summary')).includes('À choisir'));
+  verif('mannequin : face et dos', (await page.$$('#bloc-muscles svg.mq')).length === 2);
+  const zoneMq = (m) => `#bloc-muscles .mz[data-m="${m}"]`;
+  await page.dispatchEvent(`${zoneMq('pecs')} path`, 'click');
+  verif('1er toucher : pectoraux principal (rouge)', (await page.getAttribute(zoneMq('pecs'), 'data-etat')) === 'p');
+  const rouge = await page.$eval(`${zoneMq('pecs')} path`, (p) => getComputedStyle(p).fill);
+  verif('pectoraux en rouge #d9453d', rouge === 'rgb(217, 69, 61)', rouge);
+  await page.dispatchEvent(`${zoneMq('triceps')} path`, 'click');
+  await page.dispatchEvent(`${zoneMq('triceps')} path`, 'click');
+  const orange = await page.$eval(`${zoneMq('triceps')} path`, (p) => getComputedStyle(p).fill);
+  verif('2 touchers : triceps secondaire (orange #f2b035)', (await page.getAttribute(zoneMq('triceps'), 'data-etat')) === 's' && orange === 'rgb(242, 176, 53)', orange);
+  await page.dispatchEvent(`${zoneMq('epaules')} path`, 'click');
+  verif('épaules : même zone sur la face et sur le dos', (await page.$$eval(zoneMq('epaules'), (g) => g.map((x) => x.dataset.etat))).join() === 'p,p');
+  await page.dispatchEvent(`${zoneMq('epaules')} >> nth=0 >> path >> nth=0`, 'click');
+  await page.dispatchEvent(`${zoneMq('epaules')} >> nth=0 >> path >> nth=0`, 'click');
+  verif('3e toucher : épaules effacées', (await page.getAttribute(zoneMq('epaules') + ' >> nth=0', 'data-etat')) === null);
+  const resume = (await page.textContent('#bloc-muscles .mq-resume')).replace(/\s+/g, ' ');
+  verif('résumé écrit sous le mannequin', resume === 'Principaux : Pectoraux · Secondaires : Triceps', resume);
+  verif('résumé du menu : 2 zones', (await page.textContent('#bloc-muscles summary')).includes('2 zones'));
+  await page.locator('#bloc-muscles').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.locator('#bloc-muscles').screenshot({ path: path.join(CAPTURES, 'mannequin.png') });
+  await page.click('#btn-retour');
+  await page.waitForSelector('a.sortie .sortie-muscles .mannequin.mini');
+  verif('liste : petit mannequin sur la carte de la séance', (await page.getAttribute('a.sortie .sortie-muscles', 'title')) === 'Principaux : Pectoraux · Secondaires : Triceps');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.waitForTimeout(400);
+  await page.locator('a.sortie').first().screenshot({ path: path.join(CAPTURES, 'mannequin-liste.png') });
+  await page.reload();
+  await page.waitForSelector('a.sortie .sortie-muscles');
+  await page.click('a.sortie');
+  verif('menu replié quand des muscles sont déjà choisis, résumé « 2 zones »', await page.waitForFunction(() => document.querySelector('#bloc-muscles details') && !document.querySelector('#bloc-muscles details').open
+    && document.querySelector('#bloc-muscles summary').textContent.includes('2 zones')).then(() => true));
+  await ouvrirRepli(page, '#bloc-muscles');
+  verif('muscles gardés après réouverture', (await page.getAttribute('#bloc-muscles .mz[data-m="pecs"]', 'data-etat')) === 'p'
+    && (await page.getAttribute('#bloc-muscles .mz[data-m="triceps"]', 'data-etat')) === 's');
+  await page.click('#btn-retour');
+  await page.waitForSelector('a.sortie');
+
   // 5. Musculation importée par la v0.2 comme « Entraînement » : un réimport la corrige
   await page.evaluate(async () => {
     const req = indexedDB.open('mes-sorties', 1);
