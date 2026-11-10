@@ -1,0 +1,13 @@
+# Met l'appli en ligne avec GitLab Pages (adresse : <groupe>.gitlab.io/<projet>)
+# L'appli est faite de fichiers simples : on les copie tels quels dans « public ».
+pages:
+  stage: deploy
+  image: alpine:3.20
+  script:
+    - mkdir public
+    - cp -r index.html sw.js manifest.webmanifest css js icons fonts vendor public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
