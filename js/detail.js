@@ -258,6 +258,51 @@ function installerCurseur(page, pts, axe, series, marqueur, vers3d) {
   return { placerIndex };
 }
 
+// ---- Titre : nom de la sortie, modifiable (icône crayon) ------------------------------
+
+const ICONE_CRAYON = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z M14 7l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function htmlTitre(s, nbRecords) {
+  return `<h2 class="detail-nom">${echapper(s.nom || s.nomSport)}${nbRecords ? ` <span class="coupe-pr grande" title="${nbRecords} record${nbRecords > 1 ? 's' : ''} perso sur des segments">🏆<b>${nbRecords}</b></span>` : ''}</h2>
+    <button class="icone-btn petit bouton-renommer" type="button" data-renommer="ouvrir" aria-label="Renommer la sortie" title="Renommer">${ICONE_CRAYON}</button>`;
+}
+
+const htmlDate = (s, d) => `${majuscule(fmtJourLong.format(d))} · ${fmtHeure.format(d)}${s.nom ? ` · ${echapper(s.nomSport)}` : ''}`;
+
+function htmlFormulaireNom(s) {
+  return `<form class="renommer" data-renommer="formulaire">
+    <input name="nom" type="text" maxlength="80" value="${echapper(s.nom || '')}" placeholder="${echapper(s.nomSport)}" aria-label="Nom de la sortie" autocomplete="off" enterkeyhint="done">
+    <button class="icone-btn petit valider" type="submit" aria-label="Enregistrer le nom" title="Enregistrer"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="icone-btn petit" type="button" data-renommer="annuler" aria-label="Annuler" title="Annuler"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+  </form>`;
+}
+
+// Nom vide = on revient au nom du sport (Vélo, Marche…)
+function installerRenommer(page, s, d, nbRecords, toast) {
+  const zone = page.querySelector('.detail-titre');
+  const date = page.querySelector('.detail-date');
+  const rendre = () => { zone.innerHTML = htmlTitre(s, nbRecords); date.innerHTML = htmlDate(s, d); };
+  zone.onclick = (e) => {
+    const a = e.target.closest('[data-renommer]')?.dataset.renommer;
+    if (a === 'ouvrir') {
+      zone.innerHTML = htmlFormulaireNom(s);
+      const champ = zone.querySelector('input');
+      champ.focus(); champ.select();
+    } else if (a === 'annuler') rendre();
+  };
+  zone.onkeydown = (e) => { if (e.key === 'Escape' && zone.querySelector('form')) { e.preventDefault(); rendre(); } };
+  zone.onsubmit = async (e) => {
+    e.preventDefault();
+    const nom = zone.querySelector('input').value.replace(/\s+/g, ' ').trim();
+    try {
+      await completerSortie(s.id, () => ({ nom }));
+      s.nom = nom;
+      toast(nom ? 'Nom enregistré.' : `Nom retiré : « ${s.nomSport} ».`);
+    } catch (err) { console.error(err); toast('Nom non enregistré.'); }
+    rendre();
+  };
+}
+
 // ---- Carte -----------------------------------------------------------------------
 
 // Couleur du tracé : valeurs pour chaque point de la ligne dessinée
@@ -474,8 +519,8 @@ export async function afficherDetail(page, id, toast = () => {}) {
 
   page.innerHTML = `
   <section class="detail-entete">
-    <h2 class="detail-nom">${echapper(s.nom || s.nomSport)}${nbRecords ? ` <span class="coupe-pr grande" title="${nbRecords} record${nbRecords > 1 ? 's' : ''} perso sur des segments">🏆<b>${nbRecords}</b></span>` : ''}</h2>
-    <p class="detail-date">${majuscule(fmtJourLong.format(d))} · ${fmtHeure.format(d)}${s.nom ? ` · ${echapper(s.nomSport)}` : ''}</p>
+    <div class="detail-titre">${htmlTitre(s, nbRecords)}</div>
+    <p class="detail-date">${htmlDate(s, d)}</p>
     <div class="chiffres grands">
       ${s.distanceM ? `<span class="chiffre">${km(s.distanceM)}<small>km</small></span>` : ''}
       ${s.dureeChronoS != null ? `<span class="chiffre">${duree(s.dureeChronoS)}</span>` : ''}
@@ -508,6 +553,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
     <button class="btn secondaire" type="button" data-export="partager">Partager le GPX</button>
   </div>` : ''}`;
 
+  installerRenommer(page, s, d, nbRecords, toast);
   let marqueur = null;
   if (avecGps) {
     const ctxCouleurs = { ftpW: profil.ftpW, fcMaxBpm: profil.fcMaxBpm };

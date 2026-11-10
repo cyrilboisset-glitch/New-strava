@@ -918,3 +918,16 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .anneau-fait, .anneau-attendu { animation: anneau-remplit 1s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .anneau-attendu { animation-delay: 0.15s; }
 @media (prefers-reduced-motion: reduce) { .anneau-fait, .anneau-attendu { animation: none; } }
+
+/* ---- Détail : nom de la sortie avec icône crayon ---- */
+.detail-titre { display: flex; align-items: flex-start; gap: 10px; }
+.detail-titre .detail-nom { flex: 1; min-width: 0; }
+.icone-btn.petit { width: 36px; height: 36px; flex: none; color: var(--texte-2); }
+.bouton-renommer { margin-top: -2px; }
+.renommer { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.renommer input {
+  flex: 1; min-width: 0; height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--accent-trait);
+  background: var(--surface-2); color: var(--texte); font: 600 17px system-ui, sans-serif;
+}
+.renommer input:focus { outline: 2px solid color-mix(in srgb, var(--accent-trait) 45%, transparent); outline-offset: 1px; }
+.icone-btn.valider { background: var(--accent); color: var(--accent-texte); border-color: transparent; }
