@@ -859,14 +859,12 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .sortie-grande > .stats { margin: 12px 16px 0; }
 .sortie-grande > .effort { margin: 8px 16px 0; }
 .sortie-grande > :last-child { margin-bottom: 14px; }
-.puces-trace { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 2; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 2px 6px; }
+.puces-trace { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 2px 6px; }
 .puces-trace::-webkit-scrollbar { display: none; }
 .puce-trace {
   flex: none; padding: 6px 11px; border-radius: 999px; border: 0; cursor: pointer; font-size: 12px; font-weight: 700;
-  background: rgb(255 255 255 / 93%); color: #2a2f38; box-shadow: 0 2px 6px rgb(0 0 0 / 28%);
-  -webkit-tap-highlight-color: transparent;
+  background: var(--surface-2); color: var(--texte); -webkit-tap-highlight-color: transparent;
 }
-.puce-trace.on { background: var(--accent); color: var(--accent-texte); }
 .puce-trace.indispo:not(.on) { opacity: 0.55; }
 .apercu-contour { fill: none; stroke: #fff; stroke-width: 6.5; stroke-linejoin: round; stroke-linecap: round; }
 .apercu-morceau { fill: none; stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
@@ -874,7 +872,6 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .carte-fond .apercu-morceau { stroke-width: 4; }
 /* Détail : puces et légende sous la carte */
 .couleurs-carte { margin: 8px 0 0; }
-.couleurs-carte .puces-trace { position: static; padding: 0 0 6px; }
 .couleurs-carte .puce-trace { background: var(--surface-2); color: var(--texte); box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent), 0 2px 5px rgb(0 0 0 / 20%); }
 .couleurs-carte .puce-trace.on { background: var(--accent); color: var(--accent-texte); }
 .legende-trace { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--texte-2); min-height: 22px; }

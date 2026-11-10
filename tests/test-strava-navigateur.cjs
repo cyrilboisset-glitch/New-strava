@@ -800,31 +800,12 @@ async function texteToast(page) {
   verif('totaux du mois de mars sans la musculation', cumuls[2] === '1 sortie · 25,0 km · 59 min · 0 m D+', JSON.stringify(cumuls));
   verif('totaux de février sans la marche', cumuls[3] === '1 sortie · 0,1 km · 1 min · 0 m D+', JSON.stringify(cumuls));
   await page.screenshot({ path: path.join(CAPTURES, 'strava-2-tri-velo.png') });
-  // Grande carte avec tracé coloré : puces Uni / Puissance / Vitesse / FC / Pente / Altitude
+  // Grande carte de la liste : titre dessus, tracé d'une seule couleur (les couleurs sont dans le détail : plus léger)
   const cartePuissance = page.locator('.sortie-grande', { hasText: 'Sortie du matin' });
-  verif('grande carte : titre sur la carte, 6 puces, tracé en morceaux colorés (puissance)', (await cartePuissance.locator('.sortie-carte .sortie-nom').count()) === 1
-    && (await cartePuissance.locator('.puce-trace').count()) === 6 && (await cartePuissance.locator('.apercu-morceau').count()) > 0
-    && (await cartePuissance.locator('.puce-trace.on').textContent()) === 'Puissance');
-  const hashAvant = await page.evaluate(() => location.hash);
-  const couleursPuissance = await cartePuissance.locator('.apercu-morceau').evaluateAll((els) => els.map((e) => e.getAttribute('stroke')).join());
-  await cartePuissance.locator('.puce-trace[data-mode="pente"]').click();
-  const couleursVitesse = await cartePuissance.locator('.apercu-morceau').evaluateAll((els) => els.map((e) => e.getAttribute('stroke')).join());
-  verif('puce Pente : couleurs changées, sortie non ouverte, choix gardé', couleursVitesse !== couleursPuissance && (await page.evaluate(() => location.hash)) === hashAvant
-    && (await page.evaluate(async () => (await (await import('./js/db.js')).lireReglage('modeTrace')))) === 'pente');
-  await page.locator('.puce-trace[data-mode="uni"]').first().click();
-  verif('puce Uni : tracé d\'une couleur', (await page.locator('.sortie-grande .apercu-morceau').count()) === 0 && (await page.locator('.sortie-grande .apercu-trace').count()) > 0);
-  await page.locator('.puce-trace[data-mode="puissance"]').first().click();
+  verif('grande carte : titre sur la carte, pas de puces ni de couleurs dans la liste', (await cartePuissance.locator('.sortie-carte .sortie-nom').count()) === 1
+    && (await page.locator('#liste .puce-trace').count()) === 0 && (await page.locator('.sortie-grande .apercu-morceau').count()) === 0
+    && (await cartePuissance.locator('.apercu-trace').count()) === 1);
   await page.screenshot({ path: path.join(CAPTURES, 'liste-grande-carte.png') });
-  // Sorties importées avant cette version : valeurs de la trace recalculées en arrière-plan depuis le fichier
-  const rattrape = await page.evaluate(async () => {
-    const db = await import('./js/db.js'); const pr = await import('./js/profil.js');
-    const [s] = (await db.toutesLesSorties()).filter((x) => x.nom === 'Sortie du matin' || x.trace?.length > 1 && x.puissanceNormW);
-    await db.completerSortie(s.id, () => ({ traceValeurs: undefined }));
-    const n = await pr.calculerValeursTraceManquantes();
-    const apres = await db.lireSortie(s.id);
-    return { n, puissance: apres.traceValeurs?.puissance?.length, trace: apres.trace.length };
-  });
-  verif('anciennes sorties : valeurs de la trace recalculées en arrière-plan', rattrape.n >= 1 && rattrape.puissance === rattrape.trace, JSON.stringify(rattrape));
   // Détail : mêmes puces sous la carte, légende des zones de puissance
   await cartePuissance.locator('.sortie-nom').click();
   await page.waitForSelector('#couleurs-carte .puce-trace');
