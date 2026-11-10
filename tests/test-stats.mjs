@@ -96,5 +96,20 @@ egal('FTP : départ = FTP estimée au début du mois (220 W -> 209 W)', avanceme
 egal('FTP après chaque sortie : 209 W le 20 oct., 238 W le 3 nov., toujours 238 W le 5 nov. (240 W < 250 W)',
   [ftpApresSortie(avant[5], avant).ftpW, ftpApresSortie(so[0], avant).ftpW, ftpApresSortie(so[1], avant).ftpW], [209, 238, 238]);
 
+// Musculation : séances et temps (la liste donnée ne contient que les séances)
+const muscu = [
+  { debut: new Date(2026, 10, 2, 18).getTime(), dureeChronoS: 2100 }, // 35 min, lundi
+  { debut: new Date(2026, 10, 4, 18).getTime(), dureeChronoS: 1800 }, // 30 min, mercredi
+  { debut: new Date(2026, 9, 28, 18).getTime(), dureeChronoS: 3600 }, // octobre
+  { debut: new Date(2026, 10, 6, 18).getTime(), dureeChronoS: 3600 }, // pas encore faite
+];
+const ms = avancementObjectif({ type: 'seances', periode: 'semaine', cible: 3 }, muscu, jeudi);
+egal('séances de la semaine : 2 faites sur 3, 1,5 attendues à mi-semaine, reste 1', [ms.fait, ms.attendu, ms.reste, Math.round(ms.part * 100)], [2, 1.5, 1, 67]);
+const mm = avancementObjectif({ type: 'seances', periode: 'mois', cible: 10 }, muscu, jeudi);
+egal('séances du mois : 2 en novembre (pas celle d\'octobre)', mm.fait, 2);
+const mt = avancementObjectif({ type: 'tempsmuscu', periode: 'semaine', cible: 2 }, muscu, jeudi);
+proche('temps de muscu de la semaine : 65 min = 1,083 h sur 2 h', mt.fait, 65 / 60, 0.001);
+egal('temps de muscu : 54 % de l\'objectif, 1 h attendue à mi-semaine', [Math.round(mt.part * 100), mt.attendu], [54, 1]);
+
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);

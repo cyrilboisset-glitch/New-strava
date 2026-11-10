@@ -405,6 +405,48 @@ async function texteToast(page) {
   await page.click('#bloc-objectifs .objectif:nth-of-type(2) [data-obj="supprimer"]');
   await page.waitForFunction(() => document.querySelectorAll('#bloc-objectifs .objectif').length === 1);
   verif('objectif FTP supprimé', !(await page.textContent('#bloc-objectifs')).includes('260 W'));
+  // Musculation dans les objectifs : séances et temps
+  await page.click('#bloc-objectifs [data-obj="ajouter"]');
+  await page.selectOption('.objectif-form select[name="type"]', 'seances');
+  verif('unité « séances » pour l\'objectif de séances', (await page.textContent('.objectif-form .unite-objectif')) === 'séances');
+  await page.selectOption('.objectif-form select[name="periode"]', 'mois');
+  await page.fill('.objectif-form input[name="cible"]', '8');
+  await page.click('.objectif-form button[type="submit"]');
+  await page.waitForFunction(() => document.querySelectorAll('#bloc-objectifs .objectif').length === 2);
+  await page.click('#bloc-objectifs [data-obj="ajouter"]');
+  await page.selectOption('.objectif-form select[name="type"]', 'tempsmuscu');
+  verif('unité « h » pour le temps de musculation', (await page.textContent('.objectif-form .unite-objectif')) === 'h');
+  await page.selectOption('.objectif-form select[name="periode"]', 'semaine');
+  await page.fill('.objectif-form input[name="cible"]', '2.5');
+  await page.click('.objectif-form button[type="submit"]');
+  await page.waitForFunction(() => document.querySelectorAll('#bloc-objectifs .objectif').length === 3);
+  const muscuTxt = (await page.textContent('#bloc-objectifs')).replace(/\s+/g, ' ');
+  verif('Progrès : séances (Objectif : 8 séances) et temps (Objectif : 2 h 30) de musculation', muscuTxt.includes('Séances de muscu') && muscuTxt.includes('Objectif : 8 séances') && muscuTxt.includes('Temps de muscu') && muscuTxt.includes('Objectif : 2 h 30'), muscuTxt.slice(0, 400));
+  // Accueil : bandeau des objectifs en anneaux, à faire glisser, anneaux qui se remplissent
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.waitForSelector('#objectifs-rail .objectif-mini');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  const bandeau = await page.evaluate(() => {
+    const r = document.getElementById('objectifs-rail');
+    const rails = r.getBoundingClientRect(); const premier = document.querySelector('#liste .mois')?.getBoundingClientRect();
+    return { n: r.querySelectorAll('.objectif-mini').length, glisse: r.scrollWidth > r.clientWidth, enHaut: rails.bottom <= (premier?.top ?? 1e9),
+      anim: getComputedStyle(r.querySelector('.anneau-attendu') ?? r.querySelector('.anneau-fond')).animationName, texte: r.textContent.replace(/\s+/g, ' ') };
+  });
+  verif('accueil : 3 anneaux au-dessus de la liste, à faire glisser (trop larges pour l\'écran)', bandeau.n === 3 && bandeau.glisse && bandeau.enHaut, JSON.stringify(bandeau));
+  verif('accueil : Distance, Séances (muscu · mois), Temps (muscu · semaine) + « 8 séances », « 2 h 30 »', ['Distance', 'Séances', 'muscu · mois', 'Temps', 'muscu · semaine', '/ 8 séances', '/ 2 h 30'].every((t) => bandeau.texte.includes(t)), bandeau.texte);
+  verif('accueil : les anneaux se remplissent (animation)', bandeau.anim === 'anneau-remplit', bandeau.anim);
+  await page.screenshot({ path: path.join(CAPTURES, 'accueil-objectifs.png') });
+  await page.click('#onglet-progres');
+  await page.waitForSelector('#bloc-objectifs');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  // retour à une seule ligne d'objectifs pour la suite des tests
+  for (const _ of [1, 2]) {
+    page.once('dialog', (d) => d.accept());
+    await page.click('#bloc-objectifs .objectif:last-of-type [data-obj="supprimer"]');
+    await page.waitForTimeout(250);
+  }
+  await page.waitForFunction(() => document.querySelectorAll('#bloc-objectifs .objectif').length === 1);
   // On retire la sortie « bis » (et son passage) : la suite du test compte les sorties de l'archive
   await page.evaluate(async () => {
     const db = await (await import('./js/db.js')).ouvrirBase();
