@@ -506,6 +506,19 @@ l'instant »** — à proposer quand il voudra :
   s'ouvre et reste ouvert (le clic qui suit est ignoré : `ignorerClicBouton`, avec un jeton
   pour qu'une minuterie ancienne ne touche pas au geste suivant). Glissé puis relâché dans le
   vide : menu refermé. Clavier (Entrée) : bascule comme avant.
+- **v0.36.0 (10 nov. 2026)**, demandes de Cyril : 1) menu Activité : lignes plus grandes (56 px,
+  panneau 68 px, icônes 30) et le nom se déroule plus loin du doigt (texte 18 px, marge de 30 px
+  entre le texte et l'icône, où est le pouce) ; 2) **carte en plein écran** dans le détail :
+  bouton (coins) en haut à droite de la carte Leaflet (`.controle-plein`, contrôle Leaflet) ->
+  `#carte-parcours.plein-ecran` (fixe, `!important` car Leaflet pose `position: relative` en
+  ligne) + calque `.plein-couches` : croix, puces de couleur du tracé (Uni · Puissance · Vitesse ·
+  FC · Pente · Altitude, même réglage `modeTrace` que sous la carte) et légende en haut ;
+  en bas, valeurs en incrustation : de toute la sortie (distance, temps, vitesse / puissance /
+  FC moyennes, D+) ou, en touchant le tracé (à ≤ 44 px), au point touché (km, vitesse, puissance,
+  FC, pente, altitude ; la tuile de la couleur choisie est encadrée). Pincer pour zoomer (zoom
+  +/- caché) ; l'attribution OSM reste visible sous la carte des valeurs. Fermer : croix, Échap
+  ou bouton retour d'Android (`history.pushState({plein: true})` + `popstate`). Code :
+  `installerPleinEcran` dans detail.js.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

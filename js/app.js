@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.35.0 · menu Activité en un seul geste';
+export const VERSION_APPLI = '0.36.0 · carte plein écran';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -110,7 +110,7 @@ function afficherFiltres(toutes) {
   if (filtre !== 'tout' && !familles.has(filtre)) { filtre = 'tout'; return afficherFiltres(toutes); }
   // menu : une icône par activité (le nom et le nombre restent pour le lecteur d'écran)
   el.menuActivite.innerHTML = choix.map((f) =>
-    `<button type="button" class="menu-icone-item${f.cle === filtre ? ' actif' : ''}" role="menuitemradio" aria-checked="${f.cle === filtre}" data-cle="${echapper(f.cle)}" aria-label="${echapper(f.nom)} (${nombre(f.n)})" title="${echapper(f.nom)}"><span class="menu-icone-nom" aria-hidden="true">${echapper(f.nom)}</span><span class="menu-icone-svg">${iconeFamille(f.cle, 26)}</span></button>`).join('');
+    `<button type="button" class="menu-icone-item${f.cle === filtre ? ' actif' : ''}" role="menuitemradio" aria-checked="${f.cle === filtre}" data-cle="${echapper(f.cle)}" aria-label="${echapper(f.nom)} (${nombre(f.n)})" title="${echapper(f.nom)}"><span class="menu-icone-nom" aria-hidden="true">${echapper(f.nom)}</span><span class="menu-icone-svg">${iconeFamille(f.cle, 30)}</span></button>`).join('');
   el.btnActivite.disabled = familles.size < 2;
   if (el.btnActivite.disabled) menuActivite(false);
   // bouton rond : icône de l'activité choisie, nom complet pour le lecteur d'écran
