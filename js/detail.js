@@ -43,6 +43,7 @@ let modeVue = 'carte'; // 'carte' ou '3d', gardé d'une sortie à l'autre
 let indexCurseur = null; // point de la sortie sous le curseur des courbes (création de segment)
 
 export function fermerDetail() {
+  pleinEcran?.fermer(true);
   if (carte) { retirerCarte(carte); carte = null; }
   traceCouleur = null;
   if (vue3d) { vue3d.detruire(); vue3d = null; }
@@ -325,6 +326,145 @@ function htmlCouleursCarte(mode, valeurs, ctx) {
     <div class="legende-carte">${htmlLegende(legende(valeurs, mode, ctx))}</div>`;
 }
 
+// ---- Carte en plein écran : couleurs du tracé + valeurs en incrustation --------------------
+
+const ICONE_PLEIN = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICONE_FERMER = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+
+let pleinEcran = null; // { fermer(silencieux) } quand la carte est en plein écran
+
+const nombre1 = (v) => nombre(v, 1);
+function tuile(libelle, valeur, unite, mode = '') {
+  return `<div class="plein-tuile"${mode ? ` data-mode="${mode}"` : ''}><small>${libelle}</small><b>${valeur}</b>${unite ? `<em>${unite}</em>` : ''}</div>`;
+}
+
+/** Valeurs au point choisi sur le tracé (km, vitesse, puissance, FC, pente, altitude) */
+function tuilesPoint(i, cum, v) {
+  const t = [tuile('Distance', nombre1(cum[i] / 1000), 'km')];
+  if (v.vitesse?.[i] != null) t.push(tuile('Vitesse', nombre1(v.vitesse[i]), 'km/h', 'vitesse'));
+  if (v.puissance?.[i] != null) t.push(tuile('Puissance', nombre(v.puissance[i]), 'W', 'puissance'));
+  if (v.fc?.[i] != null) t.push(tuile('FC', nombre(v.fc[i]), 'bpm', 'fc'));
+  if (v.pente?.[i] != null) t.push(tuile('Pente', nombre1(v.pente[i]), '%', 'pente'));
+  if (v.altitude?.[i] != null) t.push(tuile('Altitude', nombre(v.altitude[i]), 'm', 'altitude'));
+  return t.join('');
+}
+
+/** Valeurs de toute la sortie (quand aucun point n'est choisi) */
+function tuilesSortie(s) {
+  const t = [];
+  if (s.distanceM) t.push(tuile('Distance', km(s.distanceM), 'km'));
+  if (s.dureeChronoS != null) t.push(tuile('Temps', duree(s.dureeChronoS), ''));
+  if (s.vitesseMoyMs) t.push(tuile('Vitesse moy.', nombre1(s.vitesseMoyMs * 3.6), 'km/h', 'vitesse'));
+  const w = s.puissanceMoyW ?? s.puissanceEstimee?.moyW;
+  if (w) t.push(tuile(s.puissanceMoyW ? 'Puissance moy.' : 'Puissance ≈', nombre(w), 'W', 'puissance'));
+  if (s.fcMoy) t.push(tuile('FC moy.', nombre(s.fcMoy), 'bpm', 'fc'));
+  if (s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM)) t.push(tuile('Dénivelé', nombre(s.denivelePosM), 'm D+', 'altitude'));
+  return t.join('');
+}
+
+function installerPleinEcran(page, s, { getMode, setMode, ctx }) {
+  const L = globalThis.L;
+  if (!L || !carte || !traceCouleur) return;
+  const div = page.querySelector('#carte-parcours');
+  const { ligne, valeurs } = traceCouleur;
+  let cum = null; // distance cumulée le long de la ligne (calculée à l'ouverture)
+  let choisi = null; // indice du point touché
+  let marque = null;
+
+  const Controle = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd() {
+      const b = L.DomUtil.create('button', 'controle-plein leaflet-bar');
+      b.type = 'button'; b.title = 'Carte en plein écran'; b.setAttribute('aria-label', 'Carte en plein écran'); b.innerHTML = ICONE_PLEIN;
+      L.DomEvent.disableClickPropagation(b);
+      b.addEventListener('click', ouvrir);
+      return b;
+    },
+  });
+  new Controle().addTo(carte);
+
+  const couches = document.createElement('div');
+  couches.className = 'plein-couches';
+  const rendreCouleurs = () => { couches.querySelector('.plein-couleurs').innerHTML = htmlCouleursCarte(getMode(), valeurs, ctx); };
+  const rendreBas = () => {
+    couches.querySelector('.plein-bas').innerHTML = choisi == null
+      ? `${tuilesSortie(s)}<p class="plein-aide">Touche le tracé pour voir les valeurs à cet endroit.</p>`
+      : tuilesPoint(choisi, cum, valeurs);
+    for (const t of couches.querySelectorAll('.plein-tuile[data-mode]')) t.classList.toggle('actif', t.dataset.mode === getMode());
+  };
+  couches.innerHTML = `
+    <div class="plein-haut">
+      <button class="icone-btn plein-fermer" type="button" aria-label="Fermer le plein écran" title="Fermer">${ICONE_FERMER}</button>
+      <div class="plein-couleurs"></div>
+    </div>
+    <div class="plein-bas" aria-live="polite"></div>`;
+
+  function proche(latlng) {
+    const p = carte.latLngToContainerPoint(latlng);
+    let meilleur = null; let d2min = 44 * 44; // 44 px autour du doigt
+    for (let i = 0; i < ligne.length; i++) {
+      const q = carte.latLngToContainerPoint(ligne[i]);
+      const d2 = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+      if (d2 < d2min) { d2min = d2; meilleur = i; }
+    }
+    return meilleur;
+  }
+  const surClic = (e) => {
+    choisi = proche(e.latlng);
+    if (choisi == null) marque?.remove(); else {
+      marque ??= L.circleMarker(ligne[choisi], { radius: 9, color: '#fff', weight: 3, fillColor: '#15171b', fillOpacity: 1, interactive: false });
+      marque.setLatLng(ligne[choisi]).addTo(carte);
+    }
+    rendreBas();
+  };
+  couches.addEventListener('click', async (e) => {
+    if (e.target.closest('.plein-fermer')) { fermer(false); return; }
+    const b = e.target.closest('.puce-trace');
+    if (!b) return;
+    await setMode(b.dataset.mode);
+    rendreCouleurs(); rendreBas();
+  });
+
+  const auClavier = (e) => { if (e.key === 'Escape') fermer(false); };
+  const auRetour = () => { if (pleinEcran) fermer(true); }; // bouton retour d'Android
+
+  function ouvrir() {
+    if (pleinEcran) return;
+    if (!cum) { cum = [0]; for (let i = 1; i < ligne.length; i++) cum.push(cum[i - 1] + L.latLng(ligne[i - 1]).distanceTo(L.latLng(ligne[i]))); }
+    choisi = null;
+    document.body.classList.add('carte-plein');
+    div.classList.add('plein-ecran');
+    page.append(couches);
+    rendreCouleurs(); rendreBas();
+    carte.scrollWheelZoom.enable();
+    carte.invalidateSize();
+    carte.fitBounds(L.latLngBounds(ligne), { padding: [60, 40], animate: false });
+    carte.on('click', surClic);
+    document.addEventListener('keydown', auClavier);
+    window.addEventListener('popstate', auRetour);
+    history.pushState({ ...(history.state ?? {}), plein: true }, ''); // le bouton retour d'Android ferme le plein écran
+    pleinEcran = { fermer };
+  }
+
+  // silencieux : appelé par le bouton retour (l'entrée d'historique est déjà retirée) ou en quittant la page
+  function fermer(silencieux) {
+    if (!pleinEcran) return;
+    pleinEcran = null;
+    carte.off('click', surClic);
+    marque?.remove(); marque = null;
+    document.removeEventListener('keydown', auClavier);
+    window.removeEventListener('popstate', auRetour);
+    document.body.classList.remove('carte-plein');
+    div.classList.remove('plein-ecran');
+    couches.remove();
+    carte.scrollWheelZoom.disable();
+    carte.invalidateSize();
+    carte.fitBounds(L.latLngBounds(ligne), { padding: [16, 16], animate: false });
+    if (!silencieux && history.state?.plein) history.back();
+  }
+  return { rafraichir: () => { if (pleinEcran) { rendreCouleurs(); rendreBas(); } } };
+}
+
 function creerCarte(div, pts, modeInitial = 'uni', ctx = {}) {
   const L = globalThis.L;
   const gps = pts.filter((p) => typeof p.lat === 'number');
@@ -562,15 +702,19 @@ export async function afficherDetail(page, id, toast = () => {}) {
     try { marqueur = creerCarte(page.querySelector('#carte-parcours'), pts, modeCouleur, ctxCouleurs); } catch (e) { console.warn('Carte', e); }
     const zoneCouleurs = page.querySelector('#couleurs-carte');
     if (traceCouleur) {
-      zoneCouleurs.innerHTML = htmlCouleursCarte(modeCouleur, traceCouleur.valeurs, ctxCouleurs);
-      zoneCouleurs.addEventListener('click', async (e) => {
-        const b = e.target.closest('.puce-trace');
-        if (!b || !traceCouleur) return;
-        modeCouleur = b.dataset.mode;
+      // un seul endroit change le mode : puces sous la carte, puces et légende du plein écran
+      const changerMode = async (mode) => {
+        modeCouleur = mode;
         colorerCarte(modeCouleur, ctxCouleurs);
         zoneCouleurs.innerHTML = htmlCouleursCarte(modeCouleur, traceCouleur.valeurs, ctxCouleurs);
         try { await ecrireReglage('modeTrace', modeCouleur); } catch { /* sans importance */ }
+      };
+      zoneCouleurs.innerHTML = htmlCouleursCarte(modeCouleur, traceCouleur.valeurs, ctxCouleurs);
+      zoneCouleurs.addEventListener('click', (e) => {
+        const b = e.target.closest('.puce-trace');
+        if (b && traceCouleur) changerMode(b.dataset.mode);
       });
+      installerPleinEcran(page, s, { getMode: () => modeCouleur, setMode: changerMode, ctx: ctxCouleurs });
     } else zoneCouleurs.hidden = true;
   }
   // Vue 3D, reliée au curseur des courbes dans les deux sens

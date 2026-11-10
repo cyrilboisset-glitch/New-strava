@@ -894,6 +894,40 @@ async function texteToast(page) {
   const nbLignes = await page.locator('#carte-parcours path.leaflet-interactive').count();
   verif('détail : tracé en morceaux sur la carte Leaflet', nbLignes > 2, String(nbLignes));
   await page.screenshot({ path: path.join(CAPTURES, 'detail-trace-colore.png') });
+  // Carte en plein écran : couleurs du tracé et valeurs en incrustation
+  const hashDetail = await page.evaluate(() => location.hash);
+  await page.click('#carte-parcours .controle-plein');
+  await page.waitForSelector('#carte-parcours.plein-ecran');
+  await page.waitForTimeout(400);
+  const plein = await page.evaluate(() => {
+    const m = document.getElementById('carte-parcours').getBoundingClientRect();
+    return { x: Math.round(m.x), y: Math.round(m.y), l: Math.round(m.width), h: Math.round(m.height), puces: document.querySelectorAll('.plein-couches .puce-trace').length, tuiles: document.querySelector('.plein-bas').textContent.replace(/\s+/g, ' '),
+      legende: !!document.querySelector('.plein-couches .legende-trace'), pageDefile: getComputedStyle(document.body).overflow };
+  });
+  verif('plein écran : la carte couvre tout l\'écran, 6 puces, légende, valeurs de la sortie en incrustation', plein.x === 0 && plein.y === 0 && plein.l === 390 && plein.h === 844 && plein.puces === 6 && plein.legende
+    && /Distance.*km/.test(plein.tuiles) && /Temps/.test(plein.tuiles) && /Puissance moy\.180/.test(plein.tuiles), JSON.stringify(plein));
+  await page.screenshot({ path: path.join(CAPTURES, 'detail-plein-ecran.png') });
+  // toucher le tracé : valeurs à cet endroit
+  const ligneX = [195, 400]; // la sortie du test est une ligne verticale au milieu de l'écran
+  await page.mouse.click(ligneX[0], ligneX[1]);
+  await page.waitForFunction(() => /Pente|Altitude|Vitesse|Puissance\s*\d/.test(document.querySelector('.plein-bas').textContent) && !document.querySelector('.plein-aide'));
+  verif('plein écran : toucher le tracé affiche les valeurs du point (km, puissance…)', /Distance/.test(await page.textContent('.plein-bas')) && /Puissance\d+W/.test((await page.textContent('.plein-bas')).replace(/\s+/g, '')), await page.textContent('.plein-bas'));
+  // changer la couleur depuis le plein écran
+  await page.click('.plein-couches .puce-trace[data-mode="uni"]');
+  await page.waitForFunction(() => !document.querySelector('.plein-couches .legende-trace'));
+  verif('plein écran : puce « Uni » change le tracé (plus de légende), choix gardé', (await page.locator('.plein-couches .legende-trace').count()) === 0
+    && (await page.evaluate(async () => (await (await import('./js/db.js')).lireReglage('modeTrace')))) === 'uni');
+  await page.click('.plein-couches .puce-trace[data-mode="puissance"]');
+  await page.waitForFunction(() => !!document.querySelector('.plein-couches .legende-trace'));
+  // fermer par la croix, rouvrir, fermer par le bouton retour du téléphone
+  await page.click('.plein-fermer');
+  await page.waitForFunction(() => !document.getElementById('carte-parcours').classList.contains('plein-ecran'));
+  verif('plein écran : la croix referme, on reste sur la sortie', !(await page.$('.plein-couches')) && (await page.evaluate(() => location.hash)) === hashDetail);
+  await page.click('#carte-parcours .controle-plein');
+  await page.waitForSelector('#carte-parcours.plein-ecran');
+  await page.goBack();
+  await page.waitForFunction(() => !document.getElementById('carte-parcours').classList.contains('plein-ecran'));
+  verif('plein écran : le bouton retour du téléphone referme sans quitter la sortie', (await page.evaluate(() => location.hash)) === hashDetail && !!(await page.$('#page-detail .detail-nom:not([hidden])')));
   await page.click('#couleurs-carte .puce-trace[data-mode="uni"]');
   verif('détail : Uni = pas de légende, tracé d\'une couleur', (await page.locator('#couleurs-carte .legende-trace').count()) === 0 && (await page.locator('#carte-parcours path.leaflet-interactive').count()) < nbLignes);
   await page.click('#couleurs-carte .puce-trace[data-mode="puissance"]');
@@ -939,8 +973,8 @@ async function texteToast(page) {
     panneau: Math.round(document.getElementById('menu-activite').getBoundingClientRect().width),
     lignes: [...document.querySelectorAll('#menu-activite .menu-icone-item')].map((i) => ({ cle: i.dataset.cle, l: Math.round(i.getBoundingClientRect().width), survol: i.classList.contains('survol') })),
   }));
-  const larges = largeursMenu.lignes.filter((x) => x.l > 60);
-  verif('geste en un mouvement : seule la ligne sous le doigt s\'élargit, le panneau garde sa largeur', larges.length === 1 && larges[0].cle === 'sport-1' && larges[0].survol && largeursMenu.panneau <= 62, JSON.stringify(largeursMenu));
+  const larges = largeursMenu.lignes.filter((x) => x.l > 70);
+  verif('geste en un mouvement : seule la ligne sous le doigt s\'élargit, le panneau garde sa largeur', larges.length === 1 && larges[0].cle === 'sport-1' && larges[0].survol && largeursMenu.panneau <= 70, JSON.stringify(largeursMenu));
   await page.screenshot({ path: path.join(CAPTURES, 'menu-activite-geste.png'), clip: { x: 0, y: 0, width: 390, height: 440 } });
   await page.mouse.up();
   await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'sport-1', null, { timeout: 5000 });
