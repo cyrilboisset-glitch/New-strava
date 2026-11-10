@@ -926,9 +926,51 @@ async function texteToast(page) {
   await page.mouse.up();
   await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'musculation', null, { timeout: 5000 });
   verif('glisser le doigt d\'une icône à l\'autre : l\'icône sous le doigt se déroule, relâcher la choisit', surMuscu === 'musculation');
+  // Geste en un seul mouvement : appuyer sur le bouton rond, glisser, relâcher sur l'icône voulue
+  const bouton = await page.locator('#btn-activite').boundingBox();
+  await page.mouse.move(bouton.x + bouton.width / 2, bouton.y + bouton.height / 2);
+  await page.mouse.down();
+  await page.waitForSelector('#menu-activite.ouvert');
+  await page.waitForTimeout(300);
+  const [xc, yc] = await centre('sport-1');
+  await page.mouse.move(xc, yc, { steps: 8 });
+  await page.waitForTimeout(400);
+  const largeursMenu = await page.evaluate(() => ({
+    panneau: Math.round(document.getElementById('menu-activite').getBoundingClientRect().width),
+    lignes: [...document.querySelectorAll('#menu-activite .menu-icone-item')].map((i) => ({ cle: i.dataset.cle, l: Math.round(i.getBoundingClientRect().width), survol: i.classList.contains('survol') })),
+  }));
+  const larges = largeursMenu.lignes.filter((x) => x.l > 60);
+  verif('geste en un mouvement : seule la ligne sous le doigt s\'élargit, le panneau garde sa largeur', larges.length === 1 && larges[0].cle === 'sport-1' && larges[0].survol && largeursMenu.panneau <= 62, JSON.stringify(largeursMenu));
+  await page.screenshot({ path: path.join(CAPTURES, 'menu-activite-geste.png'), clip: { x: 0, y: 0, width: 390, height: 440 } });
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'sport-1', null, { timeout: 5000 });
+  verif('geste en un mouvement : relâcher sur l\'icône la choisit, menu refermé', !(await page.isVisible('#menu-activite')) || !(await page.evaluate(() => document.getElementById('menu-activite').classList.contains('ouvert'))));
+  // simple toucher : le menu s'ouvre et reste ouvert ; glissé puis relâché dans le vide : refermé
   await page.click('#btn-activite');
   await page.waitForSelector('#menu-activite.ouvert');
-  await page.click('#menu-activite [data-cle="sport-2"]'); // on remet Vélo (le test suivant s'y attend)
+  await page.waitForTimeout(300);
+  verif('simple toucher sur le bouton : le menu reste ouvert', await page.evaluate(() => document.getElementById('menu-activite').classList.contains('ouvert')));
+  await page.click('#btn-activite'); // 2e toucher : referme
+  await page.waitForFunction(() => !document.getElementById('menu-activite').classList.contains('ouvert'));
+  await page.mouse.move(bouton.x + bouton.width / 2, bouton.y + bouton.height / 2);
+  await page.mouse.down();
+  await page.waitForSelector('#menu-activite.ouvert');
+  await page.mouse.move(200, 700, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForFunction(() => !document.getElementById('menu-activite').classList.contains('ouvert'));
+  verif('glissé puis relâché dans le vide : menu refermé, activité inchangée', (await page.getAttribute('#menu-activite [aria-checked="true"]', 'data-cle')) === 'sport-1');
+  await page.mouse.move(bouton.x + bouton.width / 2, bouton.y + bouton.height / 2);
+  await page.mouse.down();
+  await page.waitForSelector('#menu-activite.ouvert');
+  await page.waitForTimeout(300);
+  const [xv2, yv2] = await centre('sport-2');
+  await page.mouse.move(xv2, yv2, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'sport-2');
+  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
+  await page.click('#btn-activite');
+  await page.waitForSelector('#menu-activite.ouvert');
+  await page.click('#menu-activite [data-cle="sport-2"]'); // (déjà Vélo : le test suivant s'y attend)
   await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'sport-2');
   await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
   verif('bouton Synchro : pastille d\'état dans le bouton ⟳', !!(await page.$('#btn-menu-synchro .pastille')) && (await page.$$('.outils')).length === 0);

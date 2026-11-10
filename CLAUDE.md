@@ -498,6 +498,14 @@ l'instant »** — à proposer quand il voudra :
   doigt d'une icône à l'autre et relâcher sur celle voulue (pointerdown / move / up dans app.js,
   `choisirActivite`) ; un simple toucher marche comme avant. Panneau aligné à droite
   (`touch-action: none`). Le nom reste aussi dans `aria-label` avec le nombre.
+- **v0.35.0 (10 nov. 2026) : menu Activité en un seul geste**, demande de Cyril. On appuie
+  sur le bouton rond (le menu s'ouvre dès l'appui), on glisse le doigt sans le lever sur une
+  icône, on relâche pour la choisir (pointerdown / move / up sur `#btn-activite`, capture du
+  pointeur, `gesteBouton` dans app.js). Seule la ligne sous le doigt s'élargit vers la gauche
+  (panneau de largeur fixe 60 px, la ligne déborde ; `.survol`). Simple toucher : le menu
+  s'ouvre et reste ouvert (le clic qui suit est ignoré : `ignorerClicBouton`, avec un jeton
+  pour qu'une minuterie ancienne ne touche pas au geste suivant). Glissé puis relâché dans le
+  vide : menu refermé. Clavier (Entrée) : bascule comme avant.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

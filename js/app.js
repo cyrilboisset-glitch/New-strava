@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.34.0 · noms des activités qui se déroulent';
+export const VERSION_APPLI = '0.35.0 · menu Activité en un seul geste';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -133,7 +133,45 @@ function menuActivite(oui) {
     minuterieActivite = setTimeout(() => { el.menuActivite.hidden = true; }, 200);
   }
 }
-el.btnActivite.addEventListener('click', (e) => { e.stopPropagation(); if (!activiteOuvert()) ouvrirMenu(false); menuActivite(!activiteOuvert()); });
+// Geste en un seul mouvement : on appuie sur le bouton rond, le menu s'ouvre ; sans lever le
+// doigt on le glisse sur une icône (seule sa ligne s'élargit) et on le relâche pour choisir.
+// Un simple toucher ouvre le menu, et il reste ouvert.
+let gesteBouton = null; // { id, x, y, bouge }
+let ignorerClicBouton = false;
+let jetonClicBouton = 0; // une minuterie d'un geste précédent ne doit pas toucher au geste suivant
+const ouvrirMenuActivite = () => { ouvrirMenu(false); menuActivite(true); };
+el.btnActivite.addEventListener('pointerdown', (e) => {
+  if (el.btnActivite.disabled || e.button > 0 || activiteOuvert()) return; // déjà ouvert : le clic le refermera
+  gesteBouton = { id: e.pointerId, x: e.clientX, y: e.clientY, bouge: false };
+  ignorerClicBouton = true;
+  jetonClicBouton++;
+  try { el.btnActivite.setPointerCapture(e.pointerId); } catch { /* sans importance */ }
+  ouvrirMenuActivite();
+});
+el.btnActivite.addEventListener('pointermove', (e) => {
+  if (!gesteBouton || e.pointerId !== gesteBouton.id) return;
+  if (Math.hypot(e.clientX - gesteBouton.x, e.clientY - gesteBouton.y) > 8) gesteBouton.bouge = true;
+  if (gesteBouton.bouge) survolerIcone(iconeSous(e));
+});
+const finGeste = (e) => {
+  if (!gesteBouton || e.pointerId !== gesteBouton.id) return;
+  const { bouge } = gesteBouton;
+  gesteBouton = null;
+  const it = e.type === 'pointerup' ? iconeSous(e) : null;
+  survolerIcone(null);
+  if (it) choisirActivite(it.dataset.cle); // relâché sur une icône : choisie
+  else if (bouge && e.type === 'pointerup') menuActivite(false); // glissé puis relâché dans le vide : on referme
+  const jeton = jetonClicBouton;
+  setTimeout(() => { if (jeton === jetonClicBouton) ignorerClicBouton = false; }, 80);
+};
+el.btnActivite.addEventListener('pointerup', finGeste);
+el.btnActivite.addEventListener('pointercancel', finGeste);
+el.btnActivite.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (ignorerClicBouton) { ignorerClicBouton = false; return; } // le toucher a déjà ouvert le menu
+  if (!activiteOuvert()) ouvrirMenu(false);
+  menuActivite(!activiteOuvert());
+});
 document.addEventListener('click', (e) => { if (activiteOuvert() && !e.target.closest('.menu-activite')) menuActivite(false); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && activiteOuvert()) { menuActivite(false); el.btnActivite.focus(); } });
 
