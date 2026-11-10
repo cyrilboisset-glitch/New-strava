@@ -20,7 +20,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.26.0 · mannequin des muscles';
+export const VERSION_APPLI = '0.27.0 · charte anthracite, tracés plein écran';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -382,9 +382,17 @@ function pageDepuisAdresse() {
 // revenir à un numéro plus petit = retour (glisse depuis la gauche)
 let dernierN = history.state?.n ?? 0;
 let compteurN = dernierN;
+// Position de chaque page de l'historique : en revenant en arrière (ou en avant),
+// on retrouve la page là où on l'avait laissée (ex. le bloc Segments d'une sortie)
+try { history.scrollRestoration = 'manual'; } catch { /* vieux navigateur */ }
+const defilements = new Map(); // numéro d'entrée -> scrollY
+let nQuitte = dernierN;
+let dejaVue = false; // l'entrée affichée existait déjà (retour ou avance dans l'historique)
 function sensNavigation(page, avant, retourForce) {
   let n = history.state?.n;
   let retour = !!retourForce;
+  nQuitte = dernierN;
+  dejaVue = n != null;
   if (n == null) {
     n = ++compteurN;
     history.replaceState({ ...(history.state || {}), n }, '');
@@ -425,7 +433,24 @@ async function router(options = {}) {
   await afficherPage(page, id, avant, sens);
 }
 
+/** Remet la page à `y` ; si elle n'est pas encore assez haute (blocs qui arrivent), réessaie */
+let arretDefilement = () => {};
+function remettreDefilement(y) {
+  arretDefilement();
+  window.scrollTo(0, y);
+  if (!y) return;
+  const obs = new ResizeObserver(() => { if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); });
+  obs.observe(document.body);
+  const arret = () => { obs.disconnect(); clearTimeout(fin); for (const t of ['touchstart', 'wheel', 'keydown', 'mousedown']) window.removeEventListener(t, arret); };
+  const fin = setTimeout(arret, 2500);
+  for (const t of ['touchstart', 'wheel', 'keydown', 'mousedown']) window.addEventListener(t, arret, { passive: true });
+  arretDefilement = arret;
+}
+
 async function afficherPage(page, id, avant, sens) {
+  arretDefilement();
+  defilements.set(nQuitte, window.scrollY);
+  const defilement = dejaVue ? (defilements.get(dernierN) ?? 0) : 0;
   if (avant === 'sorties' && page !== 'sorties') defilementListe = window.scrollY;
   // en revenant d'une sous-page vers une autre sous-page (segment -> sortie), on garde le lien de retour
   pageActuelle = page;
@@ -452,6 +477,7 @@ async function afficherPage(page, id, avant, sens) {
       el.pageDetail.innerHTML = `<section class="carte"><p>Détail impossible : ${echapper(e.message)}</p></section>`;
     }
     animer(el.pageDetail, sens);
+    remettreDefilement(defilement);
     return;
   }
   if (page === 'segment') {
@@ -462,6 +488,7 @@ async function afficherPage(page, id, avant, sens) {
       el.pageSegment.innerHTML = `<section class="carte"><p>Segment impossible : ${echapper(e.message)}</p></section>`;
     }
     animer(el.pageSegment, sens);
+    remettreDefilement(defilement);
     return;
   }
   navigationInterne = false;
@@ -473,16 +500,19 @@ async function afficherPage(page, id, avant, sens) {
     };
     animer(el.pageProgres, sens);
     await afficherProgres(el.pageProgres, options);
+    remettreDefilement(defilement);
   } else if (page === 'traces') {
     window.scrollTo(0, 0);
     await afficherTraces(el.pageTraces, toast, id ?? null);
+    remettreDefilement(defilement);
   } else if (page === 'profil') {
     window.scrollTo(0, 0);
     animer(el.pageReglages, sens);
     await afficherReglages(el.pageReglages, toast);
+    remettreDefilement(defilement);
   } else if (avant !== 'sorties') {
     await afficherListe(); // FTP, tri ou sorties ont pu changer ailleurs
-    window.scrollTo(0, avant === 'detail' ? defilementListe : 0);
+    remettreDefilement(dejaVue ? defilement : (avant === 'detail' ? defilementListe : 0));
     animer(el.accueil, sens);
   }
 }

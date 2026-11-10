@@ -347,6 +347,9 @@ async function texteToast(page) {
     buffer: Buffer.from(fauxGpx({ pauseS: 600, debutMs: Date.UTC(2025, 4, 17, 7), nom: 'Col du test bis' })) });
   verif('sortie bis importée', (await texteToast(page)).includes('1 nouvelle sortie'));
   await attendre(page, async () => (await (await import('./js/segments.js')).lirePassages()).length === 2, null);
+  await page.evaluate(() => document.querySelector('#bloc-segments-sortie').scrollIntoView({ block: 'start' }));
+  await page.waitForTimeout(200);
+  const yAvant = await page.evaluate(() => Math.round(window.scrollY));
   await page.click('#bloc-segments-sortie .passage');
   await page.waitForSelector('#page-segment .passage');
   verif('page du segment', (await page.textContent('#titre-page')) === 'Segment' && (await page.textContent('#page-segment .detail-nom')) === 'Faux plat du test');
@@ -360,6 +363,10 @@ async function texteToast(page) {
   // Retour au détail de la sortie, puis Progrès : liste des segments
   await page.click('#btn-retour');
   await page.waitForSelector('#page-detail .detail-nom');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.waitForTimeout(400);
+  const yApres = await page.evaluate(() => Math.round(window.scrollY));
+  verif('retour du segment : la sortie reste au niveau des segments', yAvant > 100 && Math.abs(yApres - yAvant) <= 3, `avant ${yAvant}, après ${yApres}`);
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
   await page.click('#onglet-progres');

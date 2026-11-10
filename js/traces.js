@@ -132,22 +132,25 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
   planPoids = profil.poidsKg ?? 98;
   page.innerHTML = `
   <section class="editeur-trace">
-    <div class="carte-trace" id="carte-trace"></div>
-    <div class="outils-trace">
-      <label class="menu-bouton choix-profil">
-        <span class="menu-libelle">Itinéraire</span>
-        <select id="profil-route">${Object.entries(PROFILS).map(([k, t]) => `<option value="${k}"${k === ed.profil ? ' selected' : ''}>${t}</option>`).join('')}</select>
-        <svg class="chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </label>
-      <div class="outils-boutons">
-        <button class="btn secondaire petit" type="button" data-a="annuler" title="Retirer le dernier point">↶ Annuler</button>
-        <button class="btn secondaire petit" type="button" data-a="boucle" title="Revenir au point de départ">⟲ Boucle</button>
-        <button class="btn secondaire petit" type="button" data-a="inverser" title="Parcourir dans l'autre sens">⇄ Inverser</button>
-        <button class="btn secondaire petit" type="button" data-a="position" title="Centrer sur ma position">◎</button>
-        <button class="btn secondaire petit danger" type="button" data-a="effacer">Effacer</button>
+    <div class="carte-plein">
+      <div class="carte-trace" id="carte-trace"></div>
+      <div class="outils-trace">
+        <label class="menu-bouton choix-profil">
+          <span class="menu-libelle">Itinéraire</span>
+          <select id="profil-route">${Object.entries(PROFILS).map(([k, t]) => `<option value="${k}"${k === ed.profil ? ' selected' : ''}>${t}</option>`).join('')}</select>
+          <svg class="chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </label>
+        <div class="outils-boutons">
+          <button class="btn secondaire petit" type="button" data-a="annuler" title="Retirer le dernier point">↶ Annuler</button>
+          <button class="btn secondaire petit" type="button" data-a="boucle" title="Revenir au point de départ">⟲ Boucle</button>
+          <button class="btn secondaire petit" type="button" data-a="inverser" title="Parcourir dans l'autre sens">⇄ Inverser</button>
+          <button class="btn secondaire petit" type="button" data-a="position" title="Centrer sur ma position">◎</button>
+          <button class="btn secondaire petit danger" type="button" data-a="effacer">Effacer</button>
+        </div>
       </div>
+      <p class="aide etat-flottant" id="trace-etat"></p>
+      <button class="btn principal bouton-creer" type="button" data-a="gpx">⬇ Créer le GPX</button>
     </div>
-    <p class="aide" id="trace-etat"></p>
     <div id="trace-resume"></div>
     <div class="segments vues" role="group" data-segments="vue-trace" hidden>
       <button type="button" data-valeur="profil" aria-pressed="true">Profil</button>
