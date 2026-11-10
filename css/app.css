@@ -881,3 +881,7 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .legende-trace.zones small { color: var(--texte-3); font-size: 11px; }
 .legende-degrade { flex: 1; height: 9px; border-radius: 5px; }
 .legende-trace em { font-style: normal; color: var(--texte-3); margin-left: auto; }
+
+/* Bouton Activité : l'icône est parfaitement centrée dans le rond (le petit chevron est posé à part) */
+#icone-activite { display: grid; place-items: center; width: 100%; height: 100%; line-height: 0; }
+#icone-activite svg { display: block; }
