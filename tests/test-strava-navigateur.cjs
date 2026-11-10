@@ -905,8 +905,32 @@ async function texteToast(page) {
     && (await page.getAttribute('#btn-activite', 'aria-label')) === "Type d'activité : Vélo (4)");
   verif('menu Activité : seulement des icônes (ni nombre ni rond de sélection visibles)', await page.evaluate(() => {
     const p = document.getElementById('menu-activite');
-    return [...p.querySelectorAll('[data-cle]')].every((b) => b.querySelector('svg') && b.textContent.trim() === '') && !p.querySelector('input');
+    return [...p.querySelectorAll('[data-cle]')].every((b) => b.querySelector('svg') && getComputedStyle(b.querySelector('.menu-icone-nom')).maxWidth === '0px' && !/\d/.test(b.textContent)) && !p.querySelector('input');
   }));
+  // Doigt (ou souris) sur une icône : elle se déroule et montre le nom ; glisser vers une autre puis relâcher la choisit
+  await page.click('#btn-activite');
+  await page.waitForSelector('#menu-activite.ouvert');
+  await page.waitForTimeout(300);
+  const centre = async (cle) => { const b = await page.locator(`#menu-activite [data-cle="${cle}"]`).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+  const [xv, yv] = await centre('sport-2');
+  await page.mouse.move(xv, yv);
+  await page.waitForTimeout(400);
+  const deroule = await page.evaluate(() => { const i = document.querySelector('#menu-activite .survol'); return i && { nom: i.querySelector('.menu-icone-nom').textContent, largeur: i.getBoundingClientRect().width, cle: i.dataset.cle }; });
+  verif('survol d\'une icône : elle se déroule vers la gauche avec son nom', deroule?.cle === 'sport-2' && deroule.nom === 'Vélo' && deroule.largeur > 70, JSON.stringify(deroule));
+  await page.screenshot({ path: path.join(CAPTURES, 'menu-activite-deroule.png'), clip: { x: 0, y: 0, width: 390, height: 440 } });
+  // glisser du vélo vers la musculation, relâcher : la musculation est choisie
+  await page.mouse.down();
+  const [xm, ym] = await centre('musculation');
+  await page.mouse.move(xm, ym, { steps: 6 });
+  const surMuscu = await page.evaluate(() => document.querySelector('#menu-activite .survol')?.dataset.cle);
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'musculation', null, { timeout: 5000 });
+  verif('glisser le doigt d\'une icône à l\'autre : l\'icône sous le doigt se déroule, relâcher la choisit', surMuscu === 'musculation');
+  await page.click('#btn-activite');
+  await page.waitForSelector('#menu-activite.ouvert');
+  await page.click('#menu-activite [data-cle="sport-2"]'); // on remet Vélo (le test suivant s'y attend)
+  await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'sport-2');
+  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
   verif('bouton Synchro : pastille d\'état dans le bouton ⟳', !!(await page.$('#btn-menu-synchro .pastille')) && (await page.$$('.outils')).length === 0);
   await page.click('#btn-activite');
   await page.waitForSelector('#menu-activite.ouvert');

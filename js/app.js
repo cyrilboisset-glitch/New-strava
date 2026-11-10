@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.33.0 · renommer une sortie';
+export const VERSION_APPLI = '0.34.0 · noms des activités qui se déroulent';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -110,7 +110,7 @@ function afficherFiltres(toutes) {
   if (filtre !== 'tout' && !familles.has(filtre)) { filtre = 'tout'; return afficherFiltres(toutes); }
   // menu : une icône par activité (le nom et le nombre restent pour le lecteur d'écran)
   el.menuActivite.innerHTML = choix.map((f) =>
-    `<button type="button" class="menu-icone-item${f.cle === filtre ? ' actif' : ''}" role="menuitemradio" aria-checked="${f.cle === filtre}" data-cle="${echapper(f.cle)}" aria-label="${echapper(f.nom)} (${nombre(f.n)})" title="${echapper(f.nom)}">${iconeFamille(f.cle, 26)}</button>`).join('');
+    `<button type="button" class="menu-icone-item${f.cle === filtre ? ' actif' : ''}" role="menuitemradio" aria-checked="${f.cle === filtre}" data-cle="${echapper(f.cle)}" aria-label="${echapper(f.nom)} (${nombre(f.n)})" title="${echapper(f.nom)}"><span class="menu-icone-nom" aria-hidden="true">${echapper(f.nom)}</span><span class="menu-icone-svg">${iconeFamille(f.cle, 26)}</span></button>`).join('');
   el.btnActivite.disabled = familles.size < 2;
   if (el.btnActivite.disabled) menuActivite(false);
   // bouton rond : icône de l'activité choisie, nom complet pour le lecteur d'écran
@@ -142,15 +142,42 @@ async function changerFiltre(cle) {
   try { await ecrireReglage('filtre', filtre); } catch { /* sans importance */ }
 }
 
-el.menuActivite.addEventListener('click', async (e) => {
-  const b = e.target.closest('[data-cle]');
-  if (!b) return;
+async function choisirActivite(cle) {
   menuActivite(false);
-  if (b.dataset.cle === filtre) return;
-  await changerFiltre(b.dataset.cle);
+  if (cle === filtre) return;
+  await changerFiltre(cle);
   await afficherListe();
   window.scrollTo({ top: 0, behavior: mouvementReduit() ? 'auto' : 'smooth' });
   cascade(el.liste);
+}
+
+// Menu en icônes : l'icône sous le doigt (ou la souris) se déroule vers la gauche et
+// montre le nom de l'activité. On peut aussi faire glisser le doigt d'une icône à l'autre
+// et relâcher sur celle qu'on veut.
+let iconeSurvolee = null;
+let iconeAppuyee = null; // icône où le doigt s'est posé
+function survolerIcone(it) {
+  if (it === iconeSurvolee) return;
+  iconeSurvolee?.classList.remove('survol');
+  iconeSurvolee = it;
+  it?.classList.add('survol');
+}
+const iconeSous = (e) => document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.menu-icone-item') ?? null;
+el.menuActivite.addEventListener('pointerdown', (e) => { iconeAppuyee = iconeSous(e); survolerIcone(iconeAppuyee); });
+el.menuActivite.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' || e.buttons) survolerIcone(iconeSous(e)); });
+el.menuActivite.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') survolerIcone(null); });
+el.menuActivite.addEventListener('pointerup', (e) => {
+  const it = iconeSous(e);
+  const glisse = iconeAppuyee && it && it !== iconeAppuyee; // relâché sur une autre icône que celle de départ
+  iconeAppuyee = null;
+  if (glisse) { e.preventDefault(); survolerIcone(null); choisirActivite(it.dataset.cle); } // (pas de « click » dans ce cas)
+});
+el.menuActivite.addEventListener('pointercancel', () => { iconeAppuyee = null; survolerIcone(null); });
+el.menuActivite.addEventListener('focusin', (e) => { if (e.target.matches?.(':focus-visible')) survolerIcone(e.target.closest('.menu-icone-item')); });
+el.menuActivite.addEventListener('focusout', () => survolerIcone(null));
+el.menuActivite.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cle]');
+  if (b) { survolerIcone(null); choisirActivite(b.dataset.cle); }
 });
 
 // ---- Liste : par morceaux de 30, gardée en mémoire ------------------------------

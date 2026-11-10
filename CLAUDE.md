@@ -492,6 +492,12 @@ l'instant »** — à proposer quand il voudra :
   nom vide = retour au nom du sport. Espaces multiples nettoyés, 80 caractères. L'import de
   l'archive Strava ne remplace jamais un nom déjà présent. La liste se met à jour au retour
   (version des données). Fonctions `htmlTitre`, `installerRenommer` dans detail.js.
+- **v0.34.0 (10 nov. 2026) : noms des activités qui se déroulent**, demande de Cyril. Menu
+  Activité : l'icône sous le doigt (ou la souris, ou le focus clavier) se déroule vers la gauche
+  et montre le nom (`.menu-icone-nom`, classe `survol`, sans le nombre). On peut faire glisser le
+  doigt d'une icône à l'autre et relâcher sur celle voulue (pointerdown / move / up dans app.js,
+  `choisirActivite`) ; un simple toucher marche comme avant. Panneau aligné à droite
+  (`touch-action: none`). Le nom reste aussi dans `aria-label` avec le nombre.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
