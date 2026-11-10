@@ -23,11 +23,13 @@
     </button>
     <h1 class="titre" id="titre-page">Mes sorties</h1>
     <div class="barre-actions accueil-seulement">
-      <!-- Activité : icône de l'activité choisie ; le menu natif couvre le bouton (choix d'Android) -->
-      <label class="icone-btn bouton-activite" title="Type d'activité">
-        <span id="icone-activite" aria-hidden="true"></span><svg class="mini-chevron" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <select id="choix-activite" aria-label="Type d'activité"><option value="tout">Tout</option></select>
-      </label>
+      <!-- Activité : icône de l'activité choisie ; le menu ne montre que des icônes -->
+      <div class="menu menu-activite">
+        <button id="btn-activite" class="icone-btn bouton-activite" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menu-activite" aria-label="Type d'activité" title="Type d'activité">
+          <span id="icone-activite" aria-hidden="true"></span><svg class="mini-chevron" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div id="menu-activite" class="menu-panneau menu-icones" role="menu" hidden></div>
+      </div>
       <!-- Synchro : flèches qui tournent, pastille d'état ; ouvre le menu d'actions -->
       <div class="menu">
         <button id="btn-menu-synchro" class="icone-btn bouton-synchro" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menu-synchro" title="Synchro">

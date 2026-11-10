@@ -195,7 +195,7 @@ async function texteToast(page) {
   const [choixFichier] = await Promise.all([page.waitForEvent('filechooser'), page.click('#btn-importer')]);
   await page.waitForSelector('#menu-synchro', { state: 'hidden', timeout: 2000 }).catch(() => {});
   verif('« Importer un fichier » ouvre le choix de fichier, menu refermé', choixFichier.isMultiple() && !(await page.isVisible('#menu-synchro')));
-  verif('menu Activité inactif sans sortie', await page.$eval('#choix-activite', (s) => s.disabled));
+  verif('menu Activité inactif sans sortie', await page.$eval('#btn-activite', (s) => s.disabled));
 
   // 1. La sortie du 1er juin arrive d'abord par Gadgetbridge (FIT seul)
   await page.setInputFiles('#champ-fichier', { name: 'gadgetbridge.fit', mimeType: 'application/octet-stream', buffer: fit });
@@ -784,10 +784,11 @@ async function texteToast(page) {
 
   // 4. Tri par activité
   // Menu déroulant « Activité » : « Vélo (4) » -> « Vélo 4 », choisi marqué d'une étoile
-  const filtres = async () => page.$$eval('#choix-activite option', (els) => els.map((e) => `${e.textContent.replace(/ \((\d+)\)$/, ' $1')}${e.selected ? '*' : ''}`));
+  const filtres = async () => page.$$eval('#menu-activite [data-cle]', (els) => els.map((e) => `${e.getAttribute('aria-label').replace(/ \((\d+)\)$/, ' $1')}${e.getAttribute('aria-checked') === 'true' ? '*' : ''}`));
   const choisirActivite = async (nom) => {
-    const valeur = await page.$$eval('#choix-activite option', (els, n) => els.find((e) => e.textContent.startsWith(`${n} (`)).value, nom);
-    await page.selectOption('#choix-activite', valeur);
+    await page.click('#btn-activite');
+    await page.waitForSelector('#menu-activite.ouvert');
+    await page.click(`#menu-activite [aria-label^="${nom} ("]`);
   };
   const f1 = await filtres();
   verif('boutons de tri', JSON.stringify(f1) === JSON.stringify(['Tout 7*', 'Vélo 4', 'Course à pied 1', 'Marche 1', 'Musculation 1']), JSON.stringify(f1));
@@ -801,11 +802,20 @@ async function texteToast(page) {
   await page.screenshot({ path: path.join(CAPTURES, 'strava-2-tri-velo.png') });
   // Boutons ronds de l'accueil : icône du vélo choisie, nom complet pour le lecteur d'écran, pastille sur ⟳
   verif('bouton Activité : icône du vélo, libellé « Vélo (4) »', (await page.innerHTML('#icone-activite')).includes('<circle cx="6" cy="16"')
-    && (await page.getAttribute('#choix-activite', 'aria-label')) === "Type d'activité : Vélo (4)");
+    && (await page.getAttribute('#btn-activite', 'aria-label')) === "Type d'activité : Vélo (4)");
+  verif('menu Activité : seulement des icônes (ni nombre ni rond de sélection visibles)', await page.evaluate(() => {
+    const p = document.getElementById('menu-activite');
+    return [...p.querySelectorAll('[data-cle]')].every((b) => b.querySelector('svg') && b.textContent.trim() === '') && !p.querySelector('input');
+  }));
   verif('bouton Synchro : pastille d\'état dans le bouton ⟳', !!(await page.$('#btn-menu-synchro .pastille')) && (await page.$$('.outils')).length === 0);
+  await page.click('#btn-activite');
+  await page.waitForSelector('#menu-activite.ouvert');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: path.join(CAPTURES, 'menu-activite.png'), clip: { x: 0, y: 0, width: 390, height: 520 } });
+  await page.keyboard.press('Escape');
   await page.locator('header.barre').screenshot({ path: path.join(CAPTURES, 'accueil-boutons.png') });
   await page.reload();
-  await page.waitForSelector('#choix-activite option:nth-child(2)', { state: 'attached' });
+  await page.waitForSelector('#menu-activite [data-cle]:nth-child(2)', { state: 'attached' });
   verif('tri gardé après réouverture', (await filtres())[1] === 'Vélo 4*' && (await page.$$('.sortie')).length === 4, JSON.stringify(await filtres()));
   await choisirActivite('Musculation');
   await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 1);
@@ -867,7 +877,7 @@ async function texteToast(page) {
     await new Promise((r) => { tx.oncomplete = r; });
   });
   await page.reload();
-  await page.waitForSelector('#choix-activite option:nth-child(2)', { state: 'attached' });
+  await page.waitForSelector('#menu-activite [data-cle]:nth-child(2)', { state: 'attached' });
   verif('ancienne version : rangée dans Entraînement', (await filtres()).includes('Entraînement 1'), JSON.stringify(await filtres()));
   await page.setInputFiles('#champ-fichier', { name: 'export_12345678.zip', mimeType: 'application/zip', buffer: zipBytes });
   verif('réimport sans doublon', (await texteToast(page)).includes('Aucune nouvelle sortie'));

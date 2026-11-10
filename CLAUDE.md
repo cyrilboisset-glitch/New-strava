@@ -428,6 +428,11 @@ l'instant »** — à proposer quand il voudra :
   boutons) ; le thème clair garde ses couleurs avec les mêmes ombres ; 4) Tracés
   **plein écran** : carte sur toute la hauteur, outils flottants en haut, état en
   bas, bouton « ⬇ Créer le GPX » rond en relief toujours visible (`.bouton-creer`).
+- **v0.28.0 (10 nov. 2026) : menu Activité en icônes**, demande de Cyril : le
+  select natif est remplacé par un panneau (`#menu-activite`, bouton `#btn-activite`)
+  qui ne montre que des icônes en colonne (ni nombre ni rond de sélection ; actif =
+  cadre cuivre). Nom et nombre restent dans `aria-label` pour le lecteur d'écran.
+  Se ferme en touchant ailleurs ou Échap ; ferme / est fermé par le menu Synchro.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
