@@ -21,7 +21,7 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.25.0 · boutons ronds de l\'accueil';
+export const VERSION_APPLI = '0.25.1 · fichier unique';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -507,7 +507,8 @@ function miseAJourAuto() {
 async function demarrer() {
   $('version').textContent = `v${VERSION_APPLI}`;
   try { filtre = (await lireReglage('filtre')) ?? 'tout'; } catch { /* filtre par défaut */ }
-  if ('serviceWorker' in navigator) miseAJourAuto();
+  // pas de service worker pour le fichier unique ouvert depuis le téléphone (file://, content://)
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) miseAJourAuto();
   await afficherListe();
   if (!location.hash) cascade(el.liste);
 

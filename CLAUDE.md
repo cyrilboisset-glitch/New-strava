@@ -389,6 +389,19 @@ l'instant »** — à proposer quand il voudra :
   ouvre le menu Synchro (`#menu-synchro`, inchangé). Le bouton ⟳ de synchro
   directe (`#btn-synchro-haut`) n'existe plus : « Synchroniser maintenant » est
   dans le menu. `.outils` supprimé.
+- **Compte GitHub de Cyril suspendu le 6 nov. 2026** (« violation of our Terms
+  of Service », motif inconnu) ; ticket de rétablissement n° 4964961 envoyé par
+  Cyril. Copies du code envoyées à Cyril (Mes sorties, Vélo Coach, Suivi-direct,
+  Appli vent, Parcours 3D) ; Zwift, Musculation, Menu, Couteau suisse, Basse non
+  récupérés (dépôts cachés). Ne pas lui conseiller de créer un autre compte.
+- **v0.25.1 (10 nov. 2026) : fichier unique**, demande de Cyril (« l'installer
+  sans passer par un hébergeur »). `node outils/fichier-unique.mjs` (esbuild en
+  devDependency) -> `dist/mes-sorties.html` (~580 Ko, non versionné) : code,
+  styles, polices, Leaflet, JSZip dans un seul HTML. Pas de service worker hors
+  http(s) (app.js) : pas de mise à jour auto, pas de partage Android, pas
+  d'installation PWA. Test : `tests/test-fichier-unique.cjs` (file:// dans
+  Chromium). NON vérifié sur Android (Chrome y ouvre les fichiers en content://,
+  où le stockage peut ne pas tenir).
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
