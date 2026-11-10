@@ -433,6 +433,22 @@ l'instant »** — à proposer quand il voudra :
   qui ne montre que des icônes en colonne (ni nombre ni rond de sélection ; actif =
   cadre cuivre). Nom et nombre restent dans `aria-label` pour le lecteur d'écran.
   Se ferme en touchant ailleurs ou Échap ; ferme / est fermé par le menu Synchro.
+- **v0.29.0 (10 nov. 2026) : grande carte et tracé coloré**, maquette validée par
+  Cyril (il a retiré Cadence, Vent et Progression). Carte de la liste : grande carte
+  OSM (360 × 250) avec titre / date / coupe posés dessus (`.sortie-voile`) et puces
+  Uni · Puissance · Vitesse · FC · Pente · Altitude (`.puce-trace`) ; une puce change la
+  couleur de TOUTES les cartes sans ouvrir la sortie (réglage `modeTrace`, Puissance par
+  défaut ; carte sans la donnée = couleur unie, puce pâle). Sorties sans tracé : ancienne
+  carte (icône + titre). `js/couleurs-trace.js` (sans navigateur, test-couleurs-trace.mjs) :
+  `valeursTrace(records)` = vitesse km/h, puissance W, FC, pente %, altitude m aux ~160
+  points de la trace simplifiée (mêmes points que `traceSimplifiee`, moyenne sur le pas),
+  rangées dans `sortie.traceValeurs` (v = VERSION_VALEURS_TRACE) à l'import ; pour les
+  sorties déjà importées, `calculerValeursTraceManquantes` (profil.js) relit les fichiers en
+  arrière-plan (liste rafraîchie tous les 100). Couleurs : puissance = zones Coggan avec la
+  FTP réglée, FC = zones en % de la FC max, pente = −8…+10 % fixe, vitesse et altitude =
+  du 5e au 95e centile de la sortie. Détail : mêmes puces sous la carte Leaflet (tracé en
+  morceaux sur contour blanc) + légende (zones ou dégradé). `htmlTrace` / `groupeTrace`
+  dans carte-statique.js (recolorer sans refaire la carte).
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

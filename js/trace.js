@@ -1,6 +1,7 @@
 // Lecture des traces GPX et TCX (archive Strava) et calcul du résumé
 // d'une sortie à partir des points, quand il n'y a pas de FIT.
 import { traceSimplifiee } from './sortie.js';
+import { valeursTrace } from './couleurs-trace.js';
 
 const RAYON_TERRE_M = 6371000;
 const SEUIL_MOUVEMENT_MS = 0.8; // en dessous : à l'arrêt (≈ 2,9 km/h)
@@ -211,5 +212,6 @@ export function resumerTrace(records, { id, nomFichier, sport = 0, sousSport = 0
     nbPoints: recs.length,
     nbTours: 0,
     trace: traceSimplifiee(recs),
+    traceValeurs: valeursTrace(recs),
   };
 }

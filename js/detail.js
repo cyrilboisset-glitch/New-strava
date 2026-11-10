@@ -1,6 +1,6 @@
 // Page de détail d'une sortie : carte, chiffres, courbes (curseur commun
 // avec la carte), meilleurs efforts, zones de puissance et de FC, tours.
-import { lireSortie, lireFichier, completerSortie } from './db.js';
+import { lireSortie, lireFichier, completerSortie, lireReglage, ecrireReglage } from './db.js';
 import { decoderFichier } from './fichier.js';
 import {
   pointsDetail, parSeconde, meilleursEfforts, intervalleTypiqueS, tempsParZone, chargeSortie,
@@ -15,6 +15,7 @@ import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue, htmlRepli, suivreReplis } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './carte-statique.js';
+import { MODES, MODE_DEFAUT, valeursPoints, morceauxMode, modeDisponible, legende, htmlLegende } from './couleurs-trace.js';
 import { htmlBlocMuscles, installerMuscles, avecMuscles, nettoyer as nettoyerMuscles } from './mannequin.js';
 import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties } from './segments.js';
 import { records, ftpApresSortie } from './stats.js';
@@ -43,6 +44,7 @@ let indexCurseur = null; // point de la sortie sous le curseur des courbes (cré
 
 export function fermerDetail() {
   if (carte) { retirerCarte(carte); carte = null; }
+  traceCouleur = null;
   if (vue3d) { vue3d.detruire(); vue3d = null; }
   fermerApercuSegment();
   indexCurseur = null;
@@ -258,7 +260,27 @@ function installerCurseur(page, pts, axe, series, marqueur, vers3d) {
 
 // ---- Carte -----------------------------------------------------------------------
 
-function creerCarte(div, pts) {
+// Couleur du tracé : valeurs pour chaque point de la ligne dessinée
+let traceCouleur = null; // { ligne, valeurs, groupe }
+
+function colorerCarte(mode, ctx) {
+  const L = globalThis.L;
+  if (!traceCouleur || !carte) return;
+  const { ligne, valeurs, groupe } = traceCouleur;
+  groupe.clearLayers();
+  const m = morceauxMode(valeurs, mode, ctx);
+  if (!m) return;
+  L.polyline(ligne, { color: '#fff', weight: 8, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(groupe);
+  for (const x of m) L.polyline(ligne.slice(x.i0, x.i1 + 1), { color: x.couleur, weight: 5, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(groupe);
+}
+
+function htmlCouleursCarte(mode, valeurs, ctx) {
+  return `<div class="puces-trace" role="group" aria-label="Couleur du tracé">${MODES.map((m) =>
+    `<button type="button" class="puce-trace${m.cle === mode ? ' on' : ''}${modeDisponible(valeurs, m.cle, ctx) ? '' : ' indispo'}" data-mode="${m.cle}" aria-pressed="${m.cle === mode}">${m.nom}</button>`).join('')}</div>
+    <div class="legende-carte">${htmlLegende(legende(valeurs, mode, ctx))}</div>`;
+}
+
+function creerCarte(div, pts, modeInitial = 'uni', ctx = {}) {
   const L = globalThis.L;
   const gps = pts.filter((p) => typeof p.lat === 'number');
   if (!L || gps.length < 2) return null;
@@ -274,6 +296,11 @@ function creerCarte(div, pts) {
     maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(carte);
   const poly = L.polyline(ligne, { color: trait, weight: 4, opacity: 0.95 }).addTo(carte);
+  // valeurs de la couleur : mêmes points que la ligne
+  const idx = [];
+  gps.forEach((_, i) => { if (i % pas === 0 || i === gps.length - 1) idx.push(i); });
+  traceCouleur = { ligne, valeurs: valeursPoints(gps, idx, { demi: Math.floor(pas / 2) + 1, penteMinM: 80 }), groupe: L.layerGroup().addTo(carte) };
+  colorerCarte(modeInitial, ctx);
   L.circleMarker(ligne[0], { radius: 6, color: '#fff', weight: 2, fillColor: '#2e9e4f', fillOpacity: 1 }).addTo(carte).bindTooltip('Départ');
   L.circleMarker(ligne[ligne.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#15171b', fillOpacity: 1 }).addTo(carte).bindTooltip('Arrivée');
   carte.fitBounds(poly.getBounds(), { padding: [16, 16] });
@@ -464,6 +491,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
     <button type="button" data-valeur="3d" aria-pressed="${modeVue === '3d'}">3D</button>
   </div>
   <div class="carte-parcours" id="carte-parcours" role="img" aria-label="Carte du parcours"${modeVue === '3d' ? ' hidden' : ''}></div>
+  <div class="couleurs-carte" id="couleurs-carte"${modeVue === '3d' ? ' hidden' : ''}></div>
   <div class="vue3d" id="vue3d"${modeVue === '3d' ? '' : ' hidden'}></div>` : ''}
   ${avecMuscles(familleSortie(s)) ? `<section class="carte bloc" id="bloc-muscles">${htmlBlocMuscles(s, htmlRepli, familleSortie(s).cle === 'musculation' && !Object.keys(nettoyerMuscles(s.muscles)).length)}</section>` : ''}
   ${grilleChiffres(s, charge, pts, estimee)}
@@ -482,7 +510,22 @@ export async function afficherDetail(page, id, toast = () => {}) {
 
   let marqueur = null;
   if (avecGps) {
-    try { marqueur = creerCarte(page.querySelector('#carte-parcours'), pts); } catch (e) { console.warn('Carte', e); }
+    const ctxCouleurs = { ftpW: profil.ftpW, fcMaxBpm: profil.fcMaxBpm };
+    let modeCouleur = MODE_DEFAUT;
+    try { modeCouleur = (await lireReglage('modeTrace')) ?? MODE_DEFAUT; } catch { /* mode par défaut */ }
+    try { marqueur = creerCarte(page.querySelector('#carte-parcours'), pts, modeCouleur, ctxCouleurs); } catch (e) { console.warn('Carte', e); }
+    const zoneCouleurs = page.querySelector('#couleurs-carte');
+    if (traceCouleur) {
+      zoneCouleurs.innerHTML = htmlCouleursCarte(modeCouleur, traceCouleur.valeurs, ctxCouleurs);
+      zoneCouleurs.addEventListener('click', async (e) => {
+        const b = e.target.closest('.puce-trace');
+        if (!b || !traceCouleur) return;
+        modeCouleur = b.dataset.mode;
+        colorerCarte(modeCouleur, ctxCouleurs);
+        zoneCouleurs.innerHTML = htmlCouleursCarte(modeCouleur, traceCouleur.valeurs, ctxCouleurs);
+        try { await ecrireReglage('modeTrace', modeCouleur); } catch { /* sans importance */ }
+      });
+    } else zoneCouleurs.hidden = true;
   }
   // Vue 3D, reliée au curseur des courbes dans les deux sens
   let curseur = null;
@@ -495,6 +538,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
     const montrer = (mode) => {
       modeVue = mode;
       page.querySelector('#carte-parcours').hidden = mode !== 'carte';
+      page.querySelector('#couleurs-carte').hidden = mode !== 'carte' || !traceCouleur;
       page.querySelector('#vue3d').hidden = mode !== '3d';
       for (const b of boutons.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.valeur === mode));
       vue3d?.afficher(mode === '3d');
