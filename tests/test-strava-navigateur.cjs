@@ -1260,6 +1260,61 @@ async function texteToast(page) {
   verif('recochée : FTP pas dépassée, inchangée', (await texteToast(page)).includes('pas dépassée') && (await page.inputValue('#champ-ftp')) === '285');
   await page.screenshot({ path: path.join(CAPTURES, 'ftp-auto.png') });
 
+  // Longue liste : 30 sorties d'abord, la suite en descendant, retour instantané, mise à jour discrète
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
+  const nReel = await page.locator('a.sortie').count();
+  await page.evaluate(async () => {
+    const db = await import('./js/db.js');
+    const trace = Array.from({ length: 40 }, (_, i) => [45 + 0.001 * i, 5 + 0.0005 * i]);
+    for (let k = 0; k < 100; k++) {
+      await db.enregistrerSortie({ id: `longue-${k}`, nomFichier: `l${k}.fit`, debut: Date.UTC(2020, 0, 1) + k * 86400000, sport: 2, sousSport: 0, nomSport: 'Vélo',
+        dureeChronoS: 3600, dureeTotaleS: 3600, distanceM: 30000, denivelePosM: 300, nbPoints: 40, nbTours: 0, trace }, null);
+    }
+  });
+  await page.reload();
+  await page.waitForSelector('a.sortie');
+  await page.waitForTimeout(500);
+  const premier = await page.locator('a.sortie').count();
+  verif('longue liste : seulement 30 cartes dessinées au départ (reste annoncé)', premier === 30 && (await page.textContent('#liste-suite')).includes('Encore'), `${premier} / ${await page.textContent('#liste-suite')}`);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.waitForFunction((n) => document.querySelectorAll('a.sortie').length > n, 30, { timeout: 10000 });
+  for (let i = 0; i < 8; i++) { await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(250); }
+  const total = await page.locator('a.sortie').count();
+  verif('en descendant : toutes les sorties arrivent, plus de message', total === nReel + 100 && (await page.textContent('#liste-suite')) === '', `${total} / ${nReel + 100}`);
+  const cumulsLongue = await page.$$eval('.mois-cumul', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ')));
+  verif('totaux des mois calculés sur toutes les sorties (janvier 2020 : 31 sorties)', cumulsLongue.some((t) => t.startsWith('31 sorties · 930 km')), JSON.stringify(cumulsLongue.slice(-3)));
+  // (on attend la fin des calculs en arrière-plan sur les 100 sorties ajoutées, puis la liste se met à jour)
+  await attendre(page, async () => {
+    const db = await import('./js/db.js'); const v = db.versionBase();
+    await new Promise((r) => setTimeout(r, 1200));
+    return db.versionBase() === v;
+  }, null);
+  await page.evaluate(async () => (await import('./js/app.js')).rafraichirListe());
+  // retour instantané : la liste n'est pas refaite si rien n'a changé
+  await page.evaluate(() => { window.scrollTo(0, 0); document.querySelector('a.sortie').dataset.marque = 'oui'; });
+  await page.evaluate(() => { location.hash = '#profil'; });
+  await page.waitForSelector('#champ-ftp');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  verif('retour sur l\'accueil : liste gardée telle quelle (pas refaite)', (await page.getAttribute('a.sortie', 'data-marque')) === 'oui');
+  // calculs en arrière-plan : seules les cartes changées sont refaites
+  const refait = await page.evaluate(async () => {
+    const cartes = [...document.querySelectorAll('a.sortie')].slice(0, 3);
+    cartes.forEach((c, i) => { c.dataset.marque = `m${i}`; });
+    const db = await import('./js/db.js');
+    const id = cartes[1].dataset.id;
+    await db.completerSortie(id, () => ({ nom: 'Nom changé en arrière-plan' }));
+    await (await import('./js/app.js')).rafraichirListe();
+    return id;
+  });
+  verif('mise à jour discrète : la carte changée est refaite, les autres gardées', await page.evaluate(() => {
+    const c = [...document.querySelectorAll('a.sortie')].slice(0, 3);
+    return c[1].textContent.includes('Nom changé') && c[0].dataset.marque === 'm0' && c[2].dataset.marque === 'm2' && !c[1].dataset.marque;
+  }));
+
   verif('aucune erreur dans la console', erreursConsole.length === 0, erreursConsole.join(' | '));
   await browser.close();
   srv.close();

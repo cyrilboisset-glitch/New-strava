@@ -448,6 +448,20 @@ l'instant »** — à proposer quand il voudra :
   −8…+10 % fixe, vitesse et altitude = du 5e au 95e centile de la sortie. `valeursTrace`
   / `indicesEchantillon` existent encore mais ne servent plus.
 - **v0.29.2 (10 nov. 2026)** : icône du bouton Activité recentrée dans le rond (l'icône en ligne était 3 px trop haute : `#icone-activite` en grille, `line-height: 0`).
+- **v0.30.0 (10 nov. 2026) : liste plus rapide**, demande de Cyril (« l'appli rame »).
+  Mesure (1 000 fausses sorties, CPU 4× plus lent) : avant 43 000 éléments, 6 000 images
+  de tuiles, 8 images/s au défilement, liste prête en 1,6 s ; après 1 400 éléments,
+  56 images/s, 0,1 s. Ce qui a changé dans `js/app.js` : 1) la liste ne dessine que
+  30 sorties, la suite arrive en descendant (`IntersectionObserver` sur `#liste-suite`,
+  `dessinerMorceau`) ; les totaux des mois restent calculés sur toutes les sorties ;
+  2) la liste reste dans la page : `listeAJour()` compare `versionBase()` (compteur
+  d'écritures dans db.js : sorties et réglages) à la version de la dernière lecture ; si
+  rien n'a changé, revenir sur l'accueil ne refait rien (position gardée) ; sinon
+  `afficherListe()` refait la liste en gardant le nombre de sorties déjà affichées ;
+  3) les calculs en arrière-plan (segments, estimations, FTP) appellent
+  `rafraichirListe()` (exportée) qui ne refait que les cartes dont le HTML a changé
+  (toutes les cartes ont `data-id`) ; si l'ordre ou le nombre change, reconstruction.
+  Ne pas remettre `afficherListe()` après un calcul en arrière-plan.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
