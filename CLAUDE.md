@@ -447,6 +447,7 @@ l'instant »** — à proposer quand il voudra :
   puissance = zones Coggan avec la FTP réglée, FC = zones en % de la FC max, pente =
   −8…+10 % fixe, vitesse et altitude = du 5e au 95e centile de la sortie. `valeursTrace`
   / `indicesEchantillon` existent encore mais ne servent plus.
+- **v0.29.2 (10 nov. 2026)** : icône du bouton Activité recentrée dans le rond (l'icône en ligne était 3 px trop haute : `#icone-activite` en grille, `line-height: 0`).
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

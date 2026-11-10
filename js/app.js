@@ -20,7 +20,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.29.1 · couleurs du tracé dans le détail';
+export const VERSION_APPLI = '0.29.2 · icône Activité centrée';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
