@@ -486,6 +486,12 @@ l'instant »** — à proposer quand il voudra :
   navigateur n'a pas `showOpenFilePicker` (« Importer un fichier » reste). Si la liaison d'un
   dossier est refusée (SecurityError), le message conseille ce bouton ou de faire déposer le zip
   de Gadgetbridge dans Documents. Pas de synchro automatique possible depuis Téléchargements.
+- **v0.33.0 (10 nov. 2026) : renommer une sortie**, demande de Cyril (icône crayon). Détail :
+  crayon à droite du titre (`.bouton-renommer`, `data-renommer`) -> champ avec ✓ / ✕ (Entrée
+  valide, Échap annule) ; enregistré dans `sortie.nom` (`completerSortie`, dans la sauvegarde) ;
+  nom vide = retour au nom du sport. Espaces multiples nettoyés, 80 caractères. L'import de
+  l'archive Strava ne remplace jamais un nom déjà présent. La liste se met à jour au retour
+  (version des données). Fonctions `htmlTitre`, `installerRenommer` dans detail.js.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

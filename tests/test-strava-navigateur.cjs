@@ -817,6 +817,32 @@ async function texteToast(page) {
   await page.goto(URL_APPLI + '#sortie=strava-333');
   await page.waitForSelector('#page-detail .courbe');
   verif('ouverture directe du détail', (await page.textContent('.detail-nom')) === 'Footing');
+  // Renommer la sortie (icône crayon)
+  const sportAvant = await page.textContent('#page-detail .detail-date');
+  await page.click('#page-detail [data-renommer="ouvrir"]');
+  verif('crayon : champ de saisie avec le nom actuel, validation et annulation', (await page.inputValue('#page-detail .renommer input')) === 'Footing'
+    && !!(await page.$('#page-detail .renommer .valider')) && !!(await page.$('#page-detail [data-renommer="annuler"]')));
+  await page.keyboard.press('Escape');
+  verif('Échap : on annule, nom inchangé', (await page.textContent('#page-detail .detail-nom')) === 'Footing' && !(await page.$('#page-detail .renommer')));
+  await page.click('#page-detail [data-renommer="ouvrir"]');
+  await page.fill('#page-detail .renommer input', '  Footing   du   dimanche  ');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#page-detail .detail-titre .detail-nom');
+  verif('nom changé (espaces nettoyés), message, type de sport affiché dans la date', (await page.textContent('#page-detail .detail-nom')) === 'Footing du dimanche'
+    && (await texteToast(page)) === 'Nom enregistré.' && (await page.textContent('#page-detail .detail-date')).includes('·'), await page.textContent('#page-detail .detail-date'));
+  const nomGarde = await page.evaluate(async () => (await (await import('./js/db.js')).toutesLesSorties()).map((x) => x.nom).filter((n) => n && n.startsWith('Footing')));
+  verif('nom gardé dans la base', nomGarde.includes('Footing du dimanche'), JSON.stringify(nomGarde));
+  await page.click('#page-detail [data-renommer="ouvrir"]');
+  await page.fill('#page-detail .renommer input', '');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !document.querySelector('#page-detail .renommer'));
+  verif('nom vidé : retour au nom du sport', (await page.textContent('#page-detail .detail-nom')) !== 'Footing du dimanche' && (await texteToast(page)).startsWith('Nom retiré'), await page.textContent('#page-detail .detail-nom'));
+  await page.click('#page-detail [data-renommer="ouvrir"]');
+  await page.fill('#page-detail .renommer input', 'Footing');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('#page-detail .detail-nom')?.textContent === 'Footing');
+  await texteToast(page); // lit puis cache le message « Nom enregistré. »
+  await page.screenshot({ path: path.join(CAPTURES, 'detail-renommer.png'), clip: { x: 0, y: 0, width: 390, height: 260 } });
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
 
