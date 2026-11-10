@@ -91,7 +91,7 @@ async function texteToast(page) {
   await page.waitForFunction(() => document.getElementById('synchro-titre').textContent !== 'Chargement…');
   verif('état initial', (await page.textContent('#synchro-titre')) === 'Aucun dossier relié', await page.textContent('#synchro-titre'));
   verif('écran vide affiché', await page.isVisible('#vide'));
-  verif('bouton synchro du haut caché sans dossier', !(await page.isVisible('#btn-synchro-haut')));
+  verif('menu synchro : « Synchroniser maintenant » caché sans dossier', !(await page.isVisible('#btn-synchro')));
   await page.screenshot({ path: path.join(CAPTURES, '1-vide.png') });
 
   // 1. Import manuel du zip
@@ -117,10 +117,9 @@ async function texteToast(page) {
   const t3 = await texteToast(page);
   verif('synchro du dossier', t3.includes('Aucune nouvelle sortie') && t3.includes('2 déjà connues'), t3);
   verif('état dossier relié', (await page.textContent('#synchro-titre')).includes('Gadgetbridge'), await page.textContent('#synchro-titre'));
-  verif('bouton synchro en haut visible', await page.isVisible('#btn-synchro-haut'));
-
-  // 4. Synchro à nouveau : zip déjà lu
-  await page.click('#btn-synchro-haut');
+  // 4. Synchro à nouveau (bouton rond ⟳ -> menu -> Synchroniser maintenant) : zip déjà lu
+  await page.click('#btn-menu-synchro');
+  await page.click('#btn-synchro');
   verif('zip déjà lu', (await texteToast(page)).includes('Rien de nouveau'));
 
   // 5. Page de détail (pas de fond de carte ici : tuiles coupées)

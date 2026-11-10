@@ -5,5 +5,8 @@
   "description": "Appli perso de suivi des sorties vélo, sans Strava",
   "scripts": {
     "test": "node tests/test-strava.mjs && node tests/test-analyse.mjs && TZ=Europe/Paris node tests/test-stats.mjs && node tests/test-vue3d.mjs && node tests/test-segments.mjs && node tests/test-estimation.mjs && node tests/test-routage.mjs && node tests/test-vent.mjs && node tests/test-lieux.mjs && TZ=Europe/Paris node tests/test-image.mjs && node tests/test-fit.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

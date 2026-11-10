@@ -758,3 +758,18 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .repli-contenu { margin-top: 10px; }
 .repli[open] > .repli-contenu { animation: entree-fondu 0.2s ease; }
 @media (prefers-reduced-motion: reduce) { .repli > summary .chevron { transition: none; } .repli[open] > .repli-contenu { animation: none; } }
+
+/* ---- Accueil : boutons ronds Activité et Synchro dans la barre du titre ---- */
+.barre-actions { display: flex; align-items: center; gap: 10px; }
+.barre-actions .icone-btn { position: relative; width: 48px; height: 48px; color: var(--texte); box-shadow: var(--ombre); }
+.bouton-activite { cursor: pointer; }
+.bouton-activite:focus-within { outline: 2px solid var(--accent-trait); outline-offset: 2px; }
+/* le menu natif, invisible, couvre tout le bouton : un toucher ouvre le choix d'Android */
+.bouton-activite select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; margin: 0; padding: 0; cursor: pointer; font-size: 16px; }
+.bouton-activite select:disabled { cursor: default; }
+.mini-chevron { position: absolute; right: 3px; bottom: 4px; color: var(--texte-2); }
+.bouton-activite:has(select:disabled) .mini-chevron { display: none; }
+.bouton-synchro .pastille { position: absolute; top: 5px; right: 5px; margin: 0; width: 11px; height: 11px; border: 2px solid var(--surface); box-sizing: content-box; }
+.bouton-synchro.occupe .pastille { animation: clignote 1s ease-in-out infinite; background: var(--accent-trait); }
+.bouton-synchro[aria-expanded="true"] { border-color: var(--accent-trait); }
+.lecteur-seul { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

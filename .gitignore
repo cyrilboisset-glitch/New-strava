@@ -2,3 +2,4 @@
 tests/donnees/
 node_modules/
 tests/captures/
+dist/

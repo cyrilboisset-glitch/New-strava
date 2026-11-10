@@ -11,7 +11,7 @@ import { afficherProgres, htmlFiltres } from './progres.js';
 import { afficherSegment, mettreAJourPassages, suivreRecherche, recordsDesSorties } from './segments.js';
 import { afficherTraces, fermerTraces } from './traces.js';
 import { brancherCache } from './lieux.js';
-import { iconeSport } from './icones.js';
+import { iconeSport, iconeFamille } from './icones.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
   importerFichiers, dossierPossible, choisirDossier, dossierMemorise,
@@ -21,13 +21,13 @@ import {
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
-export const VERSION_APPLI = '0.24.0 · cartes claires';
+export const VERSION_APPLI = '0.25.1 · fichier unique';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   titre: $('synchro-titre'), detail: $('synchro-detail'), pastille: $('pastille'),
   progression: $('progression'), btnDossier: $('btn-dossier'), btnSynchro: $('btn-synchro'),
-  btnHaut: $('btn-synchro-haut'), btnImporter: $('btn-importer'), champ: $('champ-fichier'),
+  btnImporter: $('btn-importer'), champ: $('champ-fichier'),
   btnChanger: $('btn-changer-dossier'), liste: $('liste'), choixActivite: $('choix-activite'), vide: $('vide'), toast: $('toast'),
   btnMenuSynchro: $('btn-menu-synchro'), menuSynchro: $('menu-synchro'), synchroCourt: $('synchro-court'),
   accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'), pageProgres: $('page-progres'),
@@ -91,6 +91,11 @@ function afficherFiltres(toutes) {
   el.choixActivite.innerHTML = choix.map((f) =>
     `<option value="${echapper(f.cle)}"${f.cle === filtre ? ' selected' : ''}>${echapper(f.nom)} (${nombre(f.n)})</option>`).join('');
   el.choixActivite.disabled = familles.size < 2;
+  // bouton rond : icône de l'activité choisie, nom complet pour le lecteur d'écran
+  $('icone-activite').innerHTML = iconeFamille(filtre, 24);
+  const choisi = choix.find((f) => f.cle === filtre);
+  el.choixActivite.setAttribute('aria-label', `Type d'activité : ${choisi ? `${choisi.nom} (${choisi.n})` : 'Tout'}`);
+  el.choixActivite.closest('label').title = choisi ? `${choisi.nom} (${choisi.n})` : 'Tout';
 }
 
 async function changerFiltre(cle) {
@@ -220,9 +225,9 @@ function toast(texte) {
 function occuper(oui) {
   occupe = oui;
   if (!oui && rechargerApres) { location.reload(); return; }
-  for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnHaut, el.btnChanger, $('btn-restaurer-menu')]) b.disabled = oui;
+  for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnChanger, $('btn-restaurer-menu')]) b.disabled = oui;
   el.btnMenuSynchro.classList.toggle('occupe', oui);
-  el.btnHaut.classList.toggle('tourne', oui);
+  el.btnMenuSynchro.classList.toggle('tourne', oui);
 }
 
 function phraseBilan(b) {
@@ -235,7 +240,6 @@ function phraseBilan(b) {
 async function afficherEtatDossier() {
   el.btnDossier.hidden = true;
   el.btnSynchro.hidden = true;
-  el.btnHaut.hidden = true;
   el.btnChanger.hidden = true;
 
   if (!dossierPossible) {
@@ -248,7 +252,6 @@ async function afficherEtatDossier() {
     return;
   }
   el.btnChanger.hidden = false;
-  el.btnHaut.hidden = false;
   el.btnSynchro.hidden = false;
   const derniere = await lireReglage('derniereSynchro');
   const autorisation = await etatAutorisation(dossier);
@@ -320,7 +323,6 @@ el.btnDossier.addEventListener('click', async () => {
 });
 el.btnChanger.addEventListener('click', () => el.btnDossier.click());
 el.btnSynchro.addEventListener('click', () => synchroniser());
-el.btnHaut.addEventListener('click', () => synchroniser());
 el.btnImporter.addEventListener('click', () => el.champ.click());
 el.champ.addEventListener('change', async () => {
   const fichiers = [...el.champ.files].map((f) => ({ nom: f.name, lire: async () => f }));
@@ -505,7 +507,8 @@ function miseAJourAuto() {
 async function demarrer() {
   $('version').textContent = `v${VERSION_APPLI}`;
   try { filtre = (await lireReglage('filtre')) ?? 'tout'; } catch { /* filtre par défaut */ }
-  if ('serviceWorker' in navigator) miseAJourAuto();
+  // pas de service worker pour le fichier unique ouvert depuis le téléphone (file://, content://)
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) miseAJourAuto();
   await afficherListe();
   if (!location.hash) cascade(el.liste);
 
