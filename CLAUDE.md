@@ -475,6 +475,17 @@ l'instant »** — à proposer quand il voudra :
   en heures, ex. 2,5 = 2 h 30) dans `TYPES_OBJECTIF` / `avancementObjectif` (stats.js) ;
   ils comptent les sorties de la famille `musculation` (le reste : vélo). Rythme des
   séances : « à faire d'ici le … » au lieu de « par jour ».
+- **v0.32.0 (10 nov. 2026) : Téléchargements**, demande de Cyril (« accéder au répertoire
+  download pour la synchro »). Chrome met le dossier Téléchargements sur sa liste de dossiers
+  protégés : `showDirectoryPicker` ne peut pas le relier (sources : code de
+  chrome_file_system_access_permission_context, version bureau ; NON vérifié sur le Xiaomi de
+  Cyril). Ce qui est possible : choisir des FICHIERS dedans. Menu Synchro → « Importer depuis
+  Téléchargements » (`#btn-telechargements`, `choisirDansTelechargements` dans import.js) =
+  `showOpenFilePicker({ startIn: 'downloads', multiple: true })`, le sélecteur s'ouvre dans
+  Téléchargements ; le zip choisi est importé comme une synchro (anti-doublons). Caché si le
+  navigateur n'a pas `showOpenFilePicker` (« Importer un fichier » reste). Si la liaison d'un
+  dossier est refusée (SecurityError), le message conseille ce bouton ou de faire déposer le zip
+  de Gadgetbridge dans Documents. Pas de synchro automatique possible depuis Téléchargements.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

@@ -200,6 +200,16 @@ async function importerZip(contenu, nomZip, bilan, connues, progression) {
 
 export const dossierPossible = typeof globalThis.showDirectoryPicker === 'function';
 
+// Téléchargements : Chrome interdit de relier ce dossier en entier (il est sur sa liste de
+// dossiers protégés), mais permet de choisir des fichiers dedans. Ce sélecteur s'ouvre
+// directement dans Téléchargements (startIn) : on touche le zip, il est lu comme une synchro.
+export const selecteurFichiersPossible = typeof globalThis.showOpenFilePicker === 'function';
+
+export async function choisirDansTelechargements() {
+  const poignees = await globalThis.showOpenFilePicker({ id: 'telechargements', startIn: 'downloads', multiple: true });
+  return poignees.map((h) => ({ nom: h.name, lire: async () => h.getFile() }));
+}
+
 export async function choisirDossier() {
   const dossier = await globalThis.showDirectoryPicker({ id: 'gadgetbridge', mode: 'read' });
   try { await ecrireReglage('dossier', dossier); } catch { /* handle non mémorisable */ }

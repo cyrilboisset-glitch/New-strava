@@ -181,7 +181,7 @@ async function texteToast(page) {
   await page.waitForFunction(() => document.getElementById('menu-synchro').classList.contains('ouvert'));
   await page.waitForTimeout(250); // fin du fondu d'ouverture (capture)
   const actions = await page.$$eval('#menu-synchro .menu-item:not([hidden])', (els) => els.map((e) => e.firstElementChild.nextElementSibling.firstChild.textContent.trim()));
-  verif('actions du menu sans dossier', JSON.stringify(actions) === JSON.stringify(['Choisir le dossier Gadgetbridge', 'Importer un fichier', 'Restaurer une sauvegarde']), JSON.stringify(actions));
+  verif('actions du menu sans dossier', JSON.stringify(actions) === JSON.stringify(['Choisir le dossier Gadgetbridge', 'Importer depuis Téléchargements', 'Importer un fichier', 'Restaurer une sauvegarde']), JSON.stringify(actions));
   verif('état dans le menu', (await page.textContent('#menu-synchro .menu-etat')).includes('Aucun dossier relié'));
   await page.screenshot({ path: path.join(CAPTURES, 'accueil-menu-synchro.png') });
   await page.keyboard.press('Escape');
@@ -196,6 +196,17 @@ async function texteToast(page) {
   await page.waitForSelector('#menu-synchro', { state: 'hidden', timeout: 2000 }).catch(() => {});
   verif('« Importer un fichier » ouvre le choix de fichier, menu refermé', choixFichier.isMultiple() && !(await page.isVisible('#menu-synchro')));
   verif('menu Activité inactif sans sortie', await page.$eval('#btn-activite', (s) => s.disabled));
+  // Importer depuis Téléchargements : le sélecteur s'ouvre dans « downloads » (Chrome interdit de relier ce dossier en entier)
+  await page.evaluate(() => {
+    window.__optionsSelecteur = null;
+    window.showOpenFilePicker = async (options) => { window.__optionsSelecteur = options; return [{ name: 'faux-export.fit', getFile: async () => new File([new Uint8Array(20)], 'faux-export.fit') }]; };
+  });
+  await page.click('#btn-menu-synchro');
+  verif('menu Synchro : « Importer depuis Téléchargements » visible', await page.isVisible('#btn-telechargements'));
+  await page.click('#btn-telechargements');
+  await page.waitForFunction(() => /illisible|Aucune nouvelle|nouvelle/i.test(document.getElementById('toast').textContent), null, { timeout: 8000 });
+  const optsTel = await page.evaluate(() => window.__optionsSelecteur);
+  verif('Téléchargements : sélecteur ouvert dans « downloads », plusieurs fichiers, fichier lu (message d\'import)', optsTel?.startIn === 'downloads' && optsTel?.multiple === true, JSON.stringify(optsTel) + ' / ' + await texteToast(page));
 
   // 1. La sortie du 1er juin arrive d'abord par Gadgetbridge (FIT seul)
   await page.setInputFiles('#champ-fichier', { name: 'gadgetbridge.fit', mimeType: 'application/octet-stream', buffer: fit });
