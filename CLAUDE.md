@@ -552,6 +552,10 @@ l'instant »** — à proposer quand il voudra :
   « Tes sorties t'appartiennent. ») sont aussi en haut de l'accueil, sous le nom
   (`#accueil-accroche`), sans « elles restent sur ton téléphone » (demande de Cyril ; cette
   phrase reste dans le Profil et l'écran vide). Caché quand il n'y a aucune sortie.
+- **v0.39.3 (11 nov. 2026)** : couleurs des anneaux d'objectifs, demande de Cyril : **cuivre =
+  là où j'en suis** (arc extérieur, `--cuivre`), **or = l'objectif / prévu à ce jour** (arc
+  intérieur, `--or`) ; légende et note de Progrès mises à jour. Remplace rouge / bleu (v0.17.0 ;
+  les textes plus haut qui disent « rouge » et « bleu » ne valent plus).
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

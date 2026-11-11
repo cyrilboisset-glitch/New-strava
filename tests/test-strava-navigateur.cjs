@@ -451,6 +451,12 @@ async function texteToast(page) {
     const t = a.textContent.replace(/\s+/g, ' ');
     return !a.hidden && t.includes('Go out. Be the GOAT.') && t.includes("Tes sorties t'appartiennent.") && !t.includes('restent sur ton') && a.getBoundingClientRect().bottom <= r.getBoundingClientRect().top;
   }));
+  const couleursAnneaux = await page.evaluate(() => {
+    const rgb = (el) => getComputedStyle(el).stroke;
+    const fait = document.querySelector('#objectifs-rail .anneau-fait'); const attendu = document.querySelector('#objectifs-rail .anneau-attendu');
+    return { fait: fait ? rgb(fait) : null, attendu: attendu ? rgb(attendu) : null };
+  });
+  verif('anneaux : « là où j\'en suis » en cuivre (#e9a178), l\'objectif en or (#f0cf73)', couleursAnneaux.attendu === 'rgb(240, 207, 115)' && (couleursAnneaux.fait === null || couleursAnneaux.fait === 'rgb(233, 161, 120)'), JSON.stringify(couleursAnneaux));
   verif('accueil : les anneaux se remplissent (animation)', bandeau.anim === 'anneau-remplit', bandeau.anim);
   await page.screenshot({ path: path.join(CAPTURES, 'accueil-objectifs.png') });
   await page.click('#onglet-progres');
