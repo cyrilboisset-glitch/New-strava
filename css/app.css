@@ -1,4 +1,14 @@
 @font-face {
+  font-family: 'Space Grotesk';
+  src: url('../fonts/space-grotesk-latin-500-normal.woff2') format('woff2');
+  font-weight: 500; font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../fonts/space-grotesk-latin-700-normal.woff2') format('woff2');
+  font-weight: 700; font-display: swap;
+}
+@font-face {
   font-family: 'Barlow Condensed';
   src: url('../fonts/barlow-condensed-latin-500-normal.woff2') format('woff2');
   font-weight: 500; font-display: swap;
@@ -15,16 +25,18 @@
 }
 
 :root {
-  --fond: #f4f5f2;
-  --surface: #ffffff;
-  --surface-2: #eceee9;
-  --ligne: #dcdfd8;
-  --texte: #15171b;
-  --texte-2: #4d5460;
-  --texte-3: #7a818c;
-  --accent: #c8f031;          /* remplissage des boutons, pastilles */
-  --accent-texte: #15171b;    /* texte posé sur l'accent */
-  --accent-trait: #4f7a00;    /* traces, liens : lisible sur le fond */
+  /* Charte GOATout : noir chaud, or et cuivre, comme l'icône */
+  --fond: #f6f1e7;
+  --surface: #fffdf8;
+  --surface-2: #efe8d9;
+  --ligne: #ddd3be;
+  --texte: #1a1713;
+  --texte-2: #5a5246;
+  --texte-3: #8a8173;
+  --accent: #e8c15a;          /* remplissage des boutons, pastilles : or */
+  --accent-texte: #1a1405;    /* texte posé sur l'accent */
+  --accent-trait: #8a6410;    /* traces, liens : or foncé, lisible sur le fond clair */
+  --cuivre: #c4673a;          /* phrases d'accroche */
   --puissance: #6d4fd8;
   --cardio: #d43b4c;
   --danger: #c0392b;
@@ -32,7 +44,7 @@
   --trace-carte: #e8590c;     /* trace sur le fond OSM (clair dans les deux thèmes) */
   --forme: #2563eb;           /* CTL */
   --fatigue: #d6336c;         /* ATL */
-  --ombre: 0 2px 3px rgb(20 32 46 / 10%), 0 10px 24px rgb(20 32 46 / 12%);
+  --ombre: 0 2px 3px rgb(40 30 10 / 10%), 0 10px 24px rgb(40 30 10 / 12%);
   --rayon: 16px;
   --police-chiffres: 'Barlow Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
   color-scheme: light;
@@ -40,31 +52,32 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --fond: #2a2f38;
-    --surface: #363c47;
-    --surface-2: #414855;
-    --ligne: #4b5361;
-    --texte: #f3f5f8;
-    --texte-2: #b9c0cc;
-    --texte-3: #8f98a7;
-    --accent: #ff8a3d;
-    --accent-texte: #1b1206;
-    --accent-trait: #ff8a3d;
+    --fond: #0f0e0d;
+    --surface: #1c1a17;
+    --surface-2: #27241f;
+    --ligne: #3a342c;
+    --texte: #f4efe6;
+    --texte-2: #cfc8ba;
+    --texte-3: #978e7f;
+    --accent: #f0cf73;
+    --accent-texte: #1a1405;
+    --accent-trait: #f0cf73;
+    --cuivre: #e9a178;
     --puissance: #a995ff;
     --cardio: #ff6b7a;
     --danger: #ff7b6b;
     --altitude: #8b93a1;
     --forme: #4d8ef7;
     --fatigue: #e8588a;
-    --ombre: 0 2px 3px rgb(0 0 0 / 25%), 0 12px 26px rgb(0 0 0 / 30%);
+    --ombre: 0 2px 3px rgb(0 0 0 / 40%), 0 12px 26px rgb(0 0 0 / 45%);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --fond: #2a2f38; --surface: #363c47; --surface-2: #414855; --ligne: #4b5361;
-  --texte: #f3f5f8; --texte-2: #b9c0cc; --texte-3: #8f98a7;
-  --accent: #ff8a3d; --accent-texte: #1b1206; --accent-trait: #ff8a3d;
-  --puissance: #a995ff; --cardio: #ff6b7a; --danger: #ff7b6b; --altitude: #8b93a1; --forme: #4d8ef7; --fatigue: #e8588a; --ombre: 0 2px 3px rgb(0 0 0 / 25%), 0 12px 26px rgb(0 0 0 / 30%);
+  --fond: #0f0e0d; --surface: #1c1a17; --surface-2: #27241f; --ligne: #3a342c;
+  --texte: #f4efe6; --texte-2: #cfc8ba; --texte-3: #978e7f;
+  --accent: #f0cf73; --accent-texte: #1a1405; --accent-trait: #f0cf73; --cuivre: #e9a178;
+  --puissance: #a995ff; --cardio: #ff6b7a; --danger: #ff7b6b; --altitude: #8b93a1; --forme: #4d8ef7; --fatigue: #e8588a; --ombre: 0 2px 3px rgb(0 0 0 / 40%), 0 12px 26px rgb(0 0 0 / 45%);
   color-scheme: dark;
 }
 
@@ -991,3 +1004,18 @@ body.carte-plein { overflow: hidden; }
 /* ---- Détail : chiffres et courbes repliables (flèche) ---- */
 #bloc-chiffres .sortie-details { margin: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--ligne); }
 .courbes > .repli > .repli-contenu { margin-top: 12px; }
+
+/* ---- GOATout : nom, phrases d'accroche ---- */
+:root { --police-marque: 'Space Grotesk', 'Barlow Condensed', system-ui, sans-serif; }
+.logo-mot { font-family: var(--police-marque); font-weight: 700; letter-spacing: -0.03em; }
+.logo-mot .out { color: var(--accent-trait); }
+#titre-page .logo-mot { font-size: 29px; }
+.accroche { margin: 0; font-family: var(--police-marque); font-weight: 500; color: var(--cuivre); }
+.pied .accroche { font-size: 14px; margin-bottom: 4px; }
+.marque-bloc { display: flex; gap: 16px; align-items: center; }
+.marque-icone { width: 72px; height: 72px; flex: none; border-radius: 17px; box-shadow: var(--ombre); }
+.marque-bloc .logo-mot { font-size: 30px; line-height: 1.1; margin: 0; }
+.marque-bloc .accroche { font-size: 16px; margin-top: 2px; }
+.marque-sous { margin: 6px 0 0; font-size: 13px; color: var(--texte-2); }
+.vide .accroche { font-size: 18px; margin-bottom: 4px; }
+.vide .marque-sous { margin: 0 0 14px; font-size: 14px; }

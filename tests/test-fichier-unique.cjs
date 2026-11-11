@@ -5,7 +5,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { chromium } = require('playwright');
 
-const FICHIER = path.join(__dirname, '..', 'dist', 'mes-sorties.html');
+const FICHIER = path.join(__dirname, '..', 'dist', 'goatout.html');
 const CAPTURES = path.join(__dirname, 'captures');
 let echecs = 0;
 const verif = (nom, ok, detail = '') => { console.log(`${ok ? '✓' : '✗'} ${nom}${ok ? '' : ` — ${detail}`}`); if (!ok) echecs++; };
@@ -21,7 +21,7 @@ const verif = (nom, ok, detail = '') => { console.log(`${ok ? '✓' : '✗'} ${n
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_|tile\.openstreetmap|net::/.test(m.text())) erreurs.push(m.text()); });
   await page.goto(`file://${FICHIER}`);
   await page.waitForFunction(() => document.getElementById('synchro-titre').textContent !== 'Chargement…');
-  verif('démarre depuis un fichier (file://)', (await page.textContent('#titre-page')) === 'Mes sorties' && (await page.textContent('#version')).startsWith('v'));
+  verif('démarre depuis un fichier (file://)', (await page.textContent('#titre-page')) === 'GOATout' && (await page.textContent('#version')).startsWith('v'));
   verif('aucune demande de fichier voisin (tout est dans le fichier)', await page.evaluate(() =>
     performance.getEntriesByType('resource').every((r) => !r.name.startsWith('file:'))), JSON.stringify(await page.evaluate(() => performance.getEntriesByType('resource').map((r) => r.name).filter((n) => n.startsWith('file:')))));
   verif('pas de service worker hors d\'un site', await page.evaluate(async () => { try { return (await navigator.serviceWorker.getRegistrations()).length === 0; } catch { return true; } }));
@@ -46,7 +46,7 @@ const verif = (nom, ok, detail = '') => { console.log(`${ok ? '✓' : '✗'} ${n
   verif('onglets Tracés, Progrès, Profil ouverts sans erreur', (await page.textContent('#titre-page')) === 'Profil');
   // Sauvegarde : le zip se télécharge
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click('#btn-sauvegarder')]);
-  verif('sauvegarde exportée', /^mes-sorties-sauvegarde-.*\.zip$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+  verif('sauvegarde exportée', /^goatout-sauvegarde-.*\.zip$/.test(dl.suggestedFilename()), dl.suggestedFilename());
 
   await page.goto('about:blank');
   await page.goto(`file://${FICHIER}`);

@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Mes sorties</title>
-  <meta name="description" content="Mes sorties vélo, récupérées depuis Gadgetbridge, sans Strava.">
-  <meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f4f5f2" media="(prefers-color-scheme: light)">
+  <title>GOATout</title>
+  <meta name="description" content="GOATout · Go out. Be the GOAT. Tes sorties t'appartiennent.">
+  <meta name="theme-color" content="#0f0e0d" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f1e7" media="(prefers-color-scheme: light)">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icone.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icone-192.png">
@@ -21,7 +21,7 @@
     <button id="btn-retour" class="icone-btn sous-page-seulement" type="button" aria-label="Retour">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
-    <h1 class="titre" id="titre-page">Mes sorties</h1>
+    <h1 class="titre" id="titre-page"><span class="logo-mot">GOAT<span class="out">out</span></span></h1>
     <div class="barre-actions accueil-seulement">
       <!-- Activité : icône de l'activité choisie ; le menu ne montre que des icônes -->
       <div class="menu menu-activite">
@@ -65,6 +65,8 @@
     <p id="progression" class="progression bandeau" hidden></p>
 
     <section id="vide" class="carte vide" hidden>
+      <p class="accroche">Go out. Be the GOAT.</p>
+      <p class="marque-sous">Tes sorties t'appartiennent : elles restent sur ton téléphone.</p>
       <h2>Aucune sortie pour l'instant</h2>
       <ol>
         <li>Dans Gadgetbridge, l'export automatique du zip dépose une sauvegarde dans un dossier (par exemple <b>Documents/Gadgetbridge</b>).</li>
@@ -88,7 +90,8 @@
   </main>
 
   <footer class="pied">
-    <p>Données gardées sur ce téléphone · <span id="version"></span></p>
+    <p class="accroche">Go out. Be the GOAT.</p>
+    <p>Tes sorties t'appartiennent · gardées sur ce téléphone · <span id="version"></span></p>
   </footer>
 
   <nav class="onglets accueil-seulement" aria-label="Navigation principale">

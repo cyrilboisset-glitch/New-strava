@@ -59,7 +59,7 @@ export async function creerSauvegarde(progression = () => {}) {
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 } });
   const jour = new Date().toISOString().slice(0, 10);
   await ecrireReglage('derniereSauvegarde', Date.now());
-  return { blob, nomFichier: `mes-sorties-sauvegarde-${jour}.zip`, nbSorties: sorties.length };
+  return { blob, nomFichier: `goatout-sauvegarde-${jour}.zip`, nbSorties: sorties.length };
 }
 
 /** Propose le fichier : enregistrement dans Téléchargements. */

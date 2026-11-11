@@ -603,12 +603,12 @@ async function texteToast(page) {
     let trace = 0; let accent = 0;
     for (let i = 0; i < d.length; i += 4) {
       if (d[i] > 230 && d[i + 1] > 80 && d[i + 1] < 130 && d[i + 2] < 50) trace++; // orange #ff6a13
-      if (d[i] > 180 && d[i] < 215 && d[i + 1] > 225 && d[i + 2] < 80) accent++; // vert-jaune #c8f031 (logo)
+      if (d[i] > 225 && d[i + 1] > 190 && d[i + 1] < 225 && d[i + 2] > 90 && d[i + 2] < 140) accent++; // or #f0cf73 (« out » du nom GOATout)
     }
     return { trace, accent };
   });
   const coul = await couleursImage();
-  verif('image : tracé orange sur la carte et logo de l\'appli', coul.trace > 500 && coul.accent > 500, JSON.stringify(coul));
+  verif('image : tracé orange sur la carte et nom GOATout en or', coul.trace > 500 && coul.accent > 200, JSON.stringify(coul));
   for (const [f, dim] of [['story', '[1080,1920]'], ['carre', '[1080,1080]'], ['paysage', '[1200,630]']]) {
     await page.click(`[data-segments="format-image"] button[data-valeur="${f}"]`);
     await page.waitForFunction((d) => { const c = document.querySelector('#bloc-image canvas.image-sortie'); return c && JSON.stringify([c.width, c.height]) === d; }, dim, { timeout: 15000 });
@@ -787,7 +787,7 @@ async function texteToast(page) {
   const [telechargement] = await Promise.all([page.waitForEvent('download'), page.click('#btn-sauvegarder')]);
   const cheminZip = path.join(CAPTURES, 'sauvegarde-test.zip');
   await telechargement.saveAs(cheminZip);
-  verif('nom du fichier de sauvegarde', /^mes-sorties-sauvegarde-\d{4}-\d{2}-\d{2}\.zip$/.test(telechargement.suggestedFilename()), telechargement.suggestedFilename());
+  verif('nom du fichier de sauvegarde', /^goatout-sauvegarde-\d{4}-\d{2}-\d{2}\.zip$/.test(telechargement.suggestedFilename()), telechargement.suggestedFilename());
   const sauvegarde = await JSZip.loadAsync(fs.readFileSync(cheminZip));
   const index = JSON.parse(await sauvegarde.file('sauvegarde-mes-sorties.json').async('string'));
   verif('sauvegarde : 7 sorties, 3 fichiers, FTP', index.sorties.length === 7 && Object.keys(sauvegarde.files).filter((n) => n.startsWith('fichiers/') && !n.endsWith('/')).length === 3 && index.reglages.ftpW === 236,

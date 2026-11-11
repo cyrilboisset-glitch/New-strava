@@ -114,7 +114,7 @@ export function gpxDepuisTrace(nom, coords, { departMs = null } = {}) {
   const pts = coords.map(([la, lo, ele]) =>
     `      <trkpt lat="${la.toFixed(6)}" lon="${lo.toFixed(6)}">${typeof ele === 'number' ? `<ele>${ele.toFixed(1)}</ele>` : ''}</trkpt>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Mes sorties" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="GOATout" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata><name>${echapperXml(nom)}</name>${departMs ? `<desc>Départ prévu</desc><time>${new Date(departMs).toISOString().replace('.000', '')}</time>` : ''}</metadata>
   <trk>
     <name>${echapperXml(nom)}</name>
@@ -143,7 +143,7 @@ export function gpxDepuisSortie(nom, pts, debutMs, { velo = true } = {}) {
     return `      <trkpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">${typeof p.altitudeM === 'number' ? `<ele>${p.altitudeM.toFixed(1)}</ele>` : ''}<time>${heure(p.tS)}</time>${ext ? `<extensions>${ext}</extensions>` : ''}</trkpt>`;
   }).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Mes sorties" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+<gpx version="1.1" creator="GOATout" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
   <metadata><name>${echapperXml(nom)}</name><time>${heure(0)}</time></metadata>
   <trk>
     <name>${echapperXml(nom)}</name>${velo ? '\n    <type>cycling</type>' : ''}
