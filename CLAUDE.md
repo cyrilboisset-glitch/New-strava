@@ -561,6 +561,18 @@ l'instant »** — à proposer quand il voudra :
   = où j'en suis, **vert en avance** (`--avance`) ou **rouge en retard** (`--retard`) ;
   `etatAvancement(a)` (objectifs.js) : atteint ou écart ≥ −0,5 % de la cible = en avance. Légende
   et note de Progrès mises à jour.
+- **Commercialisation (discutée le 11 nov. 2026, rien de codé)** : décision de Cyril : **garder
+  Open-Meteo** (pas MET Norway). Comparaison faite le 11 nov. sur 4 lieux (Grenoble, Villard-de-Lans,
+  Col de Porte, Valence) : MET Norway cohérent (température à 0,7–2,3 °C près sur 48 h, pluie d'accord
+  83–100 % des heures, vent proche en plaine, écarts en montagne) mais **pas de probabilité de pluie
+  en France** et horaire seulement ~65 h (puis par 6 h). Open-Meteo commercial : 29 $ / mois pour
+  1 million d'appels, 99 $ / mois pour 5 millions (annonce de leur blog, page des tarifs non lue) ;
+  l'appli envoie ~30 points par prévision. **L'API gratuite est interdite dès le premier usage
+  commercial** : prendre l'abonnement à la première vente, pas après 3 000. Autres pistes gratuites
+  évoquées : Cloudflare Pages (hébergement commercial gratuit, GitHub Pages l'interdit),
+  OpenFreeMap (fonds de carte vectoriels, gros chantier), OpenRouteService (2 000 itinéraires / jour,
+  usage commercial à confirmer). Environnement de Claude « New-strava » créé le 11 nov. 2026 : autorise
+  api.open-meteo.com et api.met.no.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
