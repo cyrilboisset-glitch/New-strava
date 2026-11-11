@@ -55,6 +55,37 @@ const valeur = (v, unite, dec = 0) => (v == null ? null : `${nombre(v, dec)} ${u
 
 // ---- Chiffres ----------------------------------------------------------------
 
+// ---- Chiffres de la sortie : œil ouvert / fermé pour les montrer ou les cacher ----------------
+// (plus court à parcourir pour atteindre les courbes et créer un segment ; choix gardé)
+
+const OEIL_OUVERT = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+const OEIL_FERME = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.2A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.3 6.5C3.7 8.3 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.2-1M9.9 9.9a3.2 3.2 0 0 0 4.2 4.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function htmlChiffres(grille, caches) {
+  if (!grille) return '';
+  return `<div class="chiffres-bloc" id="bloc-chiffres">
+    <button class="chiffres-bascule" type="button" data-chiffres="bascule" aria-expanded="${!caches}" aria-label="${caches ? 'Afficher' : 'Masquer'} les chiffres de la sortie">
+      <span class="chiffres-titre">Chiffres de la sortie</span><span class="chiffres-oeil" aria-hidden="true">${caches ? OEIL_FERME : OEIL_OUVERT}</span>
+    </button>
+    <div class="chiffres-contenu"${caches ? ' hidden' : ''}>${grille}</div>
+  </div>`;
+}
+
+function installerChiffres(page) {
+  const bloc = page.querySelector('#bloc-chiffres');
+  if (!bloc) return;
+  bloc.querySelector('[data-chiffres="bascule"]').addEventListener('click', async (e) => {
+    const bouton = e.currentTarget;
+    const contenu = bloc.querySelector('.chiffres-contenu');
+    const caches = !contenu.hidden ? true : false; // on va cacher si c'était visible
+    contenu.hidden = caches;
+    bouton.setAttribute('aria-expanded', String(!caches));
+    bouton.setAttribute('aria-label', `${caches ? 'Afficher' : 'Masquer'} les chiffres de la sortie`);
+    bouton.querySelector('.chiffres-oeil').innerHTML = caches ? OEIL_FERME : OEIL_OUVERT;
+    try { await ecrireReglage('chiffresCaches', caches); } catch { /* sans importance */ }
+  });
+}
+
 function grilleChiffres(s, charge, pts, estimee = false) {
   const lignes = [];
   const ajout = (nom, val) => { if (val != null && val !== '') lignes.push(`<div class="detail"><dt>${nom}</dt><dd>${val}</dd></div>`); };
@@ -635,6 +666,8 @@ export async function afficherDetail(page, id, toast = () => {}) {
   const courbes = blocCourbes(pts, axe);
   const d = new Date(s.debut);
   const nbRecords = (await recordsDesSorties().catch(() => new Map())).get(s.id) ?? 0;
+  let chiffresCaches = false;
+  try { chiffresCaches = (await lireReglage('chiffresCaches')) === true; } catch { /* visibles par défaut */ }
 
   const zonesP = puissance.length && profil.ftpW
     ? blocZones(estimee ? 'Zones de puissance (estimée)' : 'Zones de puissance', tempsParZone(puissance, ZONES_PUISSANCE, profil.ftpW), 'W', 'var(--puissance)',
@@ -679,7 +712,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
   <div class="couleurs-carte" id="couleurs-carte"${modeVue === '3d' ? ' hidden' : ''}></div>
   <div class="vue3d" id="vue3d"${modeVue === '3d' ? '' : ' hidden'}></div>` : ''}
   ${avecMuscles(familleSortie(s)) ? `<section class="carte bloc" id="bloc-muscles">${htmlBlocMuscles(s, htmlRepli, familleSortie(s).cle === 'musculation' && !Object.keys(nettoyerMuscles(s.muscles)).length)}</section>` : ''}
-  ${grilleChiffres(s, charge, pts, estimee)}
+  ${htmlChiffres(grilleChiffres(s, charge, pts, estimee), chiffresCaches)}
   ${courbes.html}
   ${avecGps ? '<section class="carte bloc" id="bloc-segments-sortie"></section>' : ''}
   <section class="carte bloc" id="bloc-meme-parcours" hidden></section>
@@ -694,6 +727,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
   </div>` : ''}`;
 
   installerRenommer(page, s, d, nbRecords, toast);
+  installerChiffres(page);
   let marqueur = null;
   if (avecGps) {
     const ctxCouleurs = { ftpW: profil.ftpW, fcMaxBpm: profil.fcMaxBpm };

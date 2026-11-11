@@ -519,6 +519,12 @@ l'instant »** — à proposer quand il voudra :
   +/- caché) ; l'attribution OSM reste visible sous la carte des valeurs. Fermer : croix, Échap
   ou bouton retour d'Android (`history.pushState({plein: true})` + `popstate`). Code :
   `installerPleinEcran` dans detail.js.
+- **v0.37.0 (11 nov. 2026) : chiffres de la sortie masquables**, demande de Cyril (œil ouvert /
+  fermé, pour atteindre plus vite les courbes et créer un segment). Détail : la grille des
+  chiffres (vitesse, temps, puissance, FC, TSS, calories…) est sous une ligne « Chiffres de la
+  sortie » avec une icône d'œil (`#bloc-chiffres`, `data-chiffres="bascule"`, `aria-expanded`) ;
+  touchée, elle cache / montre la grille. Choix gardé pour toutes les sorties (réglage
+  `chiffresCaches`, visibles par défaut). Fonctions `htmlChiffres`, `installerChiffres`.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
