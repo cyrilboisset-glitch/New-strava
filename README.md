@@ -1,4 +1,4 @@
-# Mes sorties
+# GOATout
 
 Appli perso pour suivre mes sorties vélo **sans Strava**. Les sorties
 viennent du compteur iGPSport BiNavi, récupérées par
@@ -10,7 +10,7 @@ sur le téléphone : rien n'est envoyé sur internet.
 ```
 BiNavi ──Bluetooth──> Gadgetbridge ──export auto du zip──> dossier du téléphone
                                                               │
-                                     Mes sorties (cette appli) lit le zip le plus récent
+                                     GOATout (cette appli) lit le zip le plus récent
                                      et importe les sorties qu'elle ne connaît pas
 ```
 

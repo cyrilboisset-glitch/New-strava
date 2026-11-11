@@ -3,7 +3,7 @@
 // Changer VERSION à chaque mise en ligne pour que le téléphone se mette à jour.
 import { deposerPartage } from './js/db.js';
 
-const VERSION = '0.38.0';
+const VERSION = '0.39.0';
 const CACHE = `mes-sorties-${VERSION}`;
 const FICHIERS = [
   './', 'index.html', 'manifest.webmanifest',
@@ -17,6 +17,8 @@ const FICHIERS = [
   'fonts/barlow-condensed-latin-500-normal.woff2',
   'fonts/barlow-condensed-latin-600-normal.woff2',
   'fonts/barlow-condensed-latin-700-normal.woff2',
+  'fonts/space-grotesk-latin-500-normal.woff2',
+  'fonts/space-grotesk-latin-700-normal.woff2',
   'icons/icone.svg', 'icons/icone-192.png', 'icons/icone-512.png',
 ];
 

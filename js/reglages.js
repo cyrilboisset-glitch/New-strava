@@ -31,6 +31,14 @@ export async function afficherReglages(page, toast) {
   const ftpAuto = await lireFtpAuto();
   const derniereHausse = (await lireHaussesFtp()).at(-1) ?? null;
   page.innerHTML = `
+  <section class="carte marque-bloc">
+    <img class="marque-icone" src="icons/icone.svg" alt="" width="72" height="72">
+    <div>
+      <p class="logo-mot">GOAT<span class="out">out</span></p>
+      <p class="accroche">Go out. Be the GOAT.</p>
+      <p class="marque-sous">Tes sorties t'appartiennent : elles restent sur ton téléphone.</p>
+    </div>
+  </section>
   <section class="carte reglages">
     <h2 class="bloc-titre">Puissance</h2>
     <label class="champ">

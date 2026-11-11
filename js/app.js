@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.38.0 · chiffres et courbes repliables';
+export const VERSION_APPLI = '0.39.0 · GOATout';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -580,7 +580,7 @@ let navigationInterne = false; // arrivé sur le détail par un lien de l'appli
 let defilementListe = 0;
 let pageActuelle = 'sorties';
 
-const TITRES = { sorties: 'Mes sorties', progres: 'Progrès', profil: 'Profil', detail: 'Sortie', segment: 'Segment', traces: 'Tracés' };
+const TITRES = { sorties: 'GOATout', progres: 'Progrès', profil: 'Profil', detail: 'Sortie', segment: 'Segment', traces: 'Tracés' };
 
 document.addEventListener('click', (e) => { if (e.target.closest('a[href^="#sortie="], a[href^="#segment="]')) navigationInterne = true; });
 el.btnRetour.addEventListener('click', () => {
@@ -685,7 +685,8 @@ async function afficherPage(page, id, avant, sens) {
   el.pageSegment.hidden = page !== 'segment';
   const sousPage = page === 'detail' || page === 'segment';
   document.body.classList.toggle('sous-page', sousPage);
-  el.titrePage.textContent = TITRES[page];
+  if (page === 'sorties') el.titrePage.innerHTML = '<span class="logo-mot">GOAT<span class="out">out</span></span>'; // nom en deux couleurs
+  else el.titrePage.textContent = TITRES[page];
   for (const o of document.querySelectorAll('.onglet')) {
     if (o.dataset.onglet === page) o.setAttribute('aria-current', 'page'); else o.removeAttribute('aria-current');
   }

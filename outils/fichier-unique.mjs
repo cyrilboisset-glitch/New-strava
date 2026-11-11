@@ -1,4 +1,4 @@
-// Construit « Mes sorties » en UN SEUL fichier HTML (code, styles, polices,
+// Construit « GOATout » en UN SEUL fichier HTML (code, styles, polices,
 // Leaflet, JSZip, icône), à ouvrir directement sur le téléphone sans site web.
 // Lancer : node outils/fichier-unique.mjs  ->  dist/mes-sorties.html
 //
@@ -23,12 +23,13 @@ const { outputFiles } = await esbuild.build({
   bundle: true, format: 'iife', target: 'es2022', minify: true, write: false, charset: 'utf8',
   legalComments: 'none',
 });
-const code = outputFiles[0].text;
+const icone = `data:image/svg+xml;base64,${base64('icons/icone.svg')}`;
+// l'icône (page Profil, image à partager) est intégrée au code
+const code = outputFiles[0].text.replace(/icons\/icone\.svg/g, () => icone);
 
 // 2. Styles : polices et icône en données intégrées
 const css = lire('css/app.css').replace(/url\('\.\.\/fonts\/([^']+)'\)/g, (_, f) => `url(data:font/woff2;base64,${base64(`fonts/${f}`)})`);
 const leafletCss = lire('vendor/leaflet/leaflet.css').replace(/url\(images\/[^)]+\)/g, 'none');
-const icone = `data:image/svg+xml;base64,${base64('icons/icone.svg')}`;
 
 // « </script> » ne doit pas apparaître dans un script intégré
 const sur = (js) => js.replace(/<\/script/gi, '<\\/script');
@@ -49,5 +50,5 @@ for (const reste of ['src="js/', 'href="css/', 'src="vendor/', 'manifest.webmani
   if (html.includes(reste)) throw new Error(`lien externe restant : ${reste}`);
 }
 mkdirSync(join(racine, 'dist'), { recursive: true });
-writeFileSync(join(racine, 'dist/mes-sorties.html'), html);
-console.log(`dist/mes-sorties.html : ${(html.length / 1024).toFixed(0)} Ko`);
+writeFileSync(join(racine, 'dist/goatout.html'), html);
+console.log(`dist/goatout.html : ${(html.length / 1024).toFixed(0)} Ko`);

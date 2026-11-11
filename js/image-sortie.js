@@ -7,7 +7,8 @@
 import { cadrer, tuiles } from './carte-statique.js';
 import { nombre, km, duree, fmtJourLong } from './format.js';
 
-export const NOM_APPLI = 'Mes sorties';
+export const NOM_APPLI = 'GOATout';
+export const ACCROCHE_APPLI = 'Go out. Be the GOAT.';
 export const ADRESSE_APPLI = 'cyrilboisset-glitch.github.io/New-strava';
 
 /** Formats (pixels) : tailles conseillées par les réseaux */
@@ -145,10 +146,23 @@ export function placerPhoto(info, pts, debutMs) {
 // ---- Dessin (navigateur) ------------------------------------------------------------
 
 const C = {
-  fond: '#121418', panneau: '#1d2027', texte: '#ffffff', gris: '#a3a9b3', accent: '#c8f031',
+  fond: '#0f0e0d', panneau: '#1c1a17', texte: '#f4efe6', gris: '#b9b1a3', accent: '#f0cf73', cuivre: '#e9a178',
   trace: '#ff6a13', depart: '#2e9e4f', or: '#f2c230', photo: '#1e88e5',
 };
 const CHIFFRES = "'Barlow Condensed', 'Arial Narrow', sans-serif";
+const MARQUE = "'Space Grotesk', 'Barlow Condensed', sans-serif";
+
+// Icône de l'appli (même fichier que l'icône installée) ; sans elle, un petit logo dessiné
+let logoImg = null;
+function chargerLogo() {
+  return new Promise((ok) => {
+    const img = new Image();
+    const fin = setTimeout(() => ok(null), 3000);
+    img.onload = () => { clearTimeout(fin); ok(img); };
+    img.onerror = () => { clearTimeout(fin); ok(null); };
+    img.src = 'icons/icone.svg';
+  });
+}
 const TEXTE = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
 function chargerTuile(url, delaiMs = 6000) {
@@ -238,13 +252,18 @@ async function dessinerCarte(ctx, trace, x, y, w, h, rayon, reperes) {
 function marque(ctx, x, yBas, taille, largeurMax) {
   const s = taille;
   ctx.save();
-  arrondi(ctx, x, yBas - s, s, s, s * 0.24); ctx.fillStyle = C.accent; ctx.fill();
-  // petit tracé dans le logo
-  ctx.beginPath();
-  ctx.moveTo(x + s * 0.2, yBas - s * 0.3); ctx.lineTo(x + s * 0.42, yBas - s * 0.62); ctx.lineTo(x + s * 0.6, yBas - s * 0.42); ctx.lineTo(x + s * 0.8, yBas - s * 0.75);
-  ctx.lineWidth = s * 0.1; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#12140c'; ctx.stroke();
-  ctx.fillStyle = C.texte; ctx.font = `700 ${Math.round(s * 0.62)}px ${CHIFFRES}`;
-  ctx.fillText(NOM_APPLI, x + s * 1.25, yBas - s * 0.42);
+  if (logoImg) ctx.drawImage(logoImg, x, yBas - s, s, s);
+  else {
+    arrondi(ctx, x, yBas - s, s, s, s * 0.24); ctx.fillStyle = C.fond; ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + s * 0.2, yBas - s * 0.3); ctx.lineTo(x + s * 0.42, yBas - s * 0.62); ctx.lineTo(x + s * 0.6, yBas - s * 0.42); ctx.lineTo(x + s * 0.8, yBas - s * 0.75);
+    ctx.lineWidth = s * 0.1; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = C.accent; ctx.stroke();
+  }
+  // GOAT en crème, « out » en or
+  ctx.font = `700 ${Math.round(s * 0.6)}px ${MARQUE}`;
+  const yMot = yBas - s * 0.42;
+  ctx.fillStyle = C.texte; ctx.fillText('GOAT', x + s * 1.25, yMot);
+  ctx.fillStyle = C.accent; ctx.fillText('out', x + s * 1.25 + ctx.measureText('GOAT').width, yMot);
   ctx.fillStyle = C.gris; ctx.font = `400 ${Math.round(s * 0.3)}px ${TEXTE}`;
   ctx.fillText(tronquer(ctx, ADRESSE_APPLI, largeurMax - s * 1.25), x + s * 1.25, yBas - s * 0.02);
   ctx.restore();
@@ -280,7 +299,8 @@ export async function dessinerImageSortie(canvas, o) {
   const W = f.l; const H = f.h;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-  try { await Promise.all(['500', '600', '700'].map((p) => document.fonts.load(`${p} 40px 'Barlow Condensed'`))); } catch { /* police de secours */ }
+  try { await Promise.all([...['500', '600', '700'].map((p) => document.fonts.load(`${p} 40px 'Barlow Condensed'`)), document.fonts.load("700 40px 'Space Grotesk'")]); } catch { /* police de secours */ }
+  logoImg ??= await chargerLogo();
   ctx.fillStyle = C.fond; ctx.fillRect(0, 0, W, H);
   const titre = o.sortie.nom || o.sortie.nomSport || 'Sortie';
   const reperes = o.photos.filter((p) => p.k != null).map((p) => ({ k: p.k, n: p.n }));

@@ -1,4 +1,4 @@
-# CLAUDE.md — Mes sorties (dépôt New-strava)
+# CLAUDE.md — GOATout, ex « Mes sorties » (dépôt New-strava)
 
 Contexte pour reprendre le projet. Tout le projet est en français.
 
@@ -44,8 +44,8 @@ lancer l'export maintenant (« Run AutoExport now »), puis Synchroniser.
 - Adresse : https://cyrilboisset-glitch.github.io/New-strava/ (GitHub
   Pages, branche `main`, dossier racine). Installée sur le téléphone de
   Cyril comme appli (Chrome → Installer l'application).
-- Nom affiché : « Mes sorties » (le dépôt s'appelle New-strava ; Cyril
-  peut demander à renommer).
+- Nom affiché : **« GOATout »** depuis le 11 nov. 2026 (v0.39.0 ; avant : « Mes sorties »). Le dépôt
+  s'appelle toujours New-strava ; Cyril peut demander à le renommer (l'adresse GitHub Pages changerait).
 
 ## Ce qu'on sait des FIT du BiNavi (sortie du 12 oct. 2026)
 
@@ -527,6 +527,26 @@ l'instant »** — à proposer quand il voudra :
   défaut ; le choix est gardé pour toutes les sorties (réglages `chiffresCaches` et
   `courbesCachees`, écrits au « toggle » du <details>). Code : `replisOuverts`,
   `installerReplisMemorises`, `blocChiffres`, `blocCourbesRepliable` dans detail.js.
+- **v0.39.0 (11 nov. 2026) : GOATout, nouvelle charte**, demande de Cyril (nom, charte raccord avec
+  l'icône, phrases d'accroche ; il a envoyé l'icône et une maquette). **Nom : GOATout** (« GOAT »
+  crème + « out » or, police Space Grotesk 700, OFL, `fonts/`). Accueil : titre = nom en deux
+  couleurs (`.logo-mot`) ; page Profil : bloc de marque (icône, nom, accroches). **Accroches** :
+  « Go out. Be the GOAT. » (cuivre, Space Grotesk 500) et « Tes sorties t'appartiennent » (vrai :
+  tout reste sur le téléphone) dans le pied de page, l'écran vide, le Profil, la description du
+  manifeste ; la maquette parlait aussi de sorties partagées / défis entre amis : **pas dans
+  l'appli, ne pas le promettre**. **Palette** (couleurs mesurées sur la maquette) : fond #0f0e0d,
+  cartes #1c1a17 / #27241f, lignes #3a342c, texte #f4efe6, or #f0cf73 (accent), cuivre #e9a178
+  (accroches), or foncé #c99a34 ; thème clair : fond crème #f6f1e7, accent #e8c15a, traits #8a6410.
+  Remplace « Anthracite adouci » (v0.27.0). Les anneaux d'objectifs gardent rouge / bleu (demande
+  de Cyril v0.17.0) et la trace sur les cartes OSM reste orange (contraste). **Icône** refaite en
+  SVG d'après son image (`icons/icone.svg`, PNG 192 / 512 / maskable rendus avec Playwright) : barres
+  noir / or / bronze, courbe dorée, « G ». Image à partager : nom GOATout et icône. Sauvegarde
+  téléchargée : `goatout-sauvegarde-<date>.zip` (le format interne reste `mes-sorties` et
+  `sauvegarde-mes-sorties.json` : les anciennes sauvegardes se restaurent). **Identifiants internes
+  inchangés exprès** : base IndexedDB `mes-sorties` (la renommer ferait perdre les données),
+  nom du cache du service worker. Fichier unique : `dist/goatout.html`. Le téléphone ne change de
+  nom et d'icône qu'après la mise à jour de l'appli installée par Chrome (peut prendre quelques
+  jours) ou après une réinstallation.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
