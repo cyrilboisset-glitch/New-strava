@@ -36,7 +36,8 @@
   --accent: #e8c15a;          /* remplissage des boutons, pastilles : or */
   --accent-texte: #1a1405;    /* texte posé sur l'accent */
   --accent-trait: #8a6410;    /* traces, liens : or foncé, lisible sur le fond clair */
-  --cuivre: #c4673a;          /* phrases d'accroche */
+  --cuivre: #c4673a;          /* phrases d'accroche, objectifs : là où j'en suis */
+  --or: #c99a34;              /* objectifs : l'objectif (prévu à ce jour) */
   --puissance: #6d4fd8;
   --cardio: #d43b4c;
   --danger: #c0392b;
@@ -63,6 +64,7 @@
     --accent-texte: #1a1405;
     --accent-trait: #f0cf73;
     --cuivre: #e9a178;
+    --or: #f0cf73;
     --puissance: #a995ff;
     --cardio: #ff6b7a;
     --danger: #ff7b6b;
@@ -76,7 +78,7 @@
 :root[data-theme="dark"] {
   --fond: #0f0e0d; --surface: #1c1a17; --surface-2: #27241f; --ligne: #3a342c;
   --texte: #f4efe6; --texte-2: #cfc8ba; --texte-3: #978e7f;
-  --accent: #f0cf73; --accent-texte: #1a1405; --accent-trait: #f0cf73; --cuivre: #e9a178;
+  --accent: #f0cf73; --accent-texte: #1a1405; --accent-trait: #f0cf73; --cuivre: #e9a178; --or: #f0cf73;
   --puissance: #a995ff; --cardio: #ff6b7a; --danger: #ff7b6b; --altitude: #8b93a1; --forme: #4d8ef7; --fatigue: #e8588a; --ombre: 0 2px 3px rgb(0 0 0 / 40%), 0 12px 26px rgb(0 0 0 / 45%);
   color-scheme: dark;
 }
@@ -703,8 +705,8 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .anneau { width: 100%; height: 100%; display: block; }
 .anneau circle { fill: none; stroke-linecap: round; }
 .anneau-fond { stroke: var(--surface-2); stroke-width: 10; }
-.anneau-fait { stroke: #e5484d; stroke-width: 10; transition: stroke-dasharray 0.8s ease; }
-.anneau-attendu { stroke: #2f7ff0; stroke-width: 10; transition: stroke-dasharray 0.8s ease; }
+.anneau-fait { stroke: var(--cuivre); stroke-width: 10; transition: stroke-dasharray 0.8s ease; }
+.anneau-attendu { stroke: var(--or); stroke-width: 10; transition: stroke-dasharray 0.8s ease; }
 .objectif-centre { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .objectif-centre b { font-family: var(--police-chiffres); font-size: 26px; line-height: 1; }
 .objectif-centre small { font-size: 11px; color: var(--texte-3); }
@@ -715,9 +717,9 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .objectif-legende li { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
 .objectif-legende b { color: var(--texte); font-variant-numeric: tabular-nums; }
 .objectif-legende .puce { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.puce.fait { background: #e5484d; }
-.puce.attendu { background: #2f7ff0; }
-.puce.cible { background: transparent; border: 2px solid var(--texte-3); width: 8px; height: 8px; }
+.puce.fait { background: var(--cuivre); }
+.puce.attendu { background: var(--or); }
+.puce.cible { background: transparent; border: 2px solid var(--or); width: 8px; height: 8px; }
 .objectif-detail { margin: 6px 0 0; font-size: 12px; color: var(--texte-3); }
 .objectif-form { padding: 10px 0; border-top: 1px solid var(--ligne); }
 #bloc-objectifs > .btn { margin-top: 14px; }
