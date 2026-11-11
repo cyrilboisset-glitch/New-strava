@@ -446,6 +446,11 @@ async function texteToast(page) {
   });
   verif('accueil : 3 anneaux au-dessus de la liste, à faire glisser (trop larges pour l\'écran)', bandeau.n === 3 && bandeau.glisse && bandeau.enHaut, JSON.stringify(bandeau));
   verif('accueil : Distance, Séances (muscu · mois), Temps (muscu · semaine) + « 8 séances », « 2 h 30 »', ['Distance', 'Séances', 'muscu · mois', 'Temps', 'muscu · semaine', '/ 8 séances', '/ 2 h 30'].every((t) => bandeau.texte.includes(t)), bandeau.texte);
+  verif('accueil : phrases d\'accroche sous le nom, au-dessus des anneaux, sans « elles restent sur ton téléphone »', await page.evaluate(() => {
+    const a = document.getElementById('accueil-accroche'); const r = document.getElementById('objectifs-rail');
+    const t = a.textContent.replace(/\s+/g, ' ');
+    return !a.hidden && t.includes('Go out. Be the GOAT.') && t.includes("Tes sorties t'appartiennent.") && !t.includes('restent sur ton') && a.getBoundingClientRect().bottom <= r.getBoundingClientRect().top;
+  }));
   verif('accueil : les anneaux se remplissent (animation)', bandeau.anim === 'anneau-remplit', bandeau.anim);
   await page.screenshot({ path: path.join(CAPTURES, 'accueil-objectifs.png') });
   await page.click('#onglet-progres');

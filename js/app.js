@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.1 · icône GOATout';
+export const VERSION_APPLI = '0.39.2 · accroches sur l\'accueil';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -262,6 +262,7 @@ async function afficherBandeau() {
 
 function appliquerDonnees({ version, toutes, profil, records }) {
   el.vide.hidden = toutes.length > 0;
+  $('accueil-accroche').hidden = toutes.length === 0; // l'écran vide a déjà ses propres phrases
   afficherFiltres(toutes); // peut remettre le filtre sur « tout »
   Object.assign(liste, { version, toutes, profil, records, filtre });
   liste.sorties = toutes.filter((s) => filtre === 'tout' || familleSortie(s).cle === filtre).sort((a, b) => b.debut - a.debut);
