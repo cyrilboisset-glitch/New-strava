@@ -538,9 +538,10 @@ l'instant »** — à proposer quand il voudra :
   cartes #1c1a17 / #27241f, lignes #3a342c, texte #f4efe6, or #f0cf73 (accent), cuivre #e9a178
   (accroches), or foncé #c99a34 ; thème clair : fond crème #f6f1e7, accent #e8c15a, traits #8a6410.
   Remplace « Anthracite adouci » (v0.27.0). Les anneaux d'objectifs gardent rouge / bleu (demande
-  de Cyril v0.17.0) et la trace sur les cartes OSM reste orange (contraste). **Icône** refaite en
-  SVG d'après son image (`icons/icone.svg`, PNG 192 / 512 / maskable rendus avec Playwright) : barres
-  noir / or / bronze, courbe dorée, « G ». Image à partager : nom GOATout et icône. Sauvegarde
+  de Cyril v0.17.0) et la trace sur les cartes OSM reste orange (contraste). **Icône** : fichier fourni
+  par Cyril (PNG 1024, d'abord redessinée en SVG d'après une capture, puis remplacée en v0.39.1) ->
+  `icons/icone-192.png`, `icone-512.png` (coins arrondis) et `icone-maskable-512.png` (plein cadre) ;
+  plus de SVG. Image à partager : nom GOATout et icône. Sauvegarde
   téléchargée : `goatout-sauvegarde-<date>.zip` (le format interne reste `mes-sorties` et
   `sauvegarde-mes-sorties.json` : les anciennes sauvegardes se restaurent). **Identifiants internes
   inchangés exprès** : base IndexedDB `mes-sorties` (la renommer ferait perdre les données),

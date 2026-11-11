@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.0 · GOATout';
+export const VERSION_APPLI = '0.39.1 · icône GOATout';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));

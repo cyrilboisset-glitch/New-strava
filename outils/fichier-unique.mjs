@@ -23,9 +23,9 @@ const { outputFiles } = await esbuild.build({
   bundle: true, format: 'iife', target: 'es2022', minify: true, write: false, charset: 'utf8',
   legalComments: 'none',
 });
-const icone = `data:image/svg+xml;base64,${base64('icons/icone.svg')}`;
+const icone = `data:image/png;base64,${base64('icons/icone-192.png')}`;
 // l'icône (page Profil, image à partager) est intégrée au code
-const code = outputFiles[0].text.replace(/icons\/icone\.svg/g, () => icone);
+const code = outputFiles[0].text.replace(/icons\/icone-192\.png/g, () => icone);
 
 // 2. Styles : polices et icône en données intégrées
 const css = lire('css/app.css').replace(/url\('\.\.\/fonts\/([^']+)'\)/g, (_, f) => `url(data:font/woff2;base64,${base64(`fonts/${f}`)})`);
@@ -36,7 +36,7 @@ const sur = (js) => js.replace(/<\/script/gi, '<\\/script');
 
 let html = lire('index.html')
   .replace(/\s*<link rel="manifest"[^>]*>/, '')
-  .replace(/<link rel="icon"[^>]*>/, `<link rel="icon" href="${icone}" type="image/svg+xml">`)
+  .replace(/<link rel="icon"[^>]*>/, `<link rel="icon" href="${icone}" type="image/png">`)
   .replace(/\s*<link rel="apple-touch-icon"[^>]*>/, '')
   .replace(/<link rel="stylesheet" href="vendor\/leaflet\/leaflet.css">/, () => `<style>${leafletCss}</style>`)
   .replace(/<link rel="stylesheet" href="css\/app.css">/, () => `<style>${css}</style>`)
