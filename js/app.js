@@ -14,6 +14,8 @@ import { brancherCache } from './lieux.js';
 import { htmlMannequin, nettoyer as nettoyerMuscles, resumeMuscles } from './mannequin.js';
 import { iconeSport, iconeFamille } from './icones.js';
 import { htmlBandeauObjectifs } from './objectifs.js';
+import { afficherLegal } from './legal.js';
+import { controlerLicence } from './licence-ui.js';
 import { nombre, km, duree, ilYA, majuscule, echapper, fmtJour, fmtHeure, fmtMois } from './format.js';
 import {
   importerFichiers, dossierPossible, selecteurFichiersPossible, choisirDansTelechargements, choisirDossier, dossierMemorise,
@@ -21,7 +23,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.4 · anneaux bleu, vert, rouge';
+export const VERSION_APPLI = '0.40.0 · base commerciale';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -33,7 +35,7 @@ const el = {
   btnImporter: $('btn-importer'), champ: $('champ-fichier'),
   btnChanger: $('btn-changer-dossier'), liste: $('liste'), btnActivite: $('btn-activite'), menuActivite: $('menu-activite'), vide: $('vide'), toast: $('toast'),
   btnMenuSynchro: $('btn-menu-synchro'), menuSynchro: $('menu-synchro'), synchroCourt: $('synchro-court'),
-  accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'), pageProgres: $('page-progres'),
+  accueil: $('accueil'), pageDetail: $('page-detail'), pageReglages: $('page-reglages'), pageLegal: $('page-legal'), pageProgres: $('page-progres'),
   pageSegment: $('page-segment'), pageTraces: $('page-traces'),
   titrePage: $('titre-page'), btnRetour: $('btn-retour'),
 };
@@ -581,9 +583,9 @@ let navigationInterne = false; // arrivé sur le détail par un lien de l'appli
 let defilementListe = 0;
 let pageActuelle = 'sorties';
 
-const TITRES = { sorties: 'GOATout', progres: 'Progrès', profil: 'Profil', detail: 'Sortie', segment: 'Segment', traces: 'Tracés' };
+const TITRES = { sorties: 'GOATout', progres: 'Progrès', profil: 'Profil', detail: 'Sortie', segment: 'Segment', traces: 'Tracés', legal: 'Informations légales' };
 
-document.addEventListener('click', (e) => { if (e.target.closest('a[href^="#sortie="], a[href^="#segment="]')) navigationInterne = true; });
+document.addEventListener('click', (e) => { if (e.target.closest('a[href^="#sortie="], a[href^="#segment="], a[href="#legal"]')) navigationInterne = true; });
 el.btnRetour.addEventListener('click', () => {
   if (navigationInterne) history.back();
   else { history.replaceState(null, '', location.pathname + location.search); router({ retour: true }); }
@@ -597,6 +599,7 @@ function pageDepuisAdresse() {
   if (h === '#traces') return { page: 'traces' };
   if (h.startsWith('#trace=')) return { page: 'traces', id: decodeURIComponent(h.slice(7)) };
   if (h === '#profil' || h === '#reglages') return { page: 'profil' };
+  if (h === '#legal') return { page: 'legal' };
   return { page: 'sorties' };
 }
 
@@ -623,7 +626,7 @@ function sensNavigation(page, avant, retourForce) {
     compteurN = Math.max(compteurN, n);
   }
   dernierN = n;
-  const sous = (p) => p === 'detail' || p === 'segment';
+  const sous = (p) => p === 'detail' || p === 'segment' || p === 'legal';
   if (retour) return 'entree-gauche';
   if (sous(page)) return 'entree-droite';
   if (sous(avant)) return 'entree-gauche';
@@ -684,7 +687,8 @@ async function afficherPage(page, id, avant, sens) {
   el.pageDetail.hidden = page !== 'detail';
   el.pageReglages.hidden = page !== 'profil';
   el.pageSegment.hidden = page !== 'segment';
-  const sousPage = page === 'detail' || page === 'segment';
+  el.pageLegal.hidden = page !== 'legal';
+  const sousPage = page === 'detail' || page === 'segment' || page === 'legal';
   document.body.classList.toggle('sous-page', sousPage);
   if (page === 'sorties') el.titrePage.innerHTML = '<span class="logo-mot">GOAT<span class="out">out</span></span>'; // nom en deux couleurs
   else el.titrePage.textContent = TITRES[page];
@@ -692,6 +696,12 @@ async function afficherPage(page, id, avant, sens) {
     if (o.dataset.onglet === page) o.setAttribute('aria-current', 'page'); else o.removeAttribute('aria-current');
   }
 
+  if (page === 'legal') {
+    window.scrollTo(0, 0);
+    afficherLegal(el.pageLegal);
+    animer(el.pageLegal, sens);
+    return;
+  }
   if (page === 'detail') {
     el.pageDetail.innerHTML = '<p class="chargement">Chargement…</p>';
     window.scrollTo(0, 0);
@@ -763,10 +773,12 @@ function miseAJourAuto() {
 async function demarrer() {
   $('version').textContent = `v${VERSION_APPLI}`;
   try { filtre = (await lireReglage('filtre')) ?? 'tout'; } catch { /* filtre par défaut */ }
+  try { choisirFond(await lireReglage('fondCarte')); } catch { /* fond par défaut */ }
   // pas de service worker pour le fichier unique ouvert depuis le téléphone (file://, content://)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) miseAJourAuto();
   await afficherListe();
   if (!location.hash) cascade(el.liste);
+  controlerLicence(toast).catch((e) => console.warn('Licence', e)); // écran de licence si l'essai est fini (licence exigée seulement)
 
   // Fichiers reçus par le menu Partager d'Android
   if (new URLSearchParams(location.search).has('partage')) {

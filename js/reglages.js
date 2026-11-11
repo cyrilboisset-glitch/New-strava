@@ -5,7 +5,9 @@ import {
 } from './profil.js';
 import { afficherVelos } from './velos.js';
 import { creerSauvegarde, telecharger } from './sauvegarde.js';
-import { toutesLesSorties, lireReglage } from './db.js';
+import { FONDS, fondActuel, cleFondActuel, choisirFond } from './fonds-carte.js';
+import { htmlCarteLicence, installerCarteLicence } from './licence-ui.js';
+import { toutesLesSorties, lireReglage, ecrireReglage } from './db.js';
 import { ZONES_PUISSANCE, JOURS_ESTIMATION_FTP } from './analyse.js';
 import { nombre, echapper, fmtDate, ilYA } from './format.js';
 
@@ -30,6 +32,7 @@ export async function afficherReglages(page, toast) {
   const nbSorties = (await toutesLesSorties()).length;
   const ftpAuto = await lireFtpAuto();
   const derniereHausse = (await lireHaussesFtp()).at(-1) ?? null;
+  const carteLicence = await htmlCarteLicence();
   page.innerHTML = `
   <section class="carte marque-bloc">
     <img class="marque-icone" src="icons/icone-192.png" alt="" width="72" height="72">
@@ -38,6 +41,15 @@ export async function afficherReglages(page, toast) {
       <p class="accroche">Go out. Be the GOAT.</p>
       <p class="marque-sous">Tes sorties t'appartiennent : elles restent sur ton téléphone.</p>
     </div>
+  </section>
+  ${carteLicence}
+  <section class="carte reglages">
+    <h2 class="bloc-titre">Fond de carte</h2>
+    <label class="champ">
+      <span>Cartes</span>
+      <select id="choix-fond" aria-label="Fond de carte">${Object.entries(FONDS).map(([k, f]) => `<option value="${k}"${k === cleFondActuel() ? ' selected' : ''}>${f.nom}</option>`).join('')}</select>
+    </label>
+    <p class="aide" id="fond-note">${fondActuel().note} S'applique aux cartes des sorties, des tracés, des segments et à l'image à partager.</p>
   </section>
   <section class="carte reglages">
     <h2 class="bloc-titre">Puissance</h2>
@@ -86,7 +98,9 @@ export async function afficherReglages(page, toast) {
   <section class="carte reglages">
     <h2 class="bloc-titre">Données</h2>
     <p class="aide" id="donnees">${nbSorties} sortie${nbSorties > 1 ? 's' : ''} sur ce téléphone.</p>
-  </section>`;
+  </section>
+
+  <p class="profil-legal"><a href="#legal">Informations légales</a> · mentions, conditions, confidentialité</p>`;
 
   const champFtp = page.querySelector('#champ-ftp');
   const champFc = page.querySelector('#champ-fcmax');
@@ -161,6 +175,13 @@ export async function afficherReglages(page, toast) {
   });
 
   // Réglage automatique : enregistré tout de suite ; activé -> vérifié tout de suite
+  installerCarteLicence(page, toast);
+  page.querySelector('#choix-fond').addEventListener('change', async (e) => {
+    choisirFond(e.target.value);
+    page.querySelector('#fond-note').textContent = `${fondActuel().note} S'applique aux cartes des sorties, des tracés, des segments et à l'image à partager.`;
+    try { await ecrireReglage('fondCarte', cleFondActuel()); } catch { /* sans importance */ }
+    toast(`Fond de carte : ${fondActuel().nom}.`);
+  });
   page.querySelector('#ftp-auto').addEventListener('change', async (e) => {
     await ecrireFtpAuto(e.target.checked);
     if (!e.target.checked) { toast('Réglage automatique de la FTP coupé.'); return; }

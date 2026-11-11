@@ -573,6 +573,29 @@ l'instant »** — à proposer quand il voudra :
   OpenFreeMap (fonds de carte vectoriels, gros chantier), OpenRouteService (2 000 itinéraires / jour,
   usage commercial à confirmer). Environnement de Claude « New-strava » créé le 11 nov. 2026 : autorise
   api.open-meteo.com et api.met.no.
+- **v0.40.0 (11 nov. 2026) : base commerciale**, demande de Cyril (« modifie tout ce qu'il faut pour
+  pouvoir la commercialiser ») ; choix : **achat unique**, distribution par le **site web**.
+  Guide complet pour Cyril : `COMMERCIALISATION.md` (à jour avant tout changement du sujet).
+  Fait : 1) `js/config.js` (`CONFIG` : adresses Open-Meteo / BRouter / Nominatim / Overpass, licence,
+  essai, `urlAchat`, identité de l'éditeur) ; 2) **licence hors ligne** (`js/licence.js` : jeton
+  `GOAT-<charge>.<signature>`, ECDSA P-256, clé publique dans config, `situationLicence` :
+  libre / essai / licence / expirée) et `js/licence-ui.js` (écran plein écran quand l'essai de 14 jours
+  est fini, carte « Licence » du Profil, sauvegarde toujours exportable) ; **désactivée par défaut**
+  (`licenceObligatoire: false`, ne passer à `true` qu'après avoir activé la licence de Cyril) ;
+  3) `outils/licences.html` (outil du vendeur, hors ligne : crée la paire de clés et les licences ;
+  NE JAMAIS publier ni mettre la clé privée dans le dépôt) ; 4) **fond de carte au choix**
+  (`js/fonds-carte.js` : OpenStreetMap ou Plan IGN, réglage `fondCarte`, Profil) utilisé par les
+  cartes Leaflet, les petites cartes et l'image à partager, mention © affichée partout ; le Plan IGN
+  n'a PAS été testé en vrai (data.geopf.fr bloqué depuis l'environnement de Claude : Cyril a refusé
+  l'accès) : à vérifier sur le téléphone (affichage, CORS pour l'image à partager) ; 5) page
+  **Informations légales** (`#legal`, `js/legal.js` : mentions, conditions de vente, confidentialité,
+  sources ; texte modèle SANS juriste, identité à remplir dans `CONFIG.editeur`) ; 6) relais météo
+  `serveur/worker-meteo.js` (Cloudflare Worker, ajoute la clé Open-Meteo, non déployé). Restent à
+  la charge de Cyril : INPI, micro-entreprise, Cloudflare Pages, abonnement Open-Meteo, Stripe,
+  clés de licence, relecture des textes ; et côté code : BRouter public non commercial, écran de
+  bienvenue (FTP 236 W / poids 98 kg sont ceux de Cyril), import depuis d'autres marques. Tests :
+  `tests/test-licence.mjs`, `tests/test-worker-meteo.mjs` + blocs « base commerciale » dans
+  test-strava-navigateur.cjs.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

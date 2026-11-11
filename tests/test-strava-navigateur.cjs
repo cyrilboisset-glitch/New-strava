@@ -166,6 +166,8 @@ async function texteToast(page) {
     r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
       body: JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { 'track-length': String(Math.round(d)), 'filtered ascend': String(Math.round((d / 2) * 0.03)) }, geometry: { type: 'LineString', coordinates: coords } }] }) });
   });
+  const tuilesIgn = [];
+  await ctx.route(/data\.geopf\.fr/, (r) => { tuilesIgn.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: fausseTuile() }); });
   await ctx.route(/tile\.openstreetmap\.org/, (r) => { tuilesDemandees.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: fausseTuile() }); });
   const page = await ctx.newPage();
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|tile\.openstreetmap/.test(m.text() + (m.location()?.url ?? ''))) erreursConsole.push(m.text()); });
@@ -1527,6 +1529,82 @@ async function texteToast(page) {
     const c = [...document.querySelectorAll('a.sortie')].slice(0, 3);
     return c[1].textContent.includes('Nom changé') && c[0].dataset.marque === 'm0' && c[2].dataset.marque === 'm2' && !c[1].dataset.marque;
   }));
+
+  // ---- Base commerciale : fond de carte, informations légales, licence ----
+  await page.click('#onglet-profil');
+  await page.waitForSelector('#choix-fond');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  verif('Profil : choix du fond de carte (OpenStreetMap par défaut, Plan IGN)', (await page.$$eval('#choix-fond option', (o) => o.map((x) => x.textContent))).join('|') === 'OpenStreetMap|Plan IGN (France)' && (await page.inputValue('#choix-fond')) === 'osm');
+  await page.selectOption('#choix-fond', 'ign');
+  verif('fond IGN : choix gardé', await page.evaluate(async () => (await (await import('./js/db.js')).lireReglage('fondCarte')) === 'ign'));
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.waitForFunction(() => document.querySelector('a.sortie-grande .tuile')?.src.includes('data.geopf.fr'), null, { timeout: 8000 });
+  const credit = await page.$eval('a.sortie-grande .attribution', (e) => e.textContent);
+  verif('liste : petites cartes sur les tuiles IGN, mention « © IGN »', credit === '© IGN');
+  await page.locator('.sortie-grande').first().locator('.sortie-nom').click();
+  await page.waitForSelector('#carte-parcours.leaflet-container');
+  await page.waitForFunction(() => document.querySelector('#carte-parcours img.leaflet-tile')?.src.includes('data.geopf.fr'), null, { timeout: 8000 });
+  verif('détail : carte Leaflet sur les tuiles IGN, mention IGN affichée', (await page.textContent('#carte-parcours .leaflet-control-attribution')).includes('IGN') && tuilesIgn.length > 0);
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.click('#onglet-profil');
+  await page.waitForSelector('#choix-fond');
+  await page.selectOption('#choix-fond', 'osm');
+  await page.waitForFunction(async () => (await (await import('./js/db.js')).lireReglage('fondCarte')) === 'osm');
+
+  // Informations légales : depuis le Profil, retour au Profil
+  await page.click('.profil-legal a');
+  await page.waitForSelector('#bloc-legal');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  const legal = await page.evaluate(() => ({ titre: document.getElementById('titre-page').textContent, sections: [...document.querySelectorAll('#bloc-legal .repli-titre')].map((e) => e.textContent), marques: document.querySelectorAll('#bloc-legal .a-completer').length }));
+  verif('informations légales : mentions, conditions de vente, confidentialité, sources ; identité à compléter signalée', legal.titre === 'Informations légales' && legal.sections.join('|') === 'Mentions légales|Conditions d\'utilisation et de vente|Confidentialité|Données et logiciels utilisés' && legal.marques >= 5, JSON.stringify(legal));
+  await page.click('#bloc-legal summary:has-text("Confidentialité")');
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(CAPTURES, 'informations-legales.png') });
+  verif('confidentialité : « l\'éditeur collecte rien », services tiers listés', (await page.textContent('#bloc-legal')).includes('Ce que l\'éditeur collecte : rien') && (await page.textContent('#bloc-legal')).includes('Open-Meteo'));
+  await page.click('#btn-retour');
+  await page.waitForSelector('#champ-ftp');
+  verif('retour des informations légales : on est de nouveau sur le Profil', (await page.textContent('#titre-page')) === 'Profil');
+
+  // Licence : exigée seulement si la configuration le demande (par défaut : libre, rien ne change)
+  verif('licence pas exigée par défaut : aucune carte « Licence », écran de licence caché', !(await page.$('#carte-licence')) && await page.evaluate(() => document.getElementById('ecran-licence').hidden));
+  // L'outil du vendeur (outils/licences.html) fabrique clés et licence ; l'appli les vérifie
+  const outil = await ctx.newPage();
+  await outil.goto('file://' + path.join(__dirname, '..', 'outils', 'licences.html'));
+  await outil.click('#creer-cles');
+  await outil.waitForFunction(() => document.getElementById('publique').value.includes('"kty"'));
+  await outil.fill('#nom', 'Camille Dupont');
+  await outil.click('#creer-licence');
+  await outil.waitForFunction(() => document.getElementById('licence').value.startsWith('GOAT-'));
+  const cles = { publique: JSON.parse(await outil.inputValue('#publique')), licence: await outil.inputValue('#licence') };
+  await outil.close();
+  const verifOutil = await page.evaluate(async ({ publique, licence }) => (await import('./js/licence.js')).verifierLicence(licence, publique), cles);
+  verif('outil du vendeur : la licence créée dans licences.html est reconnue par l\'appli', verifOutil.ok && verifOutil.charge.nom === 'Camille Dupont' && /^L-/.test(verifOutil.charge.id), JSON.stringify(verifOutil));
+  // Écran de licence : essai fini -> blocage, code faux refusé, bon code accepté, sauvegarde toujours possible
+  await page.evaluate(async ({ publique }) => {
+    const { CONFIG } = await import('./js/config.js');
+    Object.assign(CONFIG, { licenceObligatoire: true, cleLicencePublique: publique, essaiJours: 14 });
+    const db = await import('./js/db.js');
+    await db.ecrireReglage('essaiDebut', Date.now() - 20 * 86400000);
+    await db.effacerReglage('licence');
+    await (await import('./js/licence-ui.js')).controlerLicence();
+  }, cles);
+  verif('essai de 14 jours fini : écran de licence plein écran, essai terminé, export des sorties proposé', await page.isVisible('#ecran-licence') && (await page.textContent('#ecran-licence')).includes('Ton essai de 14 jours est terminé') && !!(await page.$('#btn-sauvegarde-licence')));
+  await page.screenshot({ path: path.join(CAPTURES, 'ecran-licence.png') });
+  await page.fill('#code-licence', 'GOAT-faux.code');
+  await page.click('#btn-activer');
+  verif('faux code : refusé avec un message, l\'écran reste', (await page.textContent('#msg-licence')).length > 5 && await page.isVisible('#ecran-licence'));
+  const [dlLic] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click('#btn-sauvegarde-licence')]);
+  verif('licence bloquée : la sauvegarde des sorties reste téléchargeable', /^goatout-sauvegarde-.*\.zip$/.test(dlLic.suggestedFilename()), dlLic.suggestedFilename());
+  await page.fill('#code-licence', cles.licence);
+  await page.click('#btn-activer');
+  await page.waitForFunction(() => document.getElementById('ecran-licence').hidden);
+  verif('bon code : écran fermé, licence gardée', await page.evaluate(async () => !!(await (await import('./js/db.js')).lireReglage('licence'))));
+  await page.evaluate(async () => { const { CONFIG } = await import('./js/config.js'); CONFIG.licenceObligatoire = false; await (await import('./js/licence-ui.js')).controlerLicence(); });
+  await page.evaluate(async () => { const db = await import('./js/db.js'); await db.effacerReglage('licence'); await db.effacerReglage('essaiDebut'); });
 
   verif('aucune erreur dans la console', erreursConsole.length === 0, erreursConsole.join(' | '));
   await browser.close();

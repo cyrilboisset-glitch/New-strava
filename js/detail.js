@@ -15,6 +15,7 @@ import { familleSortie } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue, htmlRepli, suivreReplis } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './carte-statique.js';
+import { ajouterFond } from './fonds-carte.js';
 import { MODES, MODE_DEFAUT, valeursPoints, morceauxMode, modeDisponible, legende, htmlLegende } from './couleurs-trace.js';
 import { htmlBlocMuscles, installerMuscles, avecMuscles, nettoyer as nettoyerMuscles } from './mannequin.js';
 import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties } from './segments.js';
@@ -517,9 +518,7 @@ function creerCarte(div, pts, modeInitial = 'uni', ctx = {}) {
   carte.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
   // Fond de carte OpenStreetMap : chargé depuis internet, seules les tuiles
   // de la zone affichée sont demandées (les sorties restent sur le téléphone)
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  }).addTo(carte);
+  ajouterFond(L, carte);
   const poly = L.polyline(ligne, { color: trait, weight: 4, opacity: 0.95 }).addTo(carte);
   // valeurs de la couleur : mêmes points que la ligne
   const idx = [];

@@ -3,6 +3,8 @@
 // Seules les tuiles de la zone sont demandées à internet ; sans réseau, le
 // fond quadrillé reste visible. Tuiles toujours claires, même en thème sombre.
 
+import { urlTuile, fondActuel } from './fonds-carte.js';
+
 const TUILE = 256;
 const ZOOM_MAXI = 16;
 
@@ -72,7 +74,7 @@ export function htmlCarteStatique(trace, { largeur = 320, hauteur = 150, classe 
   const cadre = cadrer(trace, L, H);
   const pct = (v, total) => `${((v / total) * 100).toFixed(3)}%`;
   const imgs = tuiles(cadre, L, H).map((t) =>
-    `<img class="tuile" src="https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png" alt="" loading="lazy" decoding="async"
+    `<img class="tuile" src="${urlTuile(t)}" alt="" loading="lazy" decoding="async"
       style="left:${pct(t.gauche, L)};top:${pct(t.haut, H)};width:${pct(TUILE, L)};height:${pct(TUILE, H)}" onerror="this.remove()">`).join('');
   const [a, b] = [cadre.points[0], cadre.points[cadre.points.length - 1]];
   return `<div class="apercu carte-fond ${classe}" style="aspect-ratio:${L}/${H}">
@@ -80,7 +82,7 @@ export function htmlCarteStatique(trace, { largeur = 320, hauteur = 150, classe 
     <svg viewBox="0 0 ${L} ${H}" aria-hidden="true">${htmlTrace(cadre.points, morceaux)}
       <circle class="apercu-depart" cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="4.5"/>
       <circle class="apercu-arrivee" cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="4.5"/></svg>
-    <span class="attribution">© OpenStreetMap</span></div>`;
+    <span class="attribution">${fondActuel().credit}</span></div>`;
 }
 
 // Retire une carte Leaflet ; si un zoom animé est en cours, à la fin du zoom

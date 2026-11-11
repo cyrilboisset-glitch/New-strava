@@ -5,7 +5,8 @@
 // (tests/test-routage.mjs).
 import { MODELE } from './puissance-estimee.js';
 
-export const ADRESSE_BROUTER = 'https://brouter.de/brouter';
+import { CONFIG } from './config.js';
+export const ADRESSE_BROUTER = CONFIG.urlBrouter;
 // Profils de BRouter proposés (noms des profils standard du serveur)
 export const PROFILS = {
   fastbike: 'Route (rapide)',

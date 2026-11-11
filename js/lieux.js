@@ -8,8 +8,9 @@
 // Sans réseau : noms faits avec les chiffres (« Montée de 3,0 km à 5,9 % »).
 import { nombre, km } from './format.js';
 
-export const ADRESSE_NOMINATIM = 'https://nominatim.openstreetmap.org/reverse';
-export const ADRESSE_OVERPASS = 'https://overpass-api.de/api/interpreter';
+import { CONFIG } from './config.js';
+export const ADRESSE_NOMINATIM = CONFIG.urlNominatim;
+export const ADRESSE_OVERPASS = CONFIG.urlOverpass;
 export const RAYON_COL_M = 300;
 const BOUCLE_M = 300; // départ et arrivée à moins de 300 m : boucle
 

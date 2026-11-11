@@ -1032,3 +1032,22 @@ body.carte-plein { overflow: hidden; }
 .accueil-accroche .accroche { font-size: 19px; line-height: 1.2; }
 .accueil-sous { margin: 2px 0 0; font-size: 14px; color: var(--texte-2); }
 .accueil-accroche + .objectifs-accueil { margin-top: 6px; }
+
+/* ---- Licence, informations légales ---- */
+.ecran-licence { position: fixed; inset: 0; z-index: 200; background: var(--fond); overflow-y: auto; display: grid; place-items: center; padding: 24px 16px; }
+.ecran-licence[hidden] { display: none; }
+body.licence-bloquee { overflow: hidden; }
+.licence-boite { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; text-align: center; }
+.licence-boite .marque-icone { align-self: center; }
+.licence-nom { font-size: 32px; margin: 0; }
+.licence-boite h2 { margin: 4px 0 0; font-size: 20px; }
+.licence-boite p { margin: 0; color: var(--texte-2); }
+.licence-champ { display: flex; flex-direction: column; gap: 6px; text-align: left; font-weight: 600; }
+.licence-champ textarea { padding: 10px; border-radius: 12px; border: 1px solid var(--ligne); background: var(--surface-2); color: var(--texte); font: 13px ui-monospace, monospace; resize: vertical; }
+.licence-ok { margin: 0; color: var(--avance); font-weight: 700; }
+.a-completer { background: color-mix(in srgb, var(--retard) 22%, transparent); color: var(--texte); padding: 0 4px; border-radius: 4px; }
+.legal-texte { font-size: 14px; line-height: 1.5; color: var(--texte-2); }
+.legal-texte p { margin: 0 0 10px; }
+.legal-texte ul { margin: 0 0 10px; padding-left: 20px; }
+.legal-texte a, .pied a, .profil-legal a { color: var(--accent-trait); }
+.profil-legal { margin: 18px 4px 8px; font-size: 13px; color: var(--texte-3); text-align: center; }
