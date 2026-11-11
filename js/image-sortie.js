@@ -160,7 +160,7 @@ function chargerLogo() {
     const fin = setTimeout(() => ok(null), 3000);
     img.onload = () => { clearTimeout(fin); ok(img); };
     img.onerror = () => { clearTimeout(fin); ok(null); };
-    img.src = 'icons/icone.svg';
+    img.src = 'icons/icone-192.png';
   });
 }
 const TEXTE = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
