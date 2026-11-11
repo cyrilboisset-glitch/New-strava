@@ -928,23 +928,28 @@ async function texteToast(page) {
   await page.goBack();
   await page.waitForFunction(() => !document.getElementById('carte-parcours').classList.contains('plein-ecran'));
   verif('plein écran : le bouton retour du téléphone referme sans quitter la sortie', (await page.evaluate(() => location.hash)) === hashDetail && !!(await page.$('#page-detail .detail-nom:not([hidden])')));
-  // Chiffres de la sortie : œil ouvert / fermé
-  verif('chiffres : visibles par défaut (œil ouvert)', await page.isVisible('#bloc-chiffres .chiffres-contenu') && (await page.getAttribute('#bloc-chiffres [data-chiffres="bascule"]', 'aria-expanded')) === 'true');
+  // Chiffres de la sortie et courbes : menus repliables (flèche), choix gardé
+  const ouvert = (cle) => page.evaluate((c) => document.querySelector(`#page-detail details[data-repli="${c}"]`).open, cle);
+  verif('chiffres et courbes : ouverts par défaut, avec une flèche', await ouvert('chiffres') && await ouvert('courbes')
+    && !!(await page.$('#bloc-chiffres summary .chevron')) && !!(await page.$('.courbes summary .chevron')) && (await page.textContent('#bloc-chiffres summary')).includes('Chiffres de la sortie'));
   const hautAvant = await page.evaluate(() => document.getElementById('page-detail').getBoundingClientRect().height);
-  await page.click('#bloc-chiffres [data-chiffres="bascule"]');
+  await page.click('#bloc-chiffres summary');
+  await page.click('.courbes summary');
   const hautApres = await page.evaluate(() => document.getElementById('page-detail').getBoundingClientRect().height);
-  verif('œil fermé : chiffres cachés, page plus courte, libellé « Afficher », choix gardé', !(await page.isVisible('#bloc-chiffres .chiffres-contenu'))
-    && hautApres < hautAvant - 100 && (await page.getAttribute('#bloc-chiffres [data-chiffres="bascule"]', 'aria-label')).startsWith('Afficher')
-    && (await page.evaluate(async () => (await (await import('./js/db.js')).lireReglage('chiffresCaches')))) === true, `${hautAvant} -> ${hautApres}`);
-  await page.screenshot({ path: path.join(CAPTURES, 'detail-chiffres-caches.png') });
+  verif('flèches repliées : chiffres et courbes cachés, page nettement plus courte, choix gardés', !(await ouvert('chiffres')) && !(await ouvert('courbes')) && !(await page.isVisible('.courbes .courbe'))
+    && hautApres < hautAvant - 400
+    && (await page.evaluate(async () => { const m = await import('./js/db.js'); return [await m.lireReglage('chiffresCaches'), await m.lireReglage('courbesCachees')]; })).join() === 'true,true', `${hautAvant} -> ${hautApres}`);
+  await page.screenshot({ path: path.join(CAPTURES, 'detail-replis.png') });
   await page.click('#btn-retour');
   await page.waitForSelector('#accueil:not([hidden])');
   await page.waitForFunction(() => !document.documentElement.dataset.transition);
   await page.locator('.sortie-grande', { hasText: 'Sortie du matin' }).locator('.sortie-nom').click();
   await page.waitForSelector('#bloc-chiffres');
-  verif('chiffres cachés : le choix est gardé pour les autres sorties', !(await page.isVisible('#bloc-chiffres .chiffres-contenu')));
-  await page.click('#bloc-chiffres [data-chiffres="bascule"]');
-  verif('œil rouvert : chiffres de nouveau visibles', await page.isVisible('#bloc-chiffres .chiffres-contenu') && (await page.getAttribute('#bloc-chiffres [data-chiffres="bascule"]', 'aria-expanded')) === 'true');
+  verif('chiffres et courbes repliés : le choix est gardé pour les autres ouvertures', !(await ouvert('chiffres')) && !(await ouvert('courbes')));
+  await page.click('#bloc-chiffres summary');
+  await page.click('.courbes summary');
+  await page.waitForFunction(() => document.querySelector('#page-detail details[data-repli="courbes"]').open);
+  verif('flèches rouvertes : chiffres et courbes visibles', await ouvert('chiffres') && await page.isVisible('.courbes .courbe'));
   await page.click('#couleurs-carte .puce-trace[data-mode="uni"]');
   verif('détail : Uni = pas de légende, tracé d\'une couleur', (await page.locator('#couleurs-carte .legende-trace').count()) === 0 && (await page.locator('#carte-parcours path.leaflet-interactive').count()) < nbLignes);
   await page.click('#couleurs-carte .puce-trace[data-mode="puissance"]');
