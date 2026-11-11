@@ -548,6 +548,10 @@ l'instant »** — à proposer quand il voudra :
   nom du cache du service worker. Fichier unique : `dist/goatout.html`. Le téléphone ne change de
   nom et d'icône qu'après la mise à jour de l'appli installée par Chrome (peut prendre quelques
   jours) ou après une réinstallation.
+- **v0.39.2 (11 nov. 2026)** : les deux accroches (« Go out. Be the GOAT. » en cuivre,
+  « Tes sorties t'appartiennent. ») sont aussi en haut de l'accueil, sous le nom
+  (`#accueil-accroche`), sans « elles restent sur ton téléphone » (demande de Cyril ; cette
+  phrase reste dans le Profil et l'écran vide). Caché quand il n'y a aucune sortie.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
