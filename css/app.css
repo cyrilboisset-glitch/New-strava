@@ -988,16 +988,6 @@ body.carte-plein { overflow: hidden; }
 .plein-aide { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--texte-3); }
 .plein-ecran .leaflet-control-zoom { display: none; } /* pincer pour zoomer ; l'attribution OpenStreetMap reste visible sous la carte des valeurs */
 
-/* ---- Détail : chiffres de la sortie, œil ouvert / fermé ---- */
-.chiffres-bloc { margin-top: 12px; }
-.chiffres-bascule {
-  display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 48px; padding: 0 14px; margin: 0 0 8px;
-  border-radius: 14px; border: 1px solid var(--ligne); background-color: var(--surface); color: var(--texte); cursor: pointer; font: inherit; font-weight: 600;
-  background-image: linear-gradient(180deg, color-mix(in srgb, #fff 7%, transparent), transparent 70%);
-  box-shadow: var(--ombre), inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent); -webkit-tap-highlight-color: transparent;
-}
-.chiffres-bascule:active { background-color: var(--surface-2); }
-.chiffres-oeil { display: grid; place-items: center; color: var(--accent-trait); }
-.chiffres-bascule[aria-expanded="false"] .chiffres-oeil { color: var(--texte-3); }
-.chiffres-bloc .sortie-details { margin-top: 0; }
-.chiffres-bloc:has(.chiffres-contenu[hidden]) .chiffres-bascule { margin-bottom: 0; }
+/* ---- Détail : chiffres et courbes repliables (flèche) ---- */
+#bloc-chiffres .sortie-details { margin: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--ligne); }
+.courbes > .repli > .repli-contenu { margin-top: 12px; }

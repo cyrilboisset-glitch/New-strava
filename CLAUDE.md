@@ -519,12 +519,14 @@ l'instant »** — à proposer quand il voudra :
   +/- caché) ; l'attribution OSM reste visible sous la carte des valeurs. Fermer : croix, Échap
   ou bouton retour d'Android (`history.pushState({plein: true})` + `popstate`). Code :
   `installerPleinEcran` dans detail.js.
-- **v0.37.0 (11 nov. 2026) : chiffres de la sortie masquables**, demande de Cyril (œil ouvert /
-  fermé, pour atteindre plus vite les courbes et créer un segment). Détail : la grille des
-  chiffres (vitesse, temps, puissance, FC, TSS, calories…) est sous une ligne « Chiffres de la
-  sortie » avec une icône d'œil (`#bloc-chiffres`, `data-chiffres="bascule"`, `aria-expanded`) ;
-  touchée, elle cache / montre la grille. Choix gardé pour toutes les sorties (réglage
-  `chiffresCaches`, visibles par défaut). Fonctions `htmlChiffres`, `installerChiffres`.
+- **v0.37.0 / v0.38.0 (11 nov. 2026) : chiffres et courbes repliables**, demande de Cyril
+  (pour atteindre plus vite les segments). v0.37.0 avait un œil ouvert / fermé ; **v0.38.0 le
+  remplace par la flèche des menus repliables** (`htmlRepli`, comme Segments, Même parcours,
+  Muscles) et ajoute les courbes. Détail : « Chiffres de la sortie » (`#bloc-chiffres`, résumé
+  « 21,2 km/h · 164 W · 138 bpm ») et « Courbes » (`.courbes`, résumé « 4 courbes ») ; ouverts par
+  défaut ; le choix est gardé pour toutes les sorties (réglages `chiffresCaches` et
+  `courbesCachees`, écrits au « toggle » du <details>). Code : `replisOuverts`,
+  `installerReplisMemorises`, `blocChiffres`, `blocCourbesRepliable` dans detail.js.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

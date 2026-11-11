@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.37.0 · chiffres de la sortie masquables';
+export const VERSION_APPLI = '0.38.0 · chiffres et courbes repliables';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
