@@ -556,6 +556,11 @@ l'instant »** — à proposer quand il voudra :
   là où j'en suis** (arc extérieur, `--cuivre`), **or = l'objectif / prévu à ce jour** (arc
   intérieur, `--or`) ; légende et note de Progrès mises à jour. Remplace rouge / bleu (v0.17.0 ;
   les textes plus haut qui disent « rouge » et « bleu » ne valent plus).
+- **v0.39.4 (11 nov. 2026)** : anneaux d'objectifs, nouvelle demande de Cyril (remplace cuivre / or
+  de v0.39.3) : **bleu = l'objectif** (arc intérieur, prévu à ce jour, `--objectif`), arc extérieur
+  = où j'en suis, **vert en avance** (`--avance`) ou **rouge en retard** (`--retard`) ;
+  `etatAvancement(a)` (objectifs.js) : atteint ou écart ≥ −0,5 % de la cible = en avance. Légende
+  et note de Progrès mises à jour.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée

@@ -29,16 +29,26 @@ function valeurCourte(type, v) {
 }
 const uniteCourte = (type) => ({ distance: ' km', denivele: ' m', ftp: ' W', seances: ' séances', tempsmuscu: '' }[type]);
 
-// Anneau : arc extérieur rouge = où j'en suis, arc intérieur bleu = où je devrais en être.
-// Les arcs se remplissent à l'affichage (animation CSS sur stroke-dasharray, coupée si
-// Android demande moins d'animations).
-export function anneau(partFait, partAttendu) {
+/**
+ * En avance ou en retard sur le rythme régulier (« pile dans le rythme » compte comme en avance) ;
+ * objectif atteint = en avance.
+ * @returns {'avance' | 'retard'}
+ */
+export function etatAvancement(a) {
+  if (a.fait >= a.cible || a.ecart == null) return 'avance';
+  return a.ecart >= -a.cible * 0.005 ? 'avance' : 'retard';
+}
+
+// Anneau : arc extérieur = où j'en suis (vert en avance, rouge en retard), arc intérieur bleu =
+// l'objectif, c'est-à-dire où je devrais en être à ce jour. Les arcs se remplissent à
+// l'affichage (animation CSS sur stroke-dasharray, coupée si Android demande moins d'animations).
+export function anneau(partFait, partAttendu, etat = 'avance') {
   const arc = (r, part, classe) => {
     const c = 2 * Math.PI * r;
     const l = Math.max(0, Math.min(1, part)) * c;
     return `<circle class="anneau-fond" cx="60" cy="60" r="${r}"/>${l > 0.5 ? `<circle class="${classe}" cx="60" cy="60" r="${r}" stroke-dasharray="${l.toFixed(2)} ${c.toFixed(2)}" style="--c:${c.toFixed(2)}" transform="rotate(-90 60 60)"/>` : ''}`;
   };
-  return `<svg class="anneau" viewBox="0 0 120 120" aria-hidden="true">${arc(52, partFait, 'anneau-fait')}${partAttendu != null ? arc(39, Math.round(partAttendu * 1000) / 1000, 'anneau-attendu') : ''}</svg>`;
+  return `<svg class="anneau" viewBox="0 0 120 120" aria-hidden="true">${arc(52, partFait, `anneau-fait ${etat}`)}${partAttendu != null ? arc(39, Math.round(partAttendu * 1000) / 1000, 'anneau-attendu') : ''}</svg>`;
 }
 
 const periodeCourte = { semaine: 'semaine', mois: 'mois', annee: 'année' };
@@ -56,7 +66,7 @@ export function htmlBandeauObjectifs(objectifs, toutes, profil, maintenantMs = D
     const atteint = a.fait >= a.cible;
     const fait = a.fait || o.type !== 'ftp' ? valeurCourte(o.type, a.fait) : '–';
     return `<a class="objectif-mini${atteint ? ' atteint' : ''}" href="#progres" aria-label="${echapper(`${TYPES_OBJECTIF[o.type]}, ${PERIODES_OBJECTIF[o.periode].toLowerCase()} : ${valeurObjectif(o.type, a.fait)} sur ${valeurObjectif(o.type, a.cible)}`)}">
-      <span class="objectif-cercle">${anneau(a.part, a.attendu != null ? a.attendu / a.cible : null)}
+      <span class="objectif-cercle">${anneau(a.part, a.attendu != null ? a.attendu / a.cible : null, etatAvancement(a))}
         <span class="objectif-centre"><b>${pct} %</b></span></span>
       <span class="objectif-mini-nom">${NOM_COURT[o.type]}</span>
       <span class="objectif-mini-sous">${OBJECTIFS_MUSCU.includes(o.type) ? 'muscu · ' : ''}${periodeCourte[o.periode]}</span>

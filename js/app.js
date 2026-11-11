@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.3 · anneaux or et cuivre';
+export const VERSION_APPLI = '0.39.4 · anneaux bleu, vert, rouge';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));

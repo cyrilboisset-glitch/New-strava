@@ -2,7 +2,7 @@
 // records de puissance (avec courbe de puissance).
 import { toutesLesSorties, lireReglage, ecrireReglage } from './db.js';
 import { familleSortie } from './sortie.js';
-import { UNITES_OBJECTIF, OBJECTIFS_MUSCU, sortiesObjectif, valeurObjectif, anneau } from './objectifs.js';
+import { UNITES_OBJECTIF, OBJECTIFS_MUSCU, sortiesObjectif, valeurObjectif, anneau, etatAvancement } from './objectifs.js';
 import { lireProfil, calculerEffortsManquants, wKg } from './profil.js';
 import {
   bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J,
@@ -105,11 +105,11 @@ function blocObjectifs(objectifs, toutes, profil, maintenantMs) {
         </span>
       </div>
       <div class="objectif-cercle" role="img" aria-label="${fait} sur ${valeurObjectif(o.type, a.cible)}${a.attendu != null ? `, ${valeurObjectif(o.type, a.attendu)} prévus à ce jour` : ''}">
-        ${anneau(a.part, a.attendu != null ? a.attendu / a.cible : null)}
+        ${anneau(a.part, a.attendu != null ? a.attendu / a.cible : null, etatAvancement(a))}
         <span class="objectif-centre"><b>${pct} %</b><small>${atteint ? 'atteint !' : 'de l\'objectif'}</small></span>
       </div>
       <ul class="objectif-legende">
-        <li><span class="puce fait"></span>${o.type === 'ftp' ? 'FTP estimée' : 'Fait'} : <b>${fait}</b></li>
+        <li><span class="puce fait ${etatAvancement(a)}"></span>${o.type === 'ftp' ? 'FTP estimée' : 'Fait'} : <b>${fait}</b></li>
         ${a.attendu != null ? `<li><span class="puce attendu"></span>Prévu à ce jour : <b>${valeurObjectif(o.type, a.attendu)}</b></li>` : ''}
         <li><span class="puce cible"></span>Objectif : <b>${valeurObjectif(o.type, a.cible)}</b></li>
       </ul>
@@ -120,7 +120,7 @@ function blocObjectifs(objectifs, toutes, profil, maintenantMs) {
     <h2 class="bloc-titre">Mes objectifs</h2>
     ${lignes ? `<div class="objectifs">${lignes}</div>` : (edition ? '' : '<p class="aide">Aucun objectif pour l\'instant : distance ou dénivelé, séances ou temps de musculation sur la semaine, le mois ou l\'année, ou une FTP à atteindre.</p>')}
     ${edition === 'nouveau' ? formulaireObjectif(null) : '<button class="btn secondaire" type="button" data-obj="ajouter">+ Ajouter un objectif</button>'}
-    ${objectifs.length ? '<p class="bloc-note">Sorties vélo (ou séances de musculation) de la semaine (du lundi), du mois ou de l\'année en cours. Arc cuivré : où tu en es ; arc doré : où tu devrais en être en avançant régulièrement (pour la FTP : de ta FTP du début de la période jusqu\'à l\'objectif).</p>' : ''}
+    ${objectifs.length ? '<p class="bloc-note">Sorties vélo (ou séances de musculation) de la semaine (du lundi), du mois ou de l\'année en cours. Arc extérieur : où tu en es (vert en avance, rouge en retard) ; arc bleu : l\'objectif, où tu devrais en être en avançant régulièrement (pour la FTP : de ta FTP du début de la période jusqu\'à l\'objectif).</p>' : ''}
   </section>`;
 }
 
