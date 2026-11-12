@@ -31,15 +31,16 @@ const uniteCourte = (type) => ({ distance: ' km', denivele: ' m', ftp: ' W', sea
 
 /**
  * En avance ou en retard sur le rythme régulier (« pile dans le rythme » compte comme en avance) ;
- * objectif atteint = en avance.
- * @returns {'avance' | 'retard'}
+ * objectif atteint ou dépassé = « atteint » (anneau doré).
+ * @returns {'atteint' | 'avance' | 'retard'}
  */
 export function etatAvancement(a) {
-  if (a.fait >= a.cible || a.ecart == null) return 'avance';
+  if (a.fait >= a.cible) return 'atteint';
+  if (a.ecart == null) return 'avance';
   return a.ecart >= -a.cible * 0.005 ? 'avance' : 'retard';
 }
 
-// Anneau : arc extérieur = où j'en suis (vert en avance, rouge en retard), arc intérieur bleu =
+// Anneau : arc extérieur = où j'en suis (doré si l'objectif est atteint ou dépassé, vert en avance, rouge en retard), arc intérieur bleu =
 // l'objectif, c'est-à-dire où je devrais en être à ce jour. Les arcs se remplissent à
 // l'affichage (animation CSS sur stroke-dasharray, coupée si Android demande moins d'animations).
 export function anneau(partFait, partAttendu, etat = 'avance') {

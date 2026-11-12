@@ -722,7 +722,9 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .objectif-legende .puce { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .puce.fait { background: var(--avance); }
 .anneau-fait.retard { stroke: var(--retard); }
+.anneau-fait.atteint { stroke: var(--or); }
 .puce.fait.retard { background: var(--retard); }
+.puce.fait.atteint { background: var(--or); }
 .puce.attendu { background: var(--objectif); }
 .puce.cible { background: transparent; border: 2px solid var(--objectif); width: 8px; height: 8px; }
 .objectif-detail { margin: 6px 0 0; font-size: 12px; color: var(--texte-3); }
