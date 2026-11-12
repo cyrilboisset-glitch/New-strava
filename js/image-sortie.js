@@ -6,7 +6,6 @@
 // tests/test-image.mjs.
 import { cadrer, tuiles } from './carte-statique.js';
 import { nombre, km, duree, fmtJourLong } from './format.js';
-import { urlTuile, fondActuel } from './fonds-carte.js';
 
 export const NOM_APPLI = 'GOATout';
 export const ACCROCHE_APPLI = 'Go out. Be the GOAT.';
@@ -230,7 +229,7 @@ async function dessinerCarte(ctx, trace, x, y, w, h, rayon, reperes) {
   if (trace.length >= 2) {
     const cadre = cadrer(trace, w, h, Math.round(Math.min(w, h) * 0.08));
     const liste = tuiles(cadre, w, h);
-    const imgs = await Promise.all(liste.map((t) => chargerTuile(urlTuile(t))));
+    const imgs = await Promise.all(liste.map((t) => chargerTuile(`https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`)));
     // carte claire (comme dans l'appli), même sur le fond sombre de l'image
     liste.forEach((t, k) => { if (imgs[k]) ctx.drawImage(imgs[k], x + t.gauche, y + t.haut, 256, 256); });
     const p = cadre.points.map(([a, b]) => [x + a, y + b]);
@@ -242,14 +241,6 @@ async function dessinerCarte(ctx, trace, x, y, w, h, rayon, reperes) {
     rond(p[p.length - 1], '#15171b');
     rond(p[0], C.depart);
     for (const r of reperes) if (p[r.k]) pastille(ctx, p[r.k][0], p[r.k][1], r.n, Math.max(16, w / 34));
-  }
-  // mention obligatoire du fond de carte (OpenStreetMap, IGN)
-  if (trace.length >= 2) {
-    const t = Math.max(11, Math.round(w / 60));
-    ctx.font = `500 ${t}px ${TEXTE}`; ctx.textAlign = 'right';
-    const credit = fondActuel().credit; const lc = ctx.measureText(credit).width + t;
-    ctx.fillStyle = 'rgba(255,255,255,0.78)'; ctx.fillRect(x + w - lc, y + h - t * 1.7, lc, t * 1.7);
-    ctx.fillStyle = '#333'; ctx.fillText(credit, x + w - t / 2, y + h - t * 0.5);
   }
   ctx.restore();
   ctx.save();

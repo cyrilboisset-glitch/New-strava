@@ -3,7 +3,7 @@
 // Changer VERSION à chaque mise en ligne pour que le téléphone se mette à jour.
 import { deposerPartage } from './js/db.js';
 
-const VERSION = '0.40.0';
+const VERSION = '0.39.4';
 const CACHE = `mes-sorties-${VERSION}`;
 const FICHIERS = [
   './', 'index.html', 'manifest.webmanifest',
@@ -11,7 +11,7 @@ const FICHIERS = [
   'js/app.js', 'js/db.js', 'js/fit.js', 'js/import.js', 'js/sortie.js', 'js/strava.js', 'js/trace.js',
   'js/analyse.js', 'js/detail.js', 'js/fichier.js', 'js/format.js', 'js/profil.js', 'js/reglages.js',
   'js/icones.js', 'js/progres.js', 'js/sauvegarde.js', 'js/stats.js', 'js/velos.js', 'js/vue3d.js', 'js/segments.js', 'js/segments-calc.js',
-  'js/carte-statique.js', 'js/couleurs-trace.js', 'js/objectifs.js', 'js/config.js', 'js/fonds-carte.js', 'js/licence.js', 'js/licence-ui.js', 'js/legal.js', 'js/parcours.js', 'js/puissance-estimee.js',
+  'js/carte-statique.js', 'js/couleurs-trace.js', 'js/objectifs.js', 'js/parcours.js', 'js/puissance-estimee.js',
   'js/routage.js', 'js/traces.js', 'js/vent.js', 'js/lieux.js', 'js/image-sortie.js', 'js/partage-sortie.js', 'js/mannequin.js',
   'vendor/jszip.min.js', 'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css',
   'fonts/barlow-condensed-latin-500-normal.woff2',

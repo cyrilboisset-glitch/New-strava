@@ -8,7 +8,6 @@ import {
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { telecharger } from './sauvegarde.js';
 import { retirerCarte, htmlCarteStatique } from './carte-statique.js';
-import { ajouterFond } from './fonds-carte.js';
 import { nombre, km, duree, chrono, echapper, fmtDate, htmlRepli, suivreReplis } from './format.js';
 import { lireSegments, lirePassages } from './segments.js';
 import { bboxCompatible, trouverPassages } from './segments-calc.js';
@@ -200,7 +199,9 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
   if (L) {
     carte = L.map(div, { scrollWheelZoom: true, attributionControl: true, doubleClickZoom: false });
     carte.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
-    ajouterFond(L, carte);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(carte);
     couches = L.layerGroup().addTo(carte);
     carte.on('click', (e) => { ed.points.push([e.latlng.lat, e.latlng.lng]); recalculer(page, profil); });
     if (ed.points.length) carte.fitBounds(L.latLngBounds(ed.route?.coords.map((c) => [c[0], c[1]]) ?? ed.points), { padding: [24, 24], animate: false });

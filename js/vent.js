@@ -15,8 +15,7 @@ import { MODELE } from './puissance-estimee.js';
 export const PART_VENT_CYCLISTE = 0.7;
 export const MEME_VENT_KMH = 1.5;
 export const VITESSE_MAXI_KMH = 50; // descente : virages, freinage (appli vent)
-import { CONFIG } from './config.js';
-export const ADRESSE_OPEN_METEO = CONFIG.urlMeteo;
+export const ADRESSE_OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
 const R_KM = 6371.0088;
 const rad = (d) => (d * Math.PI) / 180;
 const deg = (r) => (r * 180) / Math.PI;

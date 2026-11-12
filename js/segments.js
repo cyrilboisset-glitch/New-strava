@@ -10,7 +10,6 @@ import {
 import { lireProfil, wKg } from './profil.js';
 import { nombre, km, chrono, echapper, fmtDate, htmlRepli, suivreReplis } from './format.js';
 import { htmlCarteStatique, retirerCarte } from './carte-statique.js';
-import { ajouterFond } from './fonds-carte.js';
 import { creerVue3d, construireTrace } from './vue3d.js';
 import { familleSortie } from './sortie.js';
 import { proposerNomSegment, sansDoublons, nomSegment } from './lieux.js';
@@ -333,7 +332,9 @@ function carteSegment(div, pts, i0, i1) {
   const trait = getComputedStyle(document.documentElement).getPropertyValue('--trace-carte').trim() || '#e8590c';
   const carte = L.map(div, { scrollWheelZoom: false, attributionControl: true });
   carte.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
-  ajouterFond(L, carte);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(carte);
   const sortie = L.polyline(ligne, { color: trait, weight: 3, opacity: 0.6 }).addTo(carte);
   L.polyline(seg, { color: '#fff', weight: 9, opacity: 0.9 }).addTo(carte);
   L.polyline(seg, { color: COULEUR_SEGMENT, weight: 6, opacity: 1, className: 'trait-segment' }).addTo(carte);
