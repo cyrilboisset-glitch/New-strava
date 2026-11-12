@@ -456,7 +456,8 @@ async function texteToast(page) {
     const fait = document.querySelector('#objectifs-rail .anneau-fait'); const attendu = document.querySelector('#objectifs-rail .anneau-attendu');
     return { fait: fait ? rgb(fait) : null, attendu: attendu ? rgb(attendu) : null };
   });
-  verif('anneaux : « là où j\'en suis » en cuivre (#e9a178), l\'objectif en or (#f0cf73)', couleursAnneaux.attendu === 'rgb(240, 207, 115)' && (couleursAnneaux.fait === null || couleursAnneaux.fait === 'rgb(233, 161, 120)'), JSON.stringify(couleursAnneaux));
+  verif('anneaux : objectif en bleu, « où j\'en suis » rouge en retard (0 km sur l\'année)', couleursAnneaux.attendu === 'rgb(77, 142, 247)' && (couleursAnneaux.fait === null || couleursAnneaux.fait === 'rgb(255, 92, 92)'), JSON.stringify(couleursAnneaux));
+  verif('légende : pastille « Fait » rouge (en retard)', await page.evaluate(() => { const p = document.querySelector('#objectifs-rail .anneau-fait'); return !p || p.classList.contains('retard'); }));
   verif('accueil : les anneaux se remplissent (animation)', bandeau.anim === 'anneau-remplit', bandeau.anim);
   await page.screenshot({ path: path.join(CAPTURES, 'accueil-objectifs.png') });
   await page.click('#onglet-progres');

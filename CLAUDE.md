@@ -556,6 +556,24 @@ l'instant »** — à proposer quand il voudra :
   là où j'en suis** (arc extérieur, `--cuivre`), **or = l'objectif / prévu à ce jour** (arc
   intérieur, `--or`) ; légende et note de Progrès mises à jour. Remplace rouge / bleu (v0.17.0 ;
   les textes plus haut qui disent « rouge » et « bleu » ne valent plus).
+- **v0.39.4 (11 nov. 2026)** : anneaux d'objectifs, nouvelle demande de Cyril (remplace cuivre / or
+  de v0.39.3) : **bleu = l'objectif** (arc intérieur, prévu à ce jour, `--objectif`), arc extérieur
+  = où j'en suis, **vert en avance** (`--avance`) ou **rouge en retard** (`--retard`) ;
+  `etatAvancement(a)` (objectifs.js) : atteint ou écart ≥ −0,5 % de la cible = en avance. Légende
+  et note de Progrès mises à jour.
+- **v0.40.0 mise de côté (12 nov. 2026)**, demande de Cyril : « revenir à la version précédente, je la commercialiserai après une période de test ». La base commerciale (licence hors ligne, fond IGN, informations légales, relais météo, COMMERCIALISATION.md) n'est PAS dans `main` : elle est gardée sur la branche `claude/commercialisation-v0.40.0` (commit bb037c7). L'appli reste en v0.39.4. Reprise : fusionner / reprendre cette branche. Avancée du 11 nov. : nom GOATout sans marque en France (INPI) ; « GOAT Outdoor » n'existe qu'aux États-Unis (classes 12, 18, 20, 21) ; goatout.com pris mais sans site ; goatout.fr et goatout.app libres ; Cyril est salarié (STMicroelectronics) : vérifier la clause d'exclusivité avant la micro-entreprise.
+- **Commercialisation (discutée le 11 nov. 2026, rien de codé)** : décision de Cyril : **garder
+  Open-Meteo** (pas MET Norway). Comparaison faite le 11 nov. sur 4 lieux (Grenoble, Villard-de-Lans,
+  Col de Porte, Valence) : MET Norway cohérent (température à 0,7–2,3 °C près sur 48 h, pluie d'accord
+  83–100 % des heures, vent proche en plaine, écarts en montagne) mais **pas de probabilité de pluie
+  en France** et horaire seulement ~65 h (puis par 6 h). Open-Meteo commercial : 29 $ / mois pour
+  1 million d'appels, 99 $ / mois pour 5 millions (annonce de leur blog, page des tarifs non lue) ;
+  l'appli envoie ~30 points par prévision. **L'API gratuite est interdite dès le premier usage
+  commercial** : prendre l'abonnement à la première vente, pas après 3 000. Autres pistes gratuites
+  évoquées : Cloudflare Pages (hébergement commercial gratuit, GitHub Pages l'interdit),
+  OpenFreeMap (fonds de carte vectoriels, gros chantier), OpenRouteService (2 000 itinéraires / jour,
+  usage commercial à confirmer). Environnement de Claude « New-strava » créé le 11 nov. 2026 : autorise
+  api.open-meteo.com et api.met.no.
 - **Vélo Coach et Suivi-direct (lus le 6 nov. 2026, sans rien modifier)** :
   Vélo Coach = appli Android Flutter en direct (BLE capteur de puissance /
   cardio / cadence, GPS, météo ; alertes manger / boire / puissance en montée
