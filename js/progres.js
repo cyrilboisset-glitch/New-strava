@@ -120,7 +120,7 @@ function blocObjectifs(objectifs, toutes, profil, maintenantMs) {
     <h2 class="bloc-titre">Mes objectifs</h2>
     ${lignes ? `<div class="objectifs">${lignes}</div>` : (edition ? '' : '<p class="aide">Aucun objectif pour l\'instant : distance ou dénivelé, séances ou temps de musculation sur la semaine, le mois ou l\'année, ou une FTP à atteindre.</p>')}
     ${edition === 'nouveau' ? formulaireObjectif(null) : '<button class="btn secondaire" type="button" data-obj="ajouter">+ Ajouter un objectif</button>'}
-    ${objectifs.length ? '<p class="bloc-note">Sorties vélo (ou séances de musculation) de la semaine (du lundi), du mois ou de l\'année en cours. Arc extérieur : où tu en es (vert en avance, rouge en retard) ; arc bleu : l\'objectif, où tu devrais en être en avançant régulièrement (pour la FTP : de ta FTP du début de la période jusqu\'à l\'objectif).</p>' : ''}
+    ${objectifs.length ? '<p class="bloc-note">Sorties vélo (ou séances de musculation) de la semaine (du lundi), du mois ou de l\'année en cours. Arc extérieur : où tu en es (vert en avance, rouge en retard, doré quand l\'objectif est atteint ou dépassé) ; arc bleu : l\'objectif, où tu devrais en être en avançant régulièrement (pour la FTP : de ta FTP du début de la période jusqu\'à l\'objectif).</p>' : ''}
   </section>`;
 }
 

@@ -561,6 +561,7 @@ l'instant »** — à proposer quand il voudra :
   = où j'en suis, **vert en avance** (`--avance`) ou **rouge en retard** (`--retard`) ;
   `etatAvancement(a)` (objectifs.js) : atteint ou écart ≥ −0,5 % de la cible = en avance. Légende
   et note de Progrès mises à jour.
+- **v0.39.5 (12 nov. 2026)** : anneau d'objectif **doré** (`--or`, état `atteint` de `etatAvancement`) quand l'objectif est atteint ou dépassé (fait ≥ cible) ; sinon vert en avance, rouge en retard (demande de Cyril).
 - **v0.40.0 mise de côté (12 nov. 2026)**, demande de Cyril : « revenir à la version précédente, je la commercialiserai après une période de test ». La base commerciale (licence hors ligne, fond IGN, informations légales, relais météo, COMMERCIALISATION.md) n'est PAS dans `main` : elle est gardée sur la branche `claude/commercialisation-v0.40.0` (commit bb037c7). L'appli reste en v0.39.4. Reprise : fusionner / reprendre cette branche. Avancée du 11 nov. : nom GOATout sans marque en France (INPI) ; « GOAT Outdoor » n'existe qu'aux États-Unis (classes 12, 18, 20, 21) ; goatout.com pris mais sans site ; goatout.fr et goatout.app libres ; Cyril est salarié (STMicroelectronics) : vérifier la clause d'exclusivité avant la micro-entreprise.
 - **Commercialisation (discutée le 11 nov. 2026, rien de codé)** : décision de Cyril : **garder
   Open-Meteo** (pas MET Norway). Comparaison faite le 11 nov. sur 4 lieux (Grenoble, Villard-de-Lans,

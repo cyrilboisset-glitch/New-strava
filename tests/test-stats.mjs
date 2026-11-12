@@ -111,11 +111,12 @@ const mt = avancementObjectif({ type: 'tempsmuscu', periode: 'semaine', cible: 2
 proche('temps de muscu de la semaine : 65 min = 1,083 h sur 2 h', mt.fait, 65 / 60, 0.001);
 egal('temps de muscu : 54 % de l\'objectif, 1 h attendue à mi-semaine', [Math.round(mt.part * 100), mt.attendu], [54, 1]);
 
-// Couleur de l'anneau : vert en avance (ou pile dans le rythme, ou atteint), rouge en retard
+// Couleur de l'anneau : doré si atteint ou dépassé, vert en avance (ou pile dans le rythme), rouge en retard
 const { etatAvancement } = await import('../js/objectifs.js');
 egal('anneau : retard / avance / pile dans le rythme / atteint', [
   etatAvancement(ds), etatAvancement({ fait: 120, cible: 200, ecart: 20 }), etatAvancement({ fait: 99.5, cible: 200, ecart: -0.5 }), etatAvancement({ fait: 210, cible: 200, ecart: -5 }),
-], ['retard', 'avance', 'avance', 'avance']);
+], ['retard', 'avance', 'avance', 'atteint']);
+egal('anneau : objectif égalé = doré', etatAvancement({ fait: 200, cible: 200, ecart: 0 }), 'atteint');
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);
