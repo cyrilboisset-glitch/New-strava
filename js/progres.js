@@ -3,10 +3,10 @@
 import { toutesLesSorties, lireReglage, ecrireReglage } from './db.js';
 import { familleSortie } from './sortie.js';
 import { UNITES_OBJECTIF, OBJECTIFS_MUSCU, sortiesObjectif, valeurObjectif, anneau, etatAvancement } from './objectifs.js';
-import { lireProfil, calculerEffortsManquants, wKg } from './profil.js';
+import { lireProfil, calculerEffortsManquants, wKg, lireHaussesFtp } from './profil.js';
 import {
   bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J,
-  avancementObjectif, TYPES_OBJECTIF, PERIODES_OBJECTIF,
+  avancementObjectif, TYPES_OBJECTIF, PERIODES_OBJECTIF, historiqueFtp,
 } from './stats.js';
 import { DUREES_EFFORTS_S, JOURS_ESTIMATION_FTP } from './analyse.js';
 import { nombre, km, duree, echapper, majuscule, fmtDate } from './format.js';
@@ -39,7 +39,7 @@ const fmtSemaine = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'sh
 const fmtMoisCourt = new Intl.DateTimeFormat('fr-FR', { month: 'short' });
 const fmtMoisLong = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' });
 
-const etat = { type: 'semaine', metrique: 'distance', choix: null, plage: 'j90' };
+const etat = { type: 'semaine', metrique: 'distance', choix: null, plage: 'j90', plageFtp: 'tout' };
 let calculEnCours = null;
 let edition = null; // objectif en cours de saisie : null, 'nouveau' ou son id
 
@@ -300,6 +300,98 @@ function installerCurseurForme(page, sorties, profil, maintenantMs) {
   }
 }
 
+// ---- Historique de la FTP estimée ---------------------------------------------------
+
+const PLAGES_FTP = [['j180', '6 mois'], ['j365', '1 an'], ['tout', 'Tout']];
+
+function pointsFtpAffiches(tous, maintenantMs) {
+  if (etat.plageFtp === 'tout') return tous;
+  const dep = maintenantMs - Number(etat.plageFtp.slice(1)) * 86400000;
+  return tous.filter((p) => p.tMs >= dep);
+}
+
+function blocFtpHistorique(sorties, profil, hausses, maintenantMs) {
+  const tous = historiqueFtp(sorties);
+  if (tous.length < 2) {
+    return `<section class="carte bloc" id="bloc-ftp-histo"><h2 class="bloc-titre">FTP estimée dans le temps</h2>
+      <p class="bloc-note">Il faut au moins deux sorties avec capteur de puissance et un effort de 20 minutes pour tracer la courbe.</p></section>`;
+  }
+  let pts = pointsFtpAffiches(tous, maintenantMs);
+  if (pts.length < 2) pts = tous.slice(-2);
+  const t0 = pts[0].tMs;
+  const t1 = pts[pts.length - 1].tMs;
+  const reglee = profil.ftpW;
+  const valeurs = [...pts.map((p) => p.ftpW), reglee];
+  const bas = Math.min(...valeurs) - 8;
+  const haut = Math.max(...valeurs) + 8;
+  const x = (t) => (t1 > t0 ? ((t - t0) / (t1 - t0)) * 300 : 150);
+  const y = (w) => 100 - ((w - bas) / (haut - bas)) * 100;
+  const trace = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.tMs).toFixed(2)} ${y(p.ftpW).toFixed(2)}`).join('');
+  const marques = hausses.filter((h) => h.le >= t0 && h.le <= t1)
+    .map((h) => `<line class="ftp-hausse" x1="${x(h.le).toFixed(2)}" x2="${x(h.le).toFixed(2)}" y1="0" y2="100"/>`).join('');
+  const points = pts.map((p) => `<span class="ftp-point" style="left:${((x(p.tMs) / 300) * 100).toFixed(2)}%;top:${y(p.ftpW).toFixed(1)}%"></span>`).join('');
+  const dernier = pts[pts.length - 1];
+  const maxi = pts.reduce((m, p) => (p.ftpW > m.ftpW ? p : m), pts[0]);
+  const derniereHausse = hausses[hausses.length - 1];
+  // Étiquettes au bout des traits, écartées si elles se chevauchent
+  let hautEstimee = y(dernier.ftpW);
+  let hautReglee = y(reglee);
+  if (Math.abs(hautEstimee - hautReglee) < 14) {
+    const milieu = (hautEstimee + hautReglee) / 2;
+    const estimeeEnHaut = dernier.ftpW >= reglee;
+    hautEstimee = Math.min(100, Math.max(0, milieu + (estimeeEnHaut ? -7 : 7)));
+    hautReglee = Math.min(100, Math.max(0, milieu + (estimeeEnHaut ? 7 : -7)));
+  }
+  return `
+  <section class="carte bloc" id="bloc-ftp-histo">
+    <h2 class="bloc-titre">FTP estimée dans le temps</h2>
+    <div class="stats stats-3">
+      <div><span class="stat-label">Dernière</span><span class="stat-val">${nombre(dernier.ftpW)} W</span></div>
+      <div><span class="stat-label">Maximum</span><span class="stat-val">${nombre(maxi.ftpW)} W</span></div>
+      <div><span class="stat-label">Réglée</span><span class="stat-val">${nombre(reglee)} W</span></div>
+    </div>
+    ${segments('plageFtp', PLAGES_FTP, etat.plageFtp, 'defile')}
+    <p class="courbes-position" id="ftp-position">Touchez la courbe pour lire un point</p>
+    <div class="forme-graph ftp-graph" id="ftp-graph" data-n="${pts.length}">
+      <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+        ${marques}
+        <line class="ftp-reglee" x1="0" x2="300" y1="${y(reglee).toFixed(2)}" y2="${y(reglee).toFixed(2)}"/>
+        <path class="ligne-ftp" d="${trace}"/>
+      </svg>
+      ${points}
+      <span class="etiquette-fin ftp" style="top:${hautEstimee.toFixed(1)}%">Estimée</span>
+      <span class="etiquette-fin reglee" style="top:${hautReglee.toFixed(1)}%">Réglée</span>
+      <span class="curseur" hidden></span>
+    </div>
+    <div class="courbes-x"><span>${fmtDate.format(t0)}</span><span>${fmtDate.format(t1)}</span></div>
+    <p class="bloc-note">Un point par sortie avec capteur : 95 % du meilleur 20 min des ${JOURS_ESTIMATION_FTP / 7} semaines qui finissent avec cette sortie, calculé aussi sur tes anciennes sorties. Trait pointillé : la FTP réglée dans l'appli${hausses.length ? ' ; traits fins verticaux : hausses automatiques de la FTP' : ''}.
+    Une baisse veut souvent dire « pas d'effort de 20 min à fond ces semaines-là », pas forcément une baisse de forme.${derniereHausse ? ` Dernière hausse automatique : ${nombre(derniereHausse.avantW)} → ${nombre(derniereHausse.ftpW)} W le ${fmtDate.format(derniereHausse.le)}.` : ''}</p>
+  </section>`;
+}
+
+function installerCurseurFtp(page, sorties, profil, maintenantMs) {
+  const graph = page.querySelector('#ftp-graph');
+  if (!graph) return;
+  let pts = pointsFtpAffiches(historiqueFtp(sorties), maintenantMs);
+  if (pts.length < 2) pts = historiqueFtp(sorties).slice(-2);
+  const t0 = pts[0].tMs;
+  const t1 = pts[pts.length - 1].tMs;
+  const position = page.querySelector('#ftp-position');
+  const curseur = graph.querySelector('.curseur');
+  const placer = (clientX) => {
+    const r = graph.getBoundingClientRect();
+    const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    const t = t0 + f * (t1 - t0);
+    const p = pts.reduce((m, q) => (Math.abs(q.tMs - t) < Math.abs(m.tMs - t) ? q : m), pts[0]);
+    curseur.hidden = false;
+    curseur.style.left = `${(t1 > t0 ? ((p.tMs - t0) / (t1 - t0)) * 100 : 50).toFixed(2)}%`;
+    const du = p.sortie.debut;
+    position.innerHTML = `${fmtDate.format(p.tMs)} · <b>${nombre(p.ftpW)} W</b> · meilleur 20 min ${nombre(p.puissance20W)} W (<a href="#sortie=${encodeURIComponent(p.sortie.id)}">sortie du ${fmtDate.format(du)}</a>)`;
+  };
+  graph.addEventListener('pointerdown', (e) => placer(e.clientX));
+  graph.addEventListener('pointermove', (e) => placer(e.clientX));
+}
+
 // ---- Records -------------------------------------------------------------------------
 
 function blocRecords(sorties, maintenantMs, enCours, poidsKg) {
@@ -374,6 +466,7 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
 
   let calcul = '';
   let objectifs = (await lireReglage('objectifs')) ?? [];
+  const hausses = await lireHaussesFtp();
   edition = null;
   const rendre = () => {
     page.innerHTML = `
@@ -381,8 +474,10 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
     ${blocObjectifs(objectifs, toutes, profil, maintenantMs)}
     ${blocBilans(sorties, maintenantMs)}
     ${blocForme(toutes, profil, maintenantMs)}
+    ${blocFtpHistorique(toutes, profil, hausses, maintenantMs)}
     ${blocRecords(sorties, maintenantMs, calcul, profil.poidsKg)}`;
     installerCurseurForme(page, toutes, profil, maintenantMs);
+    installerCurseurFtp(page, toutes, profil, maintenantMs);
   };
   rendre();
 
@@ -435,6 +530,7 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
       if (nom === 'type') { etat.type = v; etat.choix = null; }
       else if (nom === 'metrique') etat.metrique = v;
       else if (nom === 'plage') etat.plage = v;
+      else if (nom === 'plageFtp') etat.plageFtp = v;
       rendre();
       return;
     }

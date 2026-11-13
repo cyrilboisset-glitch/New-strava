@@ -1,7 +1,7 @@
 // Calculs de la page Progrès (sans navigateur, testés dans Node) :
 // bilans par semaine / mois / année, forme et fatigue (CTL / ATL / TSB),
 // records de puissance.
-import { chargeSortie, estimerFtp } from './analyse.js';
+import { chargeSortie, estimerFtp, JOURS_ESTIMATION_FTP } from './analyse.js';
 
 const JOUR_MS = 86400000;
 export const CONSTANTE_FORME_J = 42; // CTL : charge chronique (« forme »)
@@ -143,6 +143,27 @@ export const PERIODES_OBJECTIF = { semaine: 'Semaine', mois: 'Mois', annee: 'Ann
  */
 export function ftpApresSortie(s, sorties) {
   return estimerFtp(sorties, s.debut + (s.dureeChronoS ?? 0) * 1000);
+}
+
+/**
+ * Historique de la FTP estimée : un point par sortie avec capteur dont on connaît le
+ * meilleur 20 min ; chaque point = FTP estimée après cette sortie (95 % du meilleur 20 min
+ * des `jours` qui finissent avec elle), les anciennes sorties comptent à leur vraie date.
+ * `sorties` doivent porter effortsW. Les sorties sans effort de 20 min ne donnent pas de point.
+ * @returns {{tMs, ftpW, puissance20W, sortie}[]} dans l'ordre du temps
+ */
+export function historiqueFtp(sorties, jours = JOURS_ESTIMATION_FTP) {
+  const avec = sorties.filter((s) => s.effortsW?.[1200]).sort((a, b) => a.debut - b.debut);
+  const points = [];
+  let bas = 0;
+  for (let i = 0; i < avec.length; i++) {
+    const s = avec[i];
+    const tMs = s.debut + (s.dureeChronoS ?? 0) * 1000;
+    while (avec[bas].debut < tMs - jours * JOUR_MS) bas++;
+    const r = estimerFtp(avec.slice(bas, i + 1), tMs, jours);
+    if (r) points.push({ tMs, ftpW: r.ftpW, puissance20W: r.puissance20W, sortie: r.sortie });
+  }
+  return points;
 }
 
 /**

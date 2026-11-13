@@ -719,6 +719,14 @@ async function texteToast(page) {
   verif('forme et fatigue affichées', !!(await page.$('#forme-graph .ligne-forme')) && (await page.textContent('#bloc-forme')).includes('Fraîcheur'));
   await page.waitForFunction(() => !document.getElementById('records-progression'), null, { timeout: 30000 });
   const recordsTxt = (await page.textContent('#bloc-records table')).replace(/\s+/g, ' ');
+  const ftpHisto = (await page.textContent('#bloc-ftp-histo')).replace(/\s+/g, ' ');
+  console.log('  bloc FTP :', ftpHisto.slice(0, 160));
+  verif('bloc « FTP estimée dans le temps » affiché', ftpHisto.includes('FTP estimée dans le temps'), ftpHisto);
+  if (await page.$('#ftp-graph')) {
+    await page.locator('#ftp-graph').click({ position: { x: 200, y: 60 } });
+    verif('toucher la courbe : date, FTP et sortie lues', /190 W.*meilleur 20 min 200 W/.test(await page.textContent('#ftp-position')), await page.textContent('#ftp-position'));
+  }
+  await (await page.$('#bloc-ftp-histo')).screenshot({ path: 'tests/captures/ftp-historique.png' });
   for (const m of ['5 s 250 W2,6 W/kg · 20 avr. 2025', '20 min 200 W2,0 W/kg · 10 mai 2025', '1 h 200 W2,0 W/kg · 10 mai 2025']) verif(`record « ${m} »`, recordsTxt.includes(m), recordsTxt);
   verif('courbe de puissance', !!(await page.$('.ligne-record')));
   await page.click('[data-segments="type"] button[data-valeur="semaine"]');
