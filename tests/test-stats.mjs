@@ -1,7 +1,7 @@
 // Tests de la page Progrès : bilans par période, forme / fatigue, records.
 // Valeurs connues d'avance. Lancer : TZ=Europe/Paris node tests/test-stats.mjs
 // (les semaines et les mois se comptent en heure locale)
-import { bilanPeriodes, formeFatigue, etatFraicheur, records, debutPeriode, avancementObjectif, ftpApresSortie } from '../js/stats.js';
+import { bilanPeriodes, formeFatigue, etatFraicheur, records, debutPeriode, avancementObjectif, ftpApresSortie, historiqueFtp } from '../js/stats.js';
 
 process.env.TZ = process.env.TZ || 'Europe/Paris';
 let echecs = 0;
@@ -117,6 +117,18 @@ egal('anneau : retard / avance / pile dans le rythme / atteint', [
   etatAvancement(ds), etatAvancement({ fait: 120, cible: 200, ecart: 20 }), etatAvancement({ fait: 99.5, cible: 200, ecart: -0.5 }), etatAvancement({ fait: 210, cible: 200, ecart: -5 }),
 ], ['retard', 'avance', 'avance', 'atteint']);
 egal('anneau : objectif égalé = doré', etatAvancement({ fait: 200, cible: 200, ecart: 0 }), 'atteint');
+
+// Historique de la FTP estimée : un point par sortie avec un 20 min, 95 % du meilleur 20 min
+// des 6 semaines qui finissent avec la sortie (les anciennes sorties comptent à leur date)
+const h = (id, j, p20, extra = {}) => ({ id, debut: date(2026, 1, j), dureeChronoS: 3600, effortsW: p20 ? { 1200: p20 } : {}, ...extra });
+const histo = historiqueFtp([
+  h('c', 40, 240), h('a', 1, 200), h('sans', 10, 0), h('b', 20, 260), h('d', 41, 0),
+].map((s) => ({ ...s, debut: s.id === 'c' ? date(2026, 3, 1) : s.id === 'd' ? date(2026, 3, 2) : s.debut })));
+egal('historique FTP : un point par sortie avec 20 min (sans 20 min = pas de point), sortie du meilleur effort', histo.map((p) => p.sortie.id), ['a', 'b', 'b']);
+egal('historique FTP : 95 % du meilleur 20 min de la fenêtre', histo.map((p) => p.ftpW), [190, 247, 247]);
+egal('historique FTP : 1er mars = 40 jours après le 20 janvier, 260 W encore dans les 42 j', histo[2].puissance20W, 260);
+egal('historique FTP : un effort sorti de la fenêtre ne compte plus', historiqueFtp([h('x', 1, 300), { ...h('y', 1, 200), debut: date(2026, 4, 1) }]).map((p) => p.ftpW), [285, 190]);
+egal('historique FTP : aucun effort = vide', historiqueFtp([h('z', 1, 0)]), []);
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);

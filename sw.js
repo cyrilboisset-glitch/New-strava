@@ -3,7 +3,7 @@
 // Changer VERSION à chaque mise en ligne pour que le téléphone se mette à jour.
 import { deposerPartage } from './js/db.js';
 
-const VERSION = '0.39.5';
+const VERSION = '0.39.6';
 const CACHE = `mes-sorties-${VERSION}`;
 const FICHIERS = [
   './', 'index.html', 'manifest.webmanifest',

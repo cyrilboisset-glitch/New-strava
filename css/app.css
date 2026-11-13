@@ -485,6 +485,15 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .forme-graph { position: relative; height: 150px; margin-right: 58px; border-bottom: 1px solid var(--ligne); touch-action: pan-y; cursor: crosshair; }
 .forme-graph svg, .tsb-graph svg, .courbe-puissance svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .ligne-forme, .ligne-fatigue, .ligne-record, .ligne-recent { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.ligne-ftp { fill: none; stroke: var(--or); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.ftp-reglee { stroke: var(--texte-3); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.ftp-hausse { stroke: var(--avance); stroke-width: 1; opacity: 0.6; vector-effect: non-scaling-stroke; }
+.ftp-point { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--or); pointer-events: none; }
+.etiquette-fin.ftp { color: var(--or); }
+.etiquette-fin.ftp::before { background: var(--or); }
+.etiquette-fin.reglee::before { background: var(--texte-3); }
+#bloc-ftp-histo .segments { margin-top: 10px; }
+#bloc-ftp-histo .courbes-x { margin-right: 58px; }
 .ligne-forme { stroke: var(--forme); }
 .ligne-fatigue { stroke: var(--fatigue); }
 .ligne-record { stroke: var(--puissance); }
