@@ -119,7 +119,7 @@ export function htmlMannequin(muscles = {}, { interactif = false, legende = fals
 // ---- Bloc du détail d'une sortie ------------------------------------------------------
 
 /** Faut-il proposer le choix des muscles ? (pas pour les sorties vélo ni course) */
-export const avecMuscles = (famille) => !['sport-2', 'sport-1', 'sport-11', 'sport-17', 'sport-5'].includes(famille.cle);
+export const avecMuscles = (famille) => !['sport-2', 'velo-virtuel', 'sport-1', 'sport-11', 'sport-17', 'sport-5'].includes(famille.cle);
 
 export function htmlBlocMuscles(s, htmlRepli, ouvrir = false) {
   const n = Object.keys(nettoyer(s.muscles)).length;

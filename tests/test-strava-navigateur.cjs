@@ -681,6 +681,22 @@ async function texteToast(page) {
   await page.click('a.sortie:has-text("Home trainer sans capteur")');
   await page.waitForSelector('#page-detail .detail-nom');
   verif('sans trace : ni carte ni courbes', !(await page.$('#carte-parcours')) && !(await page.$('.courbe')));
+  // Vélo virtuel : workout par défaut (temps seulement), choix « Parcours réel (GPX) » gardé
+  verif('home trainer : choix Workout / Parcours réel, Workout par défaut', (await page.getAttribute('#mode-virtuel [data-mode="workout"]', 'aria-pressed')) === 'true'
+    && (await page.textContent('#mode-virtuel .bloc-note')).includes('seul le temps compte'));
+  await page.click('#mode-virtuel [data-mode="parcours"]');
+  await page.waitForFunction(() => document.querySelector('#mode-virtuel [data-mode="parcours"]')?.getAttribute('aria-pressed') === 'true');
+  await page.screenshot({ path: path.join(CAPTURES, 'velo-virtuel-detail.png') });
+  verif('parcours réel : explication avec l\'étoile', (await page.textContent('#mode-virtuel .bloc-note')).includes('★'));
+  await page.click('#btn-retour');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.click('a.sortie:has-text("Home trainer sans capteur")');
+  await page.waitForSelector('#mode-virtuel');
+  verif('le choix Parcours réel est gardé', (await page.getAttribute('#mode-virtuel [data-mode="parcours"]', 'aria-pressed')) === 'true');
+  await page.click('#mode-virtuel [data-mode="workout"]');
+  await page.waitForFunction(() => document.querySelector('#mode-virtuel [data-mode="workout"]')?.getAttribute('aria-pressed') === 'true');
+  verif('retour en Workout', true);
+  verif('vélo virtuel : pas de mannequin des muscles', !(await page.$('#bloc-muscles')));
   await page.click('#btn-retour');
 
   // 2 ter. Réglages : FTP 250 W -> TSS de « Col du test » = 3600 × 0,8² / 36 = 64
@@ -713,7 +729,8 @@ async function texteToast(page) {
   await page.click('.barre-col[data-i="0"]');
   const bilan2025 = (await page.textContent('#bloc-bilans .stats')).replace(/\s+/g, '');
   // 30 + 30 + 1,8 + 0,1 + 25 + 5,2 km ; 3600 + 3600 + 600 + 60 + 3540 + 2700 + 4200 s ; 400 + 180 + 40 m
-  verif('bilan 2025 : 92,1 km, 5 h 05, 620 m, 7 sorties', bilan2025 === 'Distance92,1kmTemps5h05Dénivelé620mSorties7', bilan2025);
+  // le home trainer sans trace (25 km) est un workout : son temps compte, pas sa distance (92,1 - 25 = 67,1 km)
+  verif('bilan 2025 : 67,1 km (workout virtuel sans distance), 5 h 05, 620 m, 7 sorties', bilan2025 === 'Distance67,1kmTemps5h05Dénivelé620mSorties7', bilan2025);
   await page.click('[data-segments="metrique"] button[data-valeur="denivele"]');
   verif('barre 2025 toujours choisie après changement de mesure', (await page.getAttribute('.barre-col[data-i="0"]', 'aria-pressed')) === 'true');
   verif('forme et fatigue affichées', !!(await page.$('#forme-graph .ligne-forme')) && (await page.textContent('#bloc-forme')).includes('Fraîcheur'));
@@ -785,7 +802,7 @@ async function texteToast(page) {
   const kmVelos = await page.$$eval('#bloc-velos .velo', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
   // 1000 km d'avant + 30 + 30 km ; home trainer : 25 km
   verif('kilométrage du Canyon : 1 060 km, 2 sorties, par défaut', kmVelos[0].includes('Canyon Endurace par défaut') && kmVelos[0].includes('1 060 km · 2 sorties') && kmVelos[0].includes("dont 1 000 km avant l'appli"), kmVelos[0]);
-  verif('kilométrage du home trainer : 25 km', kmVelos[1].includes('25 km · 1 sortie'), kmVelos[1]);
+  verif('kilométrage du home trainer : 0 km (workout virtuel), 1 sortie', kmVelos[1].includes('0 km · 1 sortie'), kmVelos[1]);
   await page.screenshot({ path: path.join(CAPTURES, 'velos.png'), fullPage: true });
   // Changement de vélo dans le détail d'une sortie
   await page.click('#onglet-sorties');
@@ -799,7 +816,7 @@ async function texteToast(page) {
   // la page Profil se redessine après coup : on attend le nouveau kilométrage (5 s au plus)
   await page.waitForFunction(() => document.querySelector('#bloc-velos .velo-km')?.textContent.includes('1 030'), null, { timeout: 5000 }).catch(() => {});
   const km2 =await page.$$eval('#bloc-velos .velo-km', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ')));
-  verif('après changement : Canyon 1 030 km, home trainer 55 km', km2[0].startsWith('1 030 km · 1 sortie') && km2[1].startsWith('55 km · 2 sorties'), JSON.stringify(km2));
+  verif('après changement : Canyon 1 030 km, home trainer 30 km (le workout n\'ajoute pas de km)', km2[0].startsWith('1 030 km · 1 sortie') && km2[1].startsWith('30 km · 2 sorties'), JSON.stringify(km2));
 
   // 2 quinquies. Sauvegarde puis restauration sur un téléphone « vide »
   await page.click('#onglet-profil');
@@ -890,14 +907,14 @@ async function texteToast(page) {
     await page.click(`#menu-activite [aria-label^="${nom} ("]`);
   };
   const f1 = await filtres();
-  verif('boutons de tri', JSON.stringify(f1) === JSON.stringify(['Tout 7*', 'Vélo 4', 'Course à pied 1', 'Marche 1', 'Musculation 1']), JSON.stringify(f1));
+  verif('boutons de tri', JSON.stringify(f1) === JSON.stringify(['Tout 7*', 'Vélo 3', 'Course à pied 1', 'Marche 1', 'Musculation 1', 'Vélo virtuel (home trainer) 1']), JSON.stringify(f1));
   await choisirActivite('Vélo');
-  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
+  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 3);
   const noms = await page.$$eval('.sortie-nom', (els) => els.map((e) => e.textContent));
-  verif('Vélo : 4 sorties', JSON.stringify(noms) === JSON.stringify(['Sortie du matin', 'Col du test', 'Home trainer sans capteur', 'Fichier vide']), JSON.stringify(noms));
+  verif('Vélo : 3 sorties (le home trainer est à part)', JSON.stringify(noms) === JSON.stringify(['Sortie du matin', 'Col du test', 'Fichier vide']), JSON.stringify(noms));
   const cumuls = await page.$$eval('.mois-cumul', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ')));
-  verif('totaux du mois de mars sans la musculation', cumuls[2] === '1 sortie · 25,0 km · 59 min · 0 m D+', JSON.stringify(cumuls));
-  verif('totaux de février sans la marche', cumuls[3] === '1 sortie · 0,1 km · 1 min · 0 m D+', JSON.stringify(cumuls));
+  verif('totaux du mois de mars sans la musculation ni le home trainer', cumuls[2] !== undefined && !cumuls.some((c) => c.includes('25,0 km')), JSON.stringify(cumuls));
+  verif('totaux de février sans la marche', cumuls[2] === '1 sortie · 0,1 km · 1 min · 0 m D+', JSON.stringify(cumuls));
   await page.screenshot({ path: path.join(CAPTURES, 'strava-2-tri-velo.png') });
   // Grande carte de la liste : titre dessus, tracé d'une seule couleur (les couleurs sont dans le détail : plus léger)
   const cartePuissance = page.locator('.sortie-grande', { hasText: 'Sortie du matin' });
@@ -977,8 +994,8 @@ async function texteToast(page) {
   await page.waitForSelector('#accueil:not([hidden])');
   await page.waitForFunction(() => !document.documentElement.dataset.transition);
   // Boutons ronds de l'accueil : icône du vélo choisie, nom complet pour le lecteur d'écran, pastille sur ⟳
-  verif('bouton Activité : icône du vélo, libellé « Vélo (4) »', (await page.innerHTML('#icone-activite')).includes('<circle cx="6" cy="16"')
-    && (await page.getAttribute('#btn-activite', 'aria-label')) === "Type d'activité : Vélo (4)");
+  verif('bouton Activité : icône du vélo, libellé « Vélo (3) »', (await page.innerHTML('#icone-activite')).includes('<circle cx="6" cy="16"')
+    && (await page.getAttribute('#btn-activite', 'aria-label')) === "Type d'activité : Vélo (3)");
   verif('menu Activité : seulement des icônes (ni nombre ni rond de sélection visibles)', await page.evaluate(() => {
     const p = document.getElementById('menu-activite');
     return [...p.querySelectorAll('[data-cle]')].every((b) => b.querySelector('svg') && getComputedStyle(b.querySelector('.menu-icone-nom')).maxWidth === '0px' && !/\d/.test(b.textContent)) && !p.querySelector('input');
@@ -1043,12 +1060,12 @@ async function texteToast(page) {
   await page.mouse.move(xv2, yv2, { steps: 6 });
   await page.mouse.up();
   await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'sport-2');
-  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
+  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 3);
   await page.click('#btn-activite');
   await page.waitForSelector('#menu-activite.ouvert');
   await page.click('#menu-activite [data-cle="sport-2"]'); // (déjà Vélo : le test suivant s'y attend)
   await page.waitForFunction(() => document.querySelector('#menu-activite [aria-checked="true"]')?.dataset.cle === 'sport-2');
-  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 4);
+  await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 3);
   verif('bouton Synchro : pastille d\'état dans le bouton ⟳', !!(await page.$('#btn-menu-synchro .pastille')) && (await page.$$('.outils')).length === 0);
   await page.click('#btn-activite');
   await page.waitForSelector('#menu-activite.ouvert');
@@ -1058,7 +1075,7 @@ async function texteToast(page) {
   await page.locator('header.barre').screenshot({ path: path.join(CAPTURES, 'accueil-boutons.png') });
   await page.reload();
   await page.waitForSelector('#menu-activite [data-cle]:nth-child(2)', { state: 'attached' });
-  verif('tri gardé après réouverture', (await filtres())[1] === 'Vélo 4*' && (await page.$$('.sortie')).length === 4, JSON.stringify(await filtres()));
+  verif('tri gardé après réouverture', (await filtres())[1] === 'Vélo 3*' && (await page.$$('.sortie')).length === 3, JSON.stringify(await filtres()));
   await choisirActivite('Musculation');
   await page.waitForFunction(() => document.querySelectorAll('.sortie').length === 1);
   verif('Musculation : la séance', (await page.textContent('.sortie-nom')) === 'Séance haut du corps');

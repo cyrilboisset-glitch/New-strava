@@ -1,7 +1,7 @@
 // Interface : carte de synchronisation + liste des sorties par mois, et
 // navigation vers le détail d'une sortie (#sortie=…) et les réglages (#reglages).
 import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages, versionBase } from './db.js';
-import { familleSortie } from './sortie.js';
+import { familleSortie, estWorkoutVirtuel, distanceCompteeM, denivelePosCompteM } from './sortie.js';
 import { chargeSortie } from './analyse.js';
 import { lireProfil, calculerEstimationsManquantes, calculerEffortsManquants, reglerFtpAuto } from './profil.js';
 import { htmlCarteStatique } from './carte-statique.js';
@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.6 · courbe de FTP dans le temps';
+export const VERSION_APPLI = '0.39.7 · vélo virtuel : workout ou parcours réel';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -59,8 +59,9 @@ function carteSortie(s, profil, nbRecords = 0) {
   const d = new Date(s.debut);
   const { tss } = chargeSortie(s, profil.ftpW);
   const stats = [];
-  if (s.distanceM) stats.push(['Distance', `${km(s.distanceM)}<small>km</small>`]);
-  if (s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM)) stats.push(['Dénivelé', `${nombre(s.denivelePosM)}<small>m</small>`]);
+  // un workout virtuel (home trainer) n'a que son temps : ni distance ni dénivelé
+  if (s.distanceM && !estWorkoutVirtuel(s)) stats.push(['Distance', `${km(s.distanceM)}<small>km</small>`]);
+  if (!estWorkoutVirtuel(s) && s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM)) stats.push(['Dénivelé', `${nombre(s.denivelePosM)}<small>m</small>`]);
   if (s.dureeChronoS != null) stats.push(['Temps', duree(s.dureeChronoS)]);
   const effort = [];
   if (s.puissanceNormW) effort.push(`<span><span class="p">${s.puissanceNormW} W</span> NP</span>`);
@@ -274,9 +275,9 @@ function appliquerDonnees({ version, toutes, profil, records }) {
   }
   afficherBandeau().catch((e) => console.warn('Objectifs', e));
   liste.cumuls = new Map([...groupes].map(([cle, l]) => {
-    const dist = l.reduce((a, s) => a + (s.distanceM ?? 0), 0);
+    const dist = l.reduce((a, s) => a + distanceCompteeM(s), 0);
     const temps = l.reduce((a, s) => a + (s.dureeChronoS ?? 0), 0);
-    const dplus = l.reduce((a, s) => a + (s.denivelePosM ?? 0), 0);
+    const dplus = l.reduce((a, s) => a + denivelePosCompteM(s), 0);
     return [cle, { titre: majuscule(fmtMois.format(new Date(l[0].debut))), texte: [
       `${l.length} sortie${l.length > 1 ? 's' : ''}`,
       dist > 0 ? `${km(dist)} km` : '',

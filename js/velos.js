@@ -41,7 +41,7 @@ export async function afficherVelos(bloc, toast) {
   // Matériel noté sur Strava (archive) pour les sorties vélo, regroupé par nom
   const materiels = new Map();
   for (const s of sorties) {
-    if (!s.materielStrava || familleSortie(s).cle !== 'sport-2') continue; // pas les chaussures
+    if (!s.materielStrava || !['sport-2', 'velo-virtuel'].includes(familleSortie(s).cle)) continue; // pas les chaussures (le home trainer se fait aussi sur un vélo)
     const m = materiels.get(s.materielStrava) ?? { n: 0, sansVelo: 0 };
     m.n++;
     if (!s.veloId) m.sansVelo++;

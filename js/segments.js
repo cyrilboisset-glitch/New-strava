@@ -1,7 +1,7 @@
 // Segments (comme sur Strava) : stockage, recherche des passages dans toutes
 // les sorties, et écrans (bloc du détail d'une sortie, page d'un segment,
 // liste dans Progrès). Calculs dans segments-calc.js.
-import { lireReglage, ecrireReglage, toutesLesSorties, lireFichier, mettreAJourSorties } from './db.js';
+import { lireReglage, ecrireReglage, toutesLesSorties, lireFichier, mettreAJourSorties, completerSortie } from './db.js';
 import { decoderFichier } from './fichier.js';
 import { pointsDetail } from './analyse.js';
 import {
@@ -11,7 +11,7 @@ import { lireProfil, wKg } from './profil.js';
 import { nombre, km, chrono, echapper, fmtDate, htmlRepli, suivreReplis } from './format.js';
 import { htmlCarteStatique, retirerCarte } from './carte-statique.js';
 import { creerVue3d, construireTrace } from './vue3d.js';
-import { familleSortie } from './sortie.js';
+import { familleSortie, estVirtuel, estWorkoutVirtuel } from './sortie.js';
 import { proposerNomSegment, sansDoublons, nomSegment } from './lieux.js';
 
 export const SEUIL_SPRINT_W = 700; // sprint : 700 W et plus pendant au moins 5 s (demande de Cyril)
@@ -21,6 +21,27 @@ export const VERSION_AUTO = 1; // détection automatique des montées et sprints
 // Chaque segment a un numéro d'ordre (compteur qui ne redescend jamais) ; chaque
 // sortie garde `segmentsVus` = numéro du dernier segment contre lequel elle a été
 // vérifiée, et `segmentsAuto` = version de la détection automatique faite dessus.
+
+/** Petite étoile à côté d'un temps fait sur une sortie virtuelle (parcours réel suivi en virtuel) */
+const etoileVirtuelle = (p) => (p.virtuel ? '<sup class="etoile-virtuelle" title="Sortie virtuelle" aria-label="sortie virtuelle">★</sup>' : '');
+
+/** Retire les passages de ces sorties (une sortie qui passe en « workout » n'a plus de segments) */
+export async function purgerPassagesSorties(ids) {
+  const ensemble = new Set(ids);
+  if (analyse) { analyse.passages = analyse.passages.filter((p) => !ensemble.has(p.sortieId)); await ecrirePassages(analyse.passages); }
+  else await ecrirePassages((await lirePassages()).filter((p) => !ensemble.has(p.sortieId)));
+}
+
+/** Choix « Workout » / « Parcours réel » d'une sortie virtuelle ; le parcours est (re)cherché sur les segments */
+export async function changerModeVirtuel(s, mode) {
+  if (mode === 'parcours') {
+    await completerSortie(s.id, () => ({ modeVirtuel: 'parcours', segmentsVus: -1 }));
+    mettreAJourPassages().catch((e) => console.warn('Segments', e));
+  } else {
+    await completerSortie(s.id, () => ({ modeVirtuel: 'workout' }));
+    await purgerPassagesSorties([s.id]);
+  }
+}
 
 export const lireSegments = async () => (await lireReglage('segments')) ?? [];
 export const lirePassages = async () => (await lireReglage('passages')) ?? [];
@@ -173,13 +194,26 @@ export function mettreAJourPassages(progression = () => {}) {
         const id = `${seg.id}|${s.id}|${Math.round(p.debutS)}`;
         if (analyse.ids.has(id)) continue;
         analyse.ids.add(id);
-        analyse.passages.push({ id, segmentId: seg.id, sortieId: s.id, debut: s.debut + p.debutS * 1000, ...p });
+        analyse.passages.push({ id, segmentId: seg.id, sortieId: s.id, debut: s.debut + p.debutS * 1000, ...p, ...(estVirtuel(s) ? { virtuel: true } : {}) });
         trouvesTotal++;
       }
     };
     const velo = (s) => familleSortie(s).cle === 'sport-2';
-    const aFaire = (s) => s.trace?.length > 1
+    // Pas de segments pour un workout virtuel ; sur un parcours virtuel, les segments existants sont
+    // retrouvés (passages marqués ★) mais aucune montée ni aucun sprint n'est détecté
+    const aFaire = (s) => s.trace?.length > 1 && !estWorkoutVirtuel(s)
       && ((s.segmentsVus ?? -1) < analyse.compteur || (velo(s) && s.segmentsAuto !== VERSION_AUTO));
+
+    // Nettoyage : passages des workouts virtuels (sorties d'avant cette règle) et segments automatiques
+    // qu'ils avaient fait naître et qui n'ont plus aucun passage
+    const workouts = new Set(sorties.filter(estWorkoutVirtuel).map((s) => s.id));
+    if (workouts.size) {
+      const nb = analyse.passages.length;
+      analyse.passages = analyse.passages.filter((p) => !workouts.has(p.sortieId));
+      const vides = new Set(analyse.segments.filter((g) => g.auto && workouts.has(g.sortieOrigine) && !analyse.passages.some((p) => p.segmentId === g.id)).map((g) => g.id));
+      if (vides.size) analyse.segments = analyse.segments.filter((g) => !vides.has(g.id));
+      if (analyse.passages.length !== nb || vides.size) await ecrire();
+    }
 
     for (;;) {
       const liste = sorties.filter(aFaire);
@@ -418,7 +452,7 @@ export async function afficherSegmentsSortie(bloc, s, pts, trace3d, indexCurseur
       const cle = `s${k}`;
       return `<div class="passage-suivi"><a class="passage" href="#segment=${encodeURIComponent(g.id)}">
         <span class="passage-nom">${echapper(g.nom)}<small>${g.type} · ${chiffresSegment(g)}</small></span>
-        <span class="passage-temps">${chrono(p.dureeS)}${rangTexte(rang, tous.length)}</span>
+        <span class="passage-temps">${chrono(p.dureeS)}${etoileVirtuelle(p)}${rangTexte(rang, tous.length)}</span>
         <span class="passage-mesures">${mesuresPassage(p, profil.poidsKg)}</span></a>
         <button class="btn secondaire petit" type="button" data-voir="${cle}" aria-expanded="${apercu.k === cle}">${apercu.k === cle ? 'Fermer' : 'Voir'}</button></div>
         ${apercu.k === cle ? htmlApercu() : ''}`;
@@ -551,7 +585,7 @@ export async function afficherSegment(page, id, toast) {
   if (!g) { page.innerHTML = '<section class="carte"><p>Segment introuvable.</p></section>'; return null; }
   const profil = await lireProfil();
   const sorties = new Map((await toutesLesSorties()).map((s) => [s.id, s]));
-  const passages = (await lirePassages()).filter((p) => p.segmentId === id && sorties.has(p.sortieId));
+  const passages = (await lirePassages()).filter((p) => p.segmentId === id && sorties.has(p.sortieId) && !estWorkoutVirtuel(sorties.get(p.sortieId)));
   const rangs = classer(passages);
   const record = passages.length ? [...passages].sort((a, b) => a.dureeS - b.dureeS)[0] : null;
 
@@ -566,10 +600,10 @@ export async function afficherSegment(page, id, toast) {
     <section class="carte bloc">
       <div class="stats stats-3">
         <div><span class="stat-label">Passages</span><span class="stat-val">${passages.length}</span></div>
-        <div><span class="stat-label">Record</span><span class="stat-val">${record ? chrono(record.dureeS) : '–'}</span></div>
+        <div><span class="stat-label">Record</span><span class="stat-val">${record ? chrono(record.dureeS) : '–'}${record ? etoileVirtuelle(record) : ''}</span></div>
         <div><span class="stat-label">Vitesse</span><span class="stat-val">${record?.vitesseMoyMs ? nombre(record.vitesseMoyMs * 3.6, 1) : '–'}<small>km/h</small></span></div>
       </div>
-      ${record ? `<p class="bloc-note">Record le ${fmtDate.format(record.debut)}${record.puissanceMoyW ? `, ${record.puissanceMoyW} W` : ''}.</p>` : ''}
+      ${record ? `<p class="bloc-note">Record le ${fmtDate.format(record.debut)}${record.puissanceMoyW ? `, ${record.puissanceMoyW} W` : ''}${record.virtuel ? ' (sortie virtuelle ★)' : ''}.</p>` : ''}
     </section>
     <section class="carte bloc">
       <h2 class="bloc-titre">Historique des passages</h2>
@@ -580,7 +614,7 @@ export async function afficherSegment(page, id, toast) {
       ${tries.length ? `<div class="passages">${tries.map((p) => `
         <a class="passage" href="#sortie=${encodeURIComponent(p.sortieId)}">
           <span class="passage-nom">${fmtDate.format(p.debut)}<small>${echapper(sorties.get(p.sortieId).nom || sorties.get(p.sortieId).nomSport)}</small></span>
-          <span class="passage-temps">${chrono(p.dureeS)}${rangTexte(rangs.get(p), passages.length)}</span>
+          <span class="passage-temps">${chrono(p.dureeS)}${etoileVirtuelle(p)}${rangTexte(rangs.get(p), passages.length)}</span>
           <span class="passage-mesures">${mesuresPassage(p, profil.poidsKg)}</span></a>`).join('')}</div>`
         : '<p class="aide">Aucun passage trouvé.</p>'}
       <p class="bloc-note">Temps écoulé entre le départ et l'arrivée du segment, pauses comprises (comme Strava). Avec un point toutes les 8 s, l'heure de passage est calculée entre deux points.</p>

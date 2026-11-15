@@ -21,8 +21,22 @@ const FAMILLES = {
   2: 'Vélo', 21: 'Vélo', 1: 'Course à pied', 11: 'Marche', 17: 'Randonnée', 5: 'Natation', 10: 'Entraînement',
 };
 
+// Vélo virtuel (home trainer, Zwift…) : sport « vélo » avec le sous-sport home trainer ou virtuel.
+// Deux modes, au choix de Cyril pour chaque sortie (`modeVirtuel`) :
+//  - 'workout' (par défaut) : séance sur home trainer. Seul le temps compte : ni segments, ni distance,
+//    ni dénivelé dans les totaux et les objectifs ;
+//  - 'parcours' : parcours réel suivi en virtuel (fichier GPX). Les segments comptent, leur temps
+//    est marqué d'une étoile pour dire que c'est une sortie virtuelle.
+export const estVirtuel = (s) => s.sport === 2 && (s.sousSport === 6 || s.sousSport === 58);
+export const modeVirtuel = (s) => (!estVirtuel(s) ? null : s.modeVirtuel === 'parcours' ? 'parcours' : 'workout');
+export const estWorkoutVirtuel = (s) => modeVirtuel(s) === 'workout';
+/** Distance et dénivelé qu'une sortie ajoute aux totaux : rien pour un workout virtuel */
+export const distanceCompteeM = (s) => (estWorkoutVirtuel(s) ? 0 : s.distanceM ?? 0);
+export const denivelePosCompteM = (s) => (estWorkoutVirtuel(s) ? 0 : s.denivelePosM ?? 0);
+
 /** Famille d'une sortie : { cle, nom } */
 export function familleSortie(s) {
+  if (estVirtuel(s)) return { cle: 'velo-virtuel', nom: 'Vélo virtuel (home trainer)' };
   if (s.sport === 10 && s.sousSport === SOUS_SPORT_MUSCULATION) return { cle: 'musculation', nom: 'Musculation' };
   if (FAMILLES[s.sport]) return { cle: `sport-${s.sport === 21 ? 2 : s.sport}`, nom: FAMILLES[s.sport] };
   // Types Strava inconnus (Kitesurf, Yoga…) : chacun sa famille, sous son nom

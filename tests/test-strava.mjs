@@ -3,7 +3,7 @@
 // Lancer depuis la racine du dépôt : node tests/test-strava.mjs
 import { lireCsv, dateStrava, lireActivitesCsv, typeStrava, resumerSansTrace } from '../js/strava.js';
 import { lireGpx, lireTcx, resumerTrace, puissanceNormalisee } from '../js/trace.js';
-import { familleSortie } from '../js/sortie.js';
+import { familleSortie, modeVirtuel, estWorkoutVirtuel, distanceCompteeM, denivelePosCompteM } from '../js/sortie.js';
 import { fauxGpx, fauxTcx, CSV_STRAVA } from './fausse-archive.mjs';
 
 let echecs = 0;
@@ -79,7 +79,17 @@ egal('TCX : distance, durée, FC, puissance', [rt.distanceM, rt.dureeChronoS, rt
 // Familles pour le tri de la liste
 const famille = (sport, sousSport, nomSport = '') => familleSortie({ sport, sousSport, nomSport }).nom;
 egal('familles', [famille(2, 7), famille(2, 46), famille(2, 6), famille(21, 0), famille(1, 3), famille(11, 0), famille(10, 20), famille(10, 0), famille(0, 0, 'Kitesurf'), famille(0, 0, 'Activité')],
-  ['Vélo', 'Vélo', 'Vélo', 'Vélo', 'Course à pied', 'Marche', 'Musculation', 'Entraînement', 'Kitesurf', 'Autre']);
+  ['Vélo', 'Vélo', 'Vélo virtuel (home trainer)', 'Vélo', 'Course à pied', 'Marche', 'Musculation', 'Entraînement', 'Kitesurf', 'Autre']);
+// Vélo virtuel : famille à part, deux modes (workout par défaut, parcours réel)
+egal('vélo virtuel (sous-sport 58) : même famille que le home trainer', familleSortie({ sport: 2, sousSport: 58 }).cle, familleSortie({ sport: 2, sousSport: 6 }).cle);
+egal('vélo virtuel : pas la famille vélo', familleSortie({ sport: 2, sousSport: 6 }).cle !== familleSortie({ sport: 2, sousSport: 7 }).cle, true);
+egal('modes : workout par défaut, parcours si choisi, rien pour un vélo dehors',
+  [modeVirtuel({ sport: 2, sousSport: 6 }), modeVirtuel({ sport: 2, sousSport: 58, modeVirtuel: 'parcours' }), modeVirtuel({ sport: 2, sousSport: 7 })], ['workout', 'parcours', null]);
+egal('workout virtuel : ni distance ni dénivelé comptés',
+  [distanceCompteeM({ sport: 2, sousSport: 6, distanceM: 25000 }), denivelePosCompteM({ sport: 2, sousSport: 6, denivelePosM: 300 })], [0, 0]);
+egal('parcours virtuel et vélo dehors : distance comptée',
+  [distanceCompteeM({ sport: 2, sousSport: 58, modeVirtuel: 'parcours', distanceM: 25000 }), distanceCompteeM({ sport: 2, sousSport: 7, distanceM: 40000 })], [25000, 40000]);
+egal('estWorkoutVirtuel', [estWorkoutVirtuel({ sport: 2, sousSport: 6 }), estWorkoutVirtuel({ sport: 2, sousSport: 6, modeVirtuel: 'parcours' }), estWorkoutVirtuel({ sport: 1 })], [true, false, false]);
 egal('vélo électrique et vélo : même famille', familleSortie({ sport: 21 }).cle, familleSortie({ sport: 2, sousSport: 7 }).cle);
 
 console.log(`\n${echecs} échec(s)`);

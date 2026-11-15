@@ -2,7 +2,7 @@
 // Comparaison sur la trace simplifiée gardée dans chaque sortie (pas de
 // fichier à relire : rapide même avec tout l'historique Strava).
 // Sans navigateur : testé dans Node (tests/test-parcours.mjs).
-import { familleSortie } from './sortie.js';
+import { familleSortie, estWorkoutVirtuel } from './sortie.js';
 
 const M_PAR_DEG = 111195;
 export const ECART_BOUTS_M = 200; // départs (et arrivées) à moins de 200 m
@@ -42,6 +42,7 @@ export function memeParcours(a, b) {
   if (!a.trace || !b.trace || a.trace.length < 2 || b.trace.length < 2) return false;
   if (!a.distanceM || !b.distanceM) return false;
   if (familleSortie(a).cle !== familleSortie(b).cle) return false;
+  if (estWorkoutVirtuel(a) || estWorkoutVirtuel(b)) return false; // un workout n'a pas de parcours
   if (Math.abs(a.distanceM - b.distanceM) > ECART_DISTANCE * Math.max(a.distanceM, b.distanceM)) return false;
   if (distM(a.trace[0], b.trace[0]) > ECART_BOUTS_M) return false;
   if (distM(a.trace[a.trace.length - 1], b.trace[b.trace.length - 1]) > ECART_BOUTS_M) return false;

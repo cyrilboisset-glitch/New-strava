@@ -11,13 +11,13 @@ import { estimationPossible } from './puissance-estimee.js';
 import { memeParcoursQue } from './parcours.js';
 import { toutesLesSorties } from './db.js';
 import { htmlChoixVelo } from './velos.js';
-import { familleSortie } from './sortie.js';
+import { familleSortie, estVirtuel, modeVirtuel, estWorkoutVirtuel } from './sortie.js';
 import { nombre, km, duree, chrono, echapper, majuscule, fmtJourLong, fmtHeure, fmtDate as fmtDateLongue, htmlRepli, suivreReplis } from './format.js';
 import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './carte-statique.js';
 import { MODES, MODE_DEFAUT, valeursPoints, morceauxMode, modeDisponible, legende, htmlLegende } from './couleurs-trace.js';
 import { htmlBlocMuscles, installerMuscles, avecMuscles, nettoyer as nettoyerMuscles } from './mannequin.js';
-import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties } from './segments.js';
+import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties, changerModeVirtuel } from './segments.js';
 import { records, ftpApresSortie } from './stats.js';
 import { htmlCourbePuissance, RECORDS_AFFICHES } from './progres.js';
 import { gpxDepuisSortie, nomFichierGpx } from './routage.js';
@@ -624,6 +624,22 @@ function htmlMemeParcours(s, groupe) {
 // ---- Page ----------------------------------------------------------------------------
 
 /** Remplit `page` avec le détail de la sortie `id`. */
+const TEXTES_MODE_VIRTUEL = {
+  workout: 'Séance sur home trainer : seul le temps compte dans tes totaux. Ni segments, ni distance, ni dénivelé ajoutés aux objectifs et aux bilans.',
+  parcours: 'Parcours réel suivi en virtuel (fichier GPX) : les segments comptent, leur temps est marqué d\'une ★ (sortie virtuelle). La distance et le dénivelé ne sont pas ajoutés aux objectifs.',
+};
+
+function htmlModeVirtuel(s) {
+  const mode = modeVirtuel(s);
+  return `<div class="mode-virtuel" id="mode-virtuel">
+    <div class="segments" role="group" aria-label="Type de sortie virtuelle">
+      <button type="button" data-mode="workout" aria-pressed="${mode === 'workout'}">Workout</button>
+      <button type="button" data-mode="parcours" aria-pressed="${mode === 'parcours'}">Parcours réel (GPX)</button>
+    </div>
+    <p class="bloc-note">${TEXTES_MODE_VIRTUEL[mode]}</p>
+  </div>`;
+}
+
 export async function afficherDetail(page, id, toast = () => {}) {
   fermerDetail();
   const s = await lireSortie(id);
@@ -708,6 +724,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
       ${s.denivelePosM != null && (s.denivelePosM > 0 || s.distanceM) ? `<span class="chiffre">${nombre(s.denivelePosM)}<small>m D+</small></span>` : ''}
     </div>
     ${familleSortie(s).cle === 'sport-2' || s.veloId ? htmlChoixVelo(velos, s) : ''}
+    ${estVirtuel(s) ? htmlModeVirtuel(s) : ''}
     <div class="partage-sortie">${htmlBoutonImage()}</div>
   </section>
   ${htmlBlocImage()}
@@ -722,7 +739,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
   ${avecMuscles(familleSortie(s)) ? `<section class="carte bloc" id="bloc-muscles">${htmlBlocMuscles(s, htmlRepli, familleSortie(s).cle === 'musculation' && !Object.keys(nettoyerMuscles(s.muscles)).length)}</section>` : ''}
   ${blocChiffres(grilleChiffres(s, charge, pts, estimee), s, replisEtat.chiffres)}
   ${courbes.html ? blocCourbesRepliable(courbes, replisEtat.courbes) : ''}
-  ${avecGps ? '<section class="carte bloc" id="bloc-segments-sortie"></section>' : ''}
+  ${avecGps && !estWorkoutVirtuel(s) ? '<section class="carte bloc" id="bloc-segments-sortie"></section>' : ''}
   <section class="carte bloc" id="bloc-meme-parcours" hidden></section>
   ${puissanceReelle ? blocPuissances(s, efforts, recordsTous, intervalleS, profil.poidsKg, ftpApres, ftpAvant) : ''}
   ${zonesP}
@@ -824,6 +841,15 @@ export async function afficherDetail(page, id, toast = () => {}) {
     suivreReplis(blocMuscles);
     installerMuscles(blocMuscles.querySelector('.muscles-contenu'), s, toast);
   }
+  // Vélo virtuel : workout (temps seulement) ou parcours réel (segments comptés, avec ★)
+  page.querySelector('#mode-virtuel')?.addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-mode]');
+    if (!b || b.dataset.mode === modeVirtuel(s)) return;
+    try {
+      await changerModeVirtuel(s, b.dataset.mode);
+      await afficherDetail(page, id, toast);
+    } catch (err) { console.error(err); toast('Changement non enregistré.'); }
+  });
   page.querySelector('#choix-velo')?.addEventListener('change', async (e) => {
     await completerSortie(s.id, () => ({ veloId: e.target.value || null }));
   });
