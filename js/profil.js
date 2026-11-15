@@ -2,6 +2,7 @@
 import { lireReglage, ecrireReglage, toutesLesSorties, lireFichier, completerSortie } from './db.js';
 import { decoderFichier } from './fichier.js';
 import { pointsDetail, parSeconde, meilleursEfforts, estimerFtp, JOURS_ESTIMATION_FTP, VERSION_EFFORTS, puissanceNormalisee } from './analyse.js';
+import { distanceCompteeM } from './sortie.js';
 import { estimerPuissance, estimationPossible, VERSION_ESTIMATION } from './puissance-estimee.js';
 
 export const FTP_DEFAUT_W = 236; // valeur du BiNavi (zones_target) au 12 oct. 2026
@@ -56,7 +57,7 @@ export function bilanVelos(velos, sorties) {
   for (const s of sorties) {
     const b = s.veloId && res[s.veloId];
     if (!b) continue;
-    b.distanceM += s.distanceM ?? 0;
+    b.distanceM += distanceCompteeM(s);
     b.dureeS += s.dureeChronoS ?? 0;
     b.n++;
     if (!b.derniere || s.debut > b.derniere) b.derniere = s.debut;

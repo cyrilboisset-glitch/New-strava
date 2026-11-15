@@ -2,6 +2,7 @@
 // bilans par semaine / mois / année, forme et fatigue (CTL / ATL / TSB),
 // records de puissance.
 import { chargeSortie, estimerFtp, JOURS_ESTIMATION_FTP } from './analyse.js';
+import { distanceCompteeM, denivelePosCompteM } from './sortie.js';
 
 const JOUR_MS = 86400000;
 export const CONSTANTE_FORME_J = 42; // CTL : charge chronique (« forme »)
@@ -61,9 +62,9 @@ export function bilanPeriodes(sorties, type, n, maintenantMs = Date.now()) {
     const p = periodes.find((x) => s.debut >= x.debut && s.debut < x.fin);
     if (!p) continue;
     p.n++;
-    p.distanceM += s.distanceM ?? 0;
+    p.distanceM += distanceCompteeM(s); // un workout virtuel n'ajoute que son temps
     p.dureeS += s.dureeChronoS ?? s.dureeTotaleS ?? 0;
-    p.denivelePosM += s.denivelePosM ?? 0;
+    p.denivelePosM += denivelePosCompteM(s);
   }
   return periodes;
 }
@@ -188,8 +189,8 @@ export function avancementObjectif(obj, sorties, maintenantMs = Date.now(), { ft
   let attendu = null;
   let sortieFtp = null;
   let departFtpW = null;
-  if (obj.type === 'distance') { fait = dans.reduce((a, s) => a + (s.distanceM ?? 0), 0) / 1000; attendu = cible * partEcoulee; }
-  else if (obj.type === 'denivele') { fait = dans.reduce((a, s) => a + (s.denivelePosM ?? 0), 0); attendu = cible * partEcoulee; }
+  if (obj.type === 'distance') { fait = dans.reduce((a, s) => a + distanceCompteeM(s), 0) / 1000; attendu = cible * partEcoulee; }
+  else if (obj.type === 'denivele') { fait = dans.reduce((a, s) => a + denivelePosCompteM(s), 0); attendu = cible * partEcoulee; }
   // musculation : `sorties` ne contient que les séances ; le temps est compté en heures
   else if (obj.type === 'seances') { fait = dans.length; attendu = cible * partEcoulee; }
   else if (obj.type === 'tempsmuscu') { fait = dans.reduce((a, s) => a + (s.dureeChronoS ?? 0), 0) / 3600; attendu = cible * partEcoulee; }

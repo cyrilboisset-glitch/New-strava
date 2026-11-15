@@ -130,5 +130,17 @@ egal('historique FTP : 1er mars = 40 jours après le 20 janvier, 260 W encore da
 egal('historique FTP : un effort sorti de la fenêtre ne compte plus', historiqueFtp([h('x', 1, 300), { ...h('y', 1, 200), debut: date(2026, 4, 1) }]).map((p) => p.ftpW), [285, 190]);
 egal('historique FTP : aucun effort = vide', historiqueFtp([h('z', 1, 0)]), []);
 
+// Vélo virtuel : un workout n'ajoute que son temps aux bilans (pas de distance ni de dénivelé)
+const moisVirtuel = bilanPeriodes([
+  { debut: date(2026, 11, 3), distanceM: 40000, dureeChronoS: 5400, denivelePosM: 500, sport: 2, sousSport: 7 },
+  { debut: date(2026, 11, 4), distanceM: 25000, dureeChronoS: 3600, denivelePosM: 200, sport: 2, sousSport: 6 }, // workout
+  { debut: date(2026, 11, 5), distanceM: 20000, dureeChronoS: 3000, denivelePosM: 100, sport: 2, sousSport: 58, modeVirtuel: 'parcours' },
+], 'mois', 1, date(2026, 11, 10)).pop();
+egal('bilan : workout = temps seulement, parcours virtuel compté', [moisVirtuel.n, moisVirtuel.distanceM, moisVirtuel.dureeS, moisVirtuel.denivelePosM], [3, 60000, 12000, 600]);
+const objVirtuel = avancementObjectif({ type: 'distance', periode: 'mois', cible: 100 }, [
+  { debut: date(2026, 11, 3), distanceM: 40000, sport: 2, sousSport: 7 }, { debut: date(2026, 11, 4), distanceM: 25000, sport: 2, sousSport: 6 },
+], date(2026, 11, 10));
+egal('objectif distance : le workout virtuel n\'ajoute rien', objVirtuel.fait, 40);
+
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);
