@@ -3,7 +3,7 @@
 // Lancer depuis la racine du dépôt : node tests/test-strava.mjs
 import { lireCsv, dateStrava, lireActivitesCsv, typeStrava, resumerSansTrace } from '../js/strava.js';
 import { lireGpx, lireTcx, resumerTrace, puissanceNormalisee } from '../js/trace.js';
-import { familleSortie, modeVirtuel, estWorkoutVirtuel, distanceCompteeM, denivelePosCompteM } from '../js/sortie.js';
+import { familleSortie, nomSport, modeVirtuel, estWorkoutVirtuel, distanceCompteeM, denivelePosCompteM } from '../js/sortie.js';
 import { fauxGpx, fauxTcx, CSV_STRAVA } from './fausse-archive.mjs';
 
 let echecs = 0;
@@ -30,7 +30,32 @@ egal('Course à pied (fr)', typeStrava('Course à pied').sport, 1);
 egal('Weight Training = musculation', typeStrava('Weight Training'), { sport: 10, sousSport: 20, nomSport: 'Musculation' });
 egal('Musculation (fr)', typeStrava('Musculation').nomSport, 'Musculation');
 egal('Workout = entraînement', typeStrava('Workout'), { sport: 10, sousSport: 0, nomSport: 'Entraînement' });
-egal('type inconnu gardé tel quel', typeStrava('Kitesurf').nomSport, 'Kitesurf');
+egal('type inconnu gardé tel quel', typeStrava('Curling').nomSport, 'Curling');
+// Tous les types Strava (anglais et français) : [texte, sport FIT, nom affiché, famille]
+const TOUS_TYPES = [
+  ['Ride', 2, 'Vélo', 'Vélo'], ['Sortie à vélo', 2, 'Vélo', 'Vélo'], ['Mountain Bike Ride', 2, 'VTT', 'Vélo'], ['Gravel Ride', 2, 'Gravel', 'Vélo'],
+  ['E-Bike Ride', 21, 'Vélo électrique', 'Vélo'], ['E-Mountain Bike Ride', 21, 'VTT électrique', 'Vélo'], ['Handcycle', 2, 'Handbike', 'Vélo'], ['Velomobile', 2, 'Vélomobile', 'Vélo'],
+  ['Virtual Ride', 2, 'Vélo virtuel', 'Vélo virtuel (home trainer)'],
+  ['Run', 1, 'Course à pied', 'Course à pied'], ['Trail Run', 1, 'Trail', 'Course à pied'], ['Virtual Run', 1, 'Course virtuelle', 'Course à pied'],
+  ['Walk', 11, 'Marche', 'Marche'], ['Hike', 17, 'Randonnée', 'Randonnée'], ['Wheelchair', 65, 'Fauteuil roulant', 'Fauteuil roulant'],
+  ['Swim', 5, 'Natation', 'Natation'],
+  ['Weight Training', 10, 'Musculation', 'Musculation'], ['Workout', 10, 'Entraînement', 'Entraînement'], ['Crossfit', 10, 'Crossfit', 'Entraînement'],
+  ['High Intensity Interval Training', 10, 'HIIT', 'Entraînement'], ['Yoga', 10, 'Yoga', 'Entraînement'], ['Pilates', 10, 'Pilates', 'Entraînement'],
+  ['Elliptical', 4, 'Elliptique', 'Entraînement'], ['Stair-Stepper', 4, 'Stepper', 'Entraînement'],
+  ['Alpine Ski', 13, 'Ski alpin', 'Ski et neige'], ['Backcountry Ski', 13, 'Ski de randonnée', 'Ski et neige'], ['Nordic Ski', 12, 'Ski de fond', 'Ski et neige'],
+  ['Roller Ski', 12, 'Ski à roulettes', 'Ski et neige'], ['Snowboard', 14, 'Snowboard', 'Ski et neige'], ['Snowshoe', 35, 'Raquettes à neige', 'Ski et neige'],
+  ['Kayaking', 41, 'Kayak', "Sports d'eau"], ['Canoeing', 19, 'Canoë', "Sports d'eau"], ['Stand Up Paddling', 37, 'Paddle', "Sports d'eau"], ['Kitesurf', 44, 'Kitesurf', "Sports d'eau"],
+  ['Windsurf', 43, 'Planche à voile', "Sports d'eau"], ['Surfing', 38, 'Surf', "Sports d'eau"], ['Sail', 32, 'Voile', "Sports d'eau"], ['Rowing', 15, 'Aviron', "Sports d'eau"], ['Virtual Row', 15, 'Aviron virtuel', "Sports d'eau"],
+  ['Rock Climbing', 31, 'Escalade', 'Escalade'], ['Ice Skate', 33, 'Patinage', 'Patins et glisse'], ['Inline Skate', 30, 'Roller', 'Patins et glisse'], ['Skateboard', 0, 'Skateboard', 'Patins et glisse'],
+  ['Golf', 25, 'Golf', 'Balle et raquette'], ['Tennis', 8, 'Tennis', 'Balle et raquette'], ['Table Tennis', 64, 'Tennis de table', 'Balle et raquette'], ['Badminton', 64, 'Badminton', 'Balle et raquette'],
+  ['Squash', 64, 'Squash', 'Balle et raquette'], ['Racquetball', 64, 'Racquetball', 'Balle et raquette'], ['Pickleball', 64, 'Pickleball', 'Balle et raquette'], ['Soccer', 7, 'Football', 'Balle et raquette'],
+  ['Ski alpin', 13, 'Ski alpin', 'Ski et neige'], ['Planche à voile', 43, 'Planche à voile', "Sports d'eau"], ['Escalade', 31, 'Escalade', 'Escalade'], ['Course à pied', 1, 'Course à pied', 'Course à pied'],
+];
+for (const [texte, sport, nom, famille] of TOUS_TYPES) {
+  const t = typeStrava(texte);
+  egal(`type Strava « ${texte} »`, [t.sport, t.nomSport, familleSortie(t).nom], [sport, nom, famille]);
+}
+egal('FIT : noms des sports (ski alpin, kayak, yoga, elliptique)', [nomSport(13, 0), nomSport(41, 0), nomSport(10, 43), nomSport(4, 15)], ['Ski alpin', 'Kayak', 'Yoga', 'Elliptique']);
 
 // activities.csv
 const csv = lireActivitesCsv(CSV_STRAVA);
@@ -78,8 +103,8 @@ egal('TCX : distance, durée, FC, puissance', [rt.distanceM, rt.dureeChronoS, rt
 
 // Familles pour le tri de la liste
 const famille = (sport, sousSport, nomSport = '') => familleSortie({ sport, sousSport, nomSport }).nom;
-egal('familles', [famille(2, 7), famille(2, 46), famille(2, 6), famille(21, 0), famille(1, 3), famille(11, 0), famille(10, 20), famille(10, 0), famille(0, 0, 'Kitesurf'), famille(0, 0, 'Activité')],
-  ['Vélo', 'Vélo', 'Vélo virtuel (home trainer)', 'Vélo', 'Course à pied', 'Marche', 'Musculation', 'Entraînement', 'Kitesurf', 'Autre']);
+egal('familles', [famille(2, 7), famille(2, 46), famille(2, 6), famille(21, 0), famille(1, 3), famille(11, 0), famille(10, 20), famille(10, 0), famille(0, 0, 'Curling'), famille(0, 0, 'Activité')],
+  ['Vélo', 'Vélo', 'Vélo virtuel (home trainer)', 'Vélo', 'Course à pied', 'Marche', 'Musculation', 'Entraînement', 'Curling', 'Autre']);
 // Vélo virtuel : famille à part, deux modes (workout par défaut, parcours réel)
 egal('vélo virtuel (sous-sport 58) : même famille que le home trainer', familleSortie({ sport: 2, sousSport: 58 }).cle, familleSortie({ sport: 2, sousSport: 6 }).cle);
 egal('vélo virtuel : pas la famille vélo', familleSortie({ sport: 2, sousSport: 6 }).cle !== familleSortie({ sport: 2, sousSport: 7 }).cle, true);

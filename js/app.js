@@ -1,6 +1,6 @@
 // Interface : carte de synchronisation + liste des sorties par mois, et
 // navigation vers le détail d'une sortie (#sortie=…) et les réglages (#reglages).
-import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages, versionBase } from './db.js';
+import { toutesLesSorties, lireReglage, ecrireReglage, viderPartages, versionBase, protegerStockage } from './db.js';
 import { familleSortie, estWorkoutVirtuel, distanceCompteeM, denivelePosCompteM } from './sortie.js';
 import { chargeSortie } from './analyse.js';
 import { lireProfil, calculerEstimationsManquantes, calculerEffortsManquants, reglerFtpAuto } from './profil.js';
@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.7 · vélo virtuel : workout ou parcours réel';
+export const VERSION_APPLI = '0.39.8 · tous les types d\'activité, stockage protégé';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -780,6 +780,7 @@ async function demarrer() {
 
   if (dossierPossible) dossier = await dossierMemorise();
   await afficherEtatDossier();
+  protegerStockage(); // sans attendre : Chrome répond seul, sans fenêtre
   chercherSegments();
   if (dossier) await synchroniser({ auto: true });
 }

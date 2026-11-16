@@ -1,9 +1,15 @@
 // Résumé d'une sortie à partir d'un FIT décodé : ce qu'affiche la liste.
 
+// Sports du FIT (numéros du fabricant) -> nom affiché
 const SPORTS = {
-  0: 'Activité', 1: 'Course à pied', 2: 'Vélo', 5: 'Natation', 10: 'Entraînement',
-  11: 'Marche', 17: 'Randonnée', 21: 'Vélo électrique',
+  0: 'Activité', 1: 'Course à pied', 2: 'Vélo', 4: 'Fitness', 5: 'Natation', 6: 'Basket', 7: 'Football', 8: 'Tennis',
+  9: 'Football américain', 10: 'Entraînement', 11: 'Marche', 12: 'Ski de fond', 13: 'Ski alpin', 14: 'Snowboard',
+  15: 'Aviron', 16: 'Alpinisme', 17: 'Randonnée', 19: 'Canoë', 21: 'Vélo électrique', 25: 'Golf', 30: 'Roller',
+  31: 'Escalade', 32: 'Voile', 33: 'Patinage', 35: 'Raquettes à neige', 37: 'Paddle', 38: 'Surf', 41: 'Kayak',
+  43: 'Planche à voile', 44: 'Kitesurf', 64: 'Sport de raquette', 65: 'Fauteuil roulant',
 };
+const SOUS_SPORTS_FITNESS = { 14: 'Rameur', 15: 'Elliptique', 16: 'Stepper' };
+const SOUS_SPORTS_ENTRAINEMENT = { 20: 'Musculation', 43: 'Yoga', 44: 'Pilates' };
 const SOUS_SPORTS_VELO = { 6: 'Home trainer', 7: 'Vélo de route', 8: 'VTT', 46: 'Gravel', 58: 'Vélo virtuel' };
 const SOUS_SPORTS_COURSE = { 1: 'Tapis de course', 3: 'Trail' };
 const SOUS_SPORT_MUSCULATION = 20; // FIT : sub_sport strength_training
@@ -11,15 +17,29 @@ const SOUS_SPORT_MUSCULATION = 20; // FIT : sub_sport strength_training
 export function nomSport(sport, sousSport) {
   if (sport === 2 && SOUS_SPORTS_VELO[sousSport]) return SOUS_SPORTS_VELO[sousSport];
   if (sport === 1 && SOUS_SPORTS_COURSE[sousSport]) return SOUS_SPORTS_COURSE[sousSport];
-  if (sport === 10 && sousSport === SOUS_SPORT_MUSCULATION) return 'Musculation';
+  if (sport === 10 && SOUS_SPORTS_ENTRAINEMENT[sousSport]) return SOUS_SPORTS_ENTRAINEMENT[sousSport];
+  if (sport === 4 && SOUS_SPORTS_FITNESS[sousSport]) return SOUS_SPORTS_FITNESS[sousSport];
   return SPORTS[sport] ?? 'Activité';
 }
 
-// Familles d'activités pour le tri de la liste. Tous les vélos (route,
-// gravel, VTT, home trainer, virtuel, électrique) vont dans « Vélo ».
+// Familles d'activités pour le tri de la liste et le menu Activité (une icône par famille).
+// Le nom exact du sport (Ski alpin, Kayak, Pilates…) reste affiché sur la sortie ; le vélo
+// virtuel a sa propre famille (voir plus bas). Un sport sans famille (type inconnu) a la
+// sienne, sous son nom.
 const FAMILLES = {
   2: 'Vélo', 21: 'Vélo', 1: 'Course à pied', 11: 'Marche', 17: 'Randonnée', 5: 'Natation', 10: 'Entraînement',
+  4: 'Entraînement', // appareils de fitness : elliptique, stepper, rameur
 };
+// Familles regroupant plusieurs sports FIT : { clé, nom, sports }
+const GROUPES = [
+  { cle: 'neige', nom: 'Ski et neige', sports: [12, 13, 14, 35] },
+  { cle: 'eau', nom: "Sports d'eau", sports: [15, 19, 32, 37, 38, 41, 43, 44] },
+  { cle: 'balle', nom: 'Balle et raquette', sports: [6, 7, 8, 9, 25, 64] },
+  { cle: 'escalade', nom: 'Escalade', sports: [16, 31] },
+  { cle: 'glisse', nom: 'Patins et glisse', sports: [30, 33] },
+];
+// Sports sans numéro FIT (sport 0) reconnus par leur nom
+const PAR_NOM = [[/skateboard/i, 'glisse']];
 
 // Vélo virtuel (home trainer, Zwift…) : sport « vélo » avec le sous-sport home trainer ou virtuel.
 // Deux modes, au choix de Cyril pour chaque sortie (`modeVirtuel`) :
@@ -38,7 +58,12 @@ export const denivelePosCompteM = (s) => (estWorkoutVirtuel(s) ? 0 : s.deniveleP
 export function familleSortie(s) {
   if (estVirtuel(s)) return { cle: 'velo-virtuel', nom: 'Vélo virtuel (home trainer)' };
   if (s.sport === 10 && s.sousSport === SOUS_SPORT_MUSCULATION) return { cle: 'musculation', nom: 'Musculation' };
-  if (FAMILLES[s.sport]) return { cle: `sport-${s.sport === 21 ? 2 : s.sport}`, nom: FAMILLES[s.sport] };
+  if (FAMILLES[s.sport]) {
+    const cle = s.sport === 4 ? 10 : s.sport === 21 ? 2 : s.sport;
+    return { cle: `sport-${cle}`, nom: FAMILLES[s.sport] };
+  }
+  const groupe = GROUPES.find((g) => g.sports.includes(s.sport)) ?? (s.sport === 0 ? GROUPES.find((g) => PAR_NOM.some(([re, c]) => c === g.cle && re.test(s.nomSport ?? ''))) : null);
+  if (groupe) return { cle: groupe.cle, nom: groupe.nom };
   // Types Strava inconnus (Kitesurf, Yoga…) : chacun sa famille, sous son nom
   const nom = s.nomSport && s.nomSport !== 'Activité' ? s.nomSport : 'Autre';
   return { cle: `autre-${nom}`, nom };
