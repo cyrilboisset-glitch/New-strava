@@ -8,7 +8,7 @@ import { lireGpx, lireTcx, resumerTrace } from './trace.js';
 import { degzip } from './fichier.js';
 import { NOM_INDEX, restaurerSauvegarde } from './sauvegarde.js';
 import { lireActivitesCsv, typeStrava, resumerSansTrace } from './strava.js';
-import { toutesLesSorties, sortieExiste, enregistrerSortie, completerSortie, lireReglage, ecrireReglage } from './db.js';
+import { toutesLesSorties, sortieExiste, enregistrerSortie, completerSortie, lireReglage, ecrireReglage, protegerStockage } from './db.js';
 
 const ECART_DOUBLON_MS = 60 * 1000; // même départ à 1 min près = même sortie
 let veloParDefaut = null; // id du vélo mis d'office sur les nouvelles sorties vélo
@@ -125,7 +125,7 @@ async function sortiesConnues() {
  */
 export async function importerFichiers(fichiers, progression = () => {}) {
   // Demande à Chrome de ne jamais effacer les données de l'appli
-  try { await navigator.storage?.persist?.(); } catch { /* sans importance */ }
+  protegerStockage();
   const bilan = compteur();
   const connues = await sortiesConnues();
   veloParDefaut = (await lireVelos()).find((v) => v.parDefaut && !v.retire)?.id ?? null;

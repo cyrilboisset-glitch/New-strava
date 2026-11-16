@@ -15,6 +15,18 @@ let promesseBase = null;
 let versionDonnees = 0;
 export const versionBase = () => versionDonnees;
 
+/**
+ * Demande à Chrome de ne pas effacer les données de l'appli (elles ne sont que sur le téléphone).
+ * Chrome décide seul, sans fenêtre : il accepte surtout une appli installée et utilisée souvent.
+ * @returns {Promise<boolean>} vrai si le stockage est protégé
+ */
+export async function protegerStockage() {
+  try {
+    if (await navigator.storage?.persisted?.()) return true;
+    return !!(await navigator.storage?.persist?.());
+  } catch { return false; }
+}
+
 export function ouvrirBase() {
   if (promesseBase) return promesseBase;
   promesseBase = new Promise((resoudre, rejeter) => {

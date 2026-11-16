@@ -5,7 +5,7 @@ import {
 } from './profil.js';
 import { afficherVelos } from './velos.js';
 import { creerSauvegarde, telecharger } from './sauvegarde.js';
-import { toutesLesSorties, lireReglage } from './db.js';
+import { toutesLesSorties, lireReglage, protegerStockage } from './db.js';
 import { ZONES_PUISSANCE, JOURS_ESTIMATION_FTP } from './analyse.js';
 import { nombre, echapper, fmtDate, ilYA } from './format.js';
 
@@ -136,9 +136,9 @@ export async function afficherReglages(page, toast) {
 
   // Place utilisée (approximative, donnée par le navigateur)
   navigator.storage?.estimate?.().then(async (e) => {
-    const persistant = await navigator.storage.persisted?.();
+    const persistant = await protegerStockage();
     const mo = e.usage / 1e6;
-    page.querySelector('#donnees').textContent += ` Place utilisée : environ ${nombre(mo, mo < 10 ? 1 : 0)} Mo.${persistant ? ' Stockage protégé : Chrome ne l\'effacera pas de lui-même.' : ''}`;
+    page.querySelector('#donnees').textContent += ` Place utilisée : environ ${nombre(mo, mo < 10 ? 1 : 0)} Mo.${persistant ? ' Stockage protégé : Chrome ne l\'effacera pas de lui-même.' : ' Stockage non protégé : Chrome peut effacer les données s\'il manque de place. Fais une sauvegarde de temps en temps (installer l\'appli aide à obtenir la protection).'}`;
   }).catch(() => {});
 
   page.querySelector('#btn-restaurer').addEventListener('click', () => document.getElementById('champ-fichier').click());
