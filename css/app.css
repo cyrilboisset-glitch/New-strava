@@ -494,6 +494,9 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .etiquette-fin.reglee::before { background: var(--texte-3); }
 #bloc-ftp-histo .segments { margin-top: 10px; }
 #bloc-ftp-histo .courbes-x { margin-right: 58px; }
+.pression { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ligne); }
+.pression-champs { display: grid; gap: 4px; margin-bottom: 8px; }
+.pression .temp-cases { margin-bottom: 6px; }
 .mode-virtuel { margin: 10px 0 4px; }
 .mode-virtuel .bloc-note { margin: 6px 0 0; }
 .etoile-virtuelle { margin-left: 2px; color: var(--or); font-size: 0.75em; }
