@@ -1339,6 +1339,10 @@ async function texteToast(page) {
   await page.fill('#pression-largeur', '32');
   verif('pneus plus larges : pression plus basse', (await arriere()) < arriere98, String(await arriere()));
   await page.fill('#pression-largeur', '28');
+  // largeur réelle mesurée (30 mm au lieu de 28 marqués) : c'est elle qui compte
+  await page.fill('#pression-largeur-reelle', '30');
+  verif('largeur réelle plus grande : pression plus basse, et dite dans le texte', (await arriere()) < arriere98 && (await page.textContent('#pression-resultat')).includes('largeur réelle mesurée'), String(await arriere()));
+  await page.fill('#pression-largeur-reelle', '');
   await page.selectOption('#pression-revetement', 'chemin');
   verif('chemin : pression plus basse', (await arriere()) < arriere98);
   await page.selectOption('#pression-revetement', 'route');

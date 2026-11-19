@@ -21,7 +21,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.9 · pression des pneus';
+export const VERSION_APPLI = '0.39.10 · largeur réelle des pneus';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
