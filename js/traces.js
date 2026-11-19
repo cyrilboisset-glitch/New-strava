@@ -1,7 +1,8 @@
 // Onglet « Tracés » : créer un parcours sur la carte (calcul de route vélo
 // BRouter), voir son profil et sa 3D, l'enregistrer, l'exporter en GPX.
 import { lireReglage, ecrireReglage, toutesLesSorties } from './db.js';
-import { lireProfil } from './profil.js';
+import { lireProfil, lireVelos, ecrireVelos } from './profil.js';
+import { pressionPneus, statsDescente, enPsi, REVETEMENTS, EQUIPEMENT_KG, GONFLAGE_C } from './pression-pneus.js';
 import {
   PROFILS, calculerRoute, denivele, tempsEstimeS, gpxDepuisTrace, nomFichierGpx, distanceM, lireGpxParcours,
 } from './routage.js';
@@ -21,6 +22,9 @@ const PUISSANCE_DEFAUT_W = 150; // comme le temps estimé de Parcours 3D
 // heure : départ prévu « HH:MM » (avec le jour du bloc vent) ; nomPropose : dernier nom
 // proposé par l'appli (remplacé tant que Cyril ne l'a pas changé)
 const ed = { id: null, nom: '', nomPropose: '', heure: '', profil: 'fastbike', points: [], route: null, calcul: 0, erreur: '' };
+// Pression des pneus : vélo choisi (ses poids et pneus sont gardés sur le vélo), poids du pilote, revêtement
+const pression = { veloId: '', poidsPiloteKg: null, poidsVeloKg: 8, largeurMm: 28, largeurReelleMm: null, tubeless: false, revetement: 'route' };
+let velosListe = [];
 let jetonNom = 0;
 let jetonSegments = 0;
 const COULEUR_SEGMENT = '#1e88e5';
@@ -130,6 +134,10 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
   const profil = await lireProfil();
   const puissanceW = (await lireReglage('puissanceParcoursW')) ?? PUISSANCE_DEFAUT_W;
   planPoids = profil.poidsKg ?? 98;
+  velosListe = (await lireVelos()).filter((v) => !v.retire);
+  Object.assign(pression, (await lireReglage('pression')) ?? {});
+  pression.poidsPiloteKg ??= planPoids;
+  if (pression.veloId && !velosListe.some((v) => v.id === pression.veloId)) pression.veloId = '';
   page.innerHTML = `
   <section class="editeur-trace">
     <div class="carte-plein">
@@ -160,7 +168,7 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
     <div class="vue3d" id="trace-3d" hidden></div>
     <section class="carte bloc" id="segments-trace" hidden></section>
     <section class="carte bloc" id="bloc-vent" hidden>
-      <h2 class="bloc-titre">Vent : quand partir, dans quel sens ?</h2>
+      <h2 class="bloc-titre">Météo et pneus : quand partir, dans quel sens ?</h2>
       <div class="vent-choix">
         <label class="menu-bouton choix-jour">
           <span class="menu-libelle">Jour</span>
@@ -174,6 +182,19 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
         <button class="btn principal" type="button" data-a="vent">Prévoir</button>
       </div>
       <div id="vent-resultat"></div>
+      <div class="pression" id="pression-pneus">
+        <h3 class="sous-titre">🛞 Pression des pneus</h3>
+        <div class="pression-champs">
+          <label class="champ-ligne"><span>Vélo</span><select id="pression-velo"><option value="">Autre vélo (à décrire)</option>${velosListe.map((v) => `<option value="${v.id}"${v.id === pression.veloId ? ' selected' : ''}>${echapper(v.nom)}</option>`).join('')}</select></label>
+          <label class="champ-ligne"><span>Poids du vélo (kg)</span><input type="number" id="pression-poids-velo" inputmode="decimal" min="3" max="40" step="0.1" value="${pression.poidsVeloKg}"></label>
+          <label class="champ-ligne"><span>Poids du pilote (kg)</span><input type="number" id="pression-poids-pilote" inputmode="decimal" min="30" max="200" step="0.5" value="${pression.poidsPiloteKg}"></label>
+          <label class="champ-ligne"><span>Largeur marquée sur le pneu (mm)</span><input type="number" id="pression-largeur" inputmode="numeric" min="20" max="70" step="1" value="${pression.largeurMm ?? ''}"></label>
+          <label class="champ-ligne"><span>Largeur réelle mesurée (mm)</span><input type="number" id="pression-largeur-reelle" inputmode="decimal" min="20" max="70" step="0.5" value="${pression.largeurReelleMm ?? ''}" placeholder="facultatif"></label>
+          <label class="case"><input type="checkbox" id="pression-tubeless"${pression.tubeless ? ' checked' : ''}> Pneus tubeless</label>
+          <label class="champ-ligne"><span>Revêtement du trajet</span><select id="pression-revetement">${Object.entries(REVETEMENTS).map(([k, r]) => `<option value="${k}"${k === pression.revetement ? ' selected' : ''}>${r.nom}</option>`).join('')}</select></label>
+        </div>
+        <div id="pression-resultat"></div>
+      </div>
       <label class="case"><input type="checkbox" id="couleurs-vent"${vent.couleurs ? ' checked' : ''}> Couleurs du vent sur la 3D (bleu : dans le dos, rouge : de face)</label>
       <p class="bloc-note">Heure : facultative ; elle est ajoutée au tableau (même avant 6 h ou après 20 h), gardée avec le tracé et mise dans le GPX. Repris de l'appli « Vent et températures » : prévisions Open-Meteo (seule la zone du parcours, une trentaine de points, est envoyée). Sens conseillé : vent dans le dos sur le dernier tiers. Durée avec le vent prévu : puissance pour le temps estimé sur le plat, +30 % en montée, roue libre en descente.</p>
     </section>
@@ -233,6 +254,7 @@ export async function afficherTraces(page, toast, idAOuvrir = null) {
     carte.fitBounds(globalThis.L.latLngBounds(ed.route.coords.slice(i0, i1 + 1).map((c) => [c[0], c[1]])), { padding: [40, 40] });
     page.querySelector('#carte-trace').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
+  installerPression(page);
   page.querySelector('#couleurs-vent').addEventListener('change', (e) => { vent.couleurs = e.target.checked; appliquerCouleursVent(); afficherVent(page); });
   page.querySelector('#vent-resultat').addEventListener('click', (e) => {
     const ligne = e.target.closest('[data-heure]');
@@ -527,7 +549,7 @@ async function prevoirVent(page, profil) {
 
 function calculerPlan(page) {
   const platW = Number(page.querySelector('#puissance-trace')?.value) || PUISSANCE_DEFAUT_W;
-  vent.plan = planifier(ed.route.coords, vent.series, heuresDeDepart(vent.jour, new Date(), ed.heure), platW, planPoids + 8);
+  vent.plan = planifier(ed.route.coords, vent.series, heuresDeDepart(vent.jour, new Date(), ed.heure), platW, (pression.poidsPiloteKg || planPoids) + (pression.poidsVeloKg || 8));
   // heure choisie par Cyril : c'est elle qu'on montre (3D) ; sinon la meilleure
   const precise = dateDepart(vent.jour, ed.heure);
   vent.choix = vent.plan.heures.some((h) => h.debutMs === precise) ? precise : vent.plan.meilleure.debutMs;
@@ -608,7 +630,93 @@ function textePluie(c) {
   return `🌧 Pluie : risque <b class="pluie-${r}">${r}</b> (${Math.round(c.pluieMax)} % au plus${ou}${mm}).`;
 }
 
+// ---- Pression des pneus : poids du pilote et du vélo, pneus, revêtement + trajet et météo de l'heure choisie ----
+
+const nombreOuNul = (v) => { const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && v !== '' ? n : null; };
+const barTexte = (b) => `${nombre(b, 2)} bar`;
+
+function afficherPression(page) {
+  const bloc = page.querySelector('#pression-resultat');
+  if (!bloc) return;
+  if (!ed.route) { bloc.innerHTML = ''; return; }
+  const h = heureChoisie();
+  // trajet : descentes raides (dans le sens conseillé à cette heure) ; météo : températures et pluie de l'heure choisie
+  const coords = h?.sens === 'inverse' ? [...ed.route.coords].reverse() : ed.route.coords;
+  const descente = statsDescente(coords, distanceM);
+  const entrees = {
+    poidsPiloteKg: pression.poidsPiloteKg, poidsVeloKg: pression.poidsVeloKg, largeurMm: pression.largeurReelleMm || pression.largeurMm,
+    tubeless: pression.tubeless, revetement: pression.revetement,
+    partDescenteRaide: descente?.partDescenteRaide ?? 0,
+    ...(h ? { tempC: (h.choix.tempMin + h.choix.tempMax) / 2, pluiePct: h.choix.pluieMax, pluieMm: h.choix.mmMax } : {}),
+  };
+  const r = pressionPneus(entrees);
+  const largeurUtilisee = pression.largeurReelleMm || pression.largeurMm;
+  if (!r) { bloc.innerHTML = '<p class="aide erreur">Renseigne le poids du pilote, celui du vélo et la largeur des pneus.</p>'; return; }
+  const case_ = (nom, bar) => `<div><span class="stat-label">${nom}</span><span class="temp-val">${barTexte(bar)}</span><small>${Math.round(enPsi(bar))} psi</small></div>`;
+  const gonfle = r.gonfleAvantBar != null && (r.gonfleAvantBar !== r.avantBar || r.gonfleArriereBar !== r.arriereBar)
+    ? `<p class="aide">À gonfler chez toi à ${GONFLAGE_C} °C : <b>avant ${barTexte(r.gonfleAvantBar)}, arrière ${barTexte(r.gonfleArriereBar)}</b> (il fera ${Math.round(entrees.tempC)} °C en roulant : l'air ${entrees.tempC < GONFLAGE_C ? 'se contracte et la pression baisse' : 'se dilate et la pression monte'}). Si tu gonfles dehors juste avant de partir, prends les valeurs du dessus.</p>`
+    : '';
+  const raisons = [
+    descente && descente.partDescenteRaide >= 0.02 ? `${Math.round(descente.partDescenteRaide * 100)} % du trajet en descente raide (jusqu'à ${nombre(descente.penteDescenteMaxPct, 0)} %) : un peu plus de poids sur la roue avant` : '',
+    ...r.facteurs.map((f) => `${f.texte} : ${f.pct > 0 ? '+' : '−'}${Math.abs(f.pct)} %`),
+  ].filter(Boolean);
+  bloc.innerHTML = `
+    <p class="vent-temp-titre">${h ? `Pour un départ à ${fmtHeureCourte(h.debutMs)}${h.sens === 'inverse' ? ' (sens inverse)' : ''}` : 'Sans météo (touche « Prévoir » pour tenir compte de la température et de la pluie)'}</p>
+    <div class="temp-cases">${case_('Avant', r.avantBar)}${case_('Arrière', r.arriereBar)}</div>
+    ${gonfle}
+    <p class="aide">Pneus calculés sur ${nombre(largeurUtilisee, 1)} mm (${pression.largeurReelleMm ? `largeur réelle mesurée, ${nombre(pression.largeurMm || 0)} mm marqués` : 'largeur marquée : mesure-les montés pour plus de précision'}).</p>
+    <p class="aide">Charge : ${nombre(r.chargeKg, 1)} kg (pilote ${nombre(pression.poidsPiloteKg, 1)} + vélo ${nombre(pression.poidsVeloKg, 1)} + ${EQUIPEMENT_KG} d'équipement), ${Math.round((1 - r.partAvant) * 100)} % sur l'arrière${raisons.length ? ` · ${raisons.join(' · ')}` : ''}.</p>
+    <p class="bloc-note">Estimation de départ (formule simple, pas une mesure) : à ajuster à ton ressenti. Ne dépasse jamais la pression maximale marquée sur le pneu et sur la jante.</p>`;
+}
+
+function installerPression(page) {
+  const champ = (id) => page.querySelector(`#${id}`);
+  const garder = () => ecrireReglage('pression', { ...pression }).catch(() => {});
+  const lireChamps = () => {
+    pression.poidsVeloKg = nombreOuNul(champ('pression-poids-velo').value);
+    pression.poidsPiloteKg = nombreOuNul(champ('pression-poids-pilote').value);
+    pression.largeurMm = nombreOuNul(champ('pression-largeur').value);
+    pression.largeurReelleMm = nombreOuNul(champ('pression-largeur-reelle').value);
+    pression.tubeless = champ('pression-tubeless').checked;
+    pression.revetement = champ('pression-revetement').value;
+  };
+  const recalculer = () => {
+    lireChamps();
+    afficherPression(page);
+  };
+  for (const id of ['pression-poids-velo', 'pression-poids-pilote', 'pression-largeur', 'pression-largeur-reelle']) champ(id).addEventListener('input', recalculer);
+  // une fois le champ validé : gardé (sur le vélo choisi, sinon dans le réglage), et durée du plan refaite avec les nouveaux poids
+  const valider = async () => {
+    lireChamps();
+    const v = velosListe.find((x) => x.id === pression.veloId);
+    if (v) {
+      const liste = (await lireVelos()).map((x) => (x.id === v.id ? { ...x, poidsKg: pression.poidsVeloKg, largeurMm: pression.largeurMm, largeurReelleMm: pression.largeurReelleMm, tubeless: pression.tubeless } : x));
+      await ecrireVelos(liste).catch(() => {});
+      Object.assign(v, { poidsKg: pression.poidsVeloKg, largeurMm: pression.largeurMm, largeurReelleMm: pression.largeurReelleMm, tubeless: pression.tubeless });
+    }
+    garder();
+    if (vent.series) { calculerPlan(page); afficherVent(page); } else afficherPression(page);
+  };
+  for (const id of ['pression-poids-velo', 'pression-poids-pilote', 'pression-largeur', 'pression-largeur-reelle', 'pression-tubeless', 'pression-revetement']) champ(id).addEventListener('change', valider);
+  champ('pression-velo').addEventListener('change', async (e) => {
+    pression.veloId = e.target.value;
+    const v = velosListe.find((x) => x.id === pression.veloId);
+    if (v) {
+      if (v.poidsKg) champ('pression-poids-velo').value = v.poidsKg;
+      champ('pression-largeur').value = v.largeurMm ?? '';
+      champ('pression-largeur-reelle').value = v.largeurReelleMm ?? '';
+      champ('pression-tubeless').checked = !!v.tubeless;
+    }
+    await valider();
+  });
+}
+
 function afficherVent(page) {
+  afficherVentMeteo(page);
+  afficherPression(page);
+}
+
+function afficherVentMeteo(page) {
   const bloc = page.querySelector('#vent-resultat');
   if (!bloc) return;
   const caseCouleurs = page.querySelector('#couleurs-vent');

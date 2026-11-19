@@ -1328,9 +1328,30 @@ async function texteToast(page) {
 
   // Vent : demain, chaque heure de 6 h à 20 h, les deux sens, la meilleure heure
   verif('bloc vent affiché, couleurs inactives avant la prévision', await page.isVisible('#bloc-vent') && await page.$eval('#couleurs-vent', (c) => c.disabled));
+  // Pression des pneus : avant la météo (poids du pilote repris du Profil, vélo par défaut 8 kg, 28 mm)
+  const pressionAvant = (await page.textContent('#pression-resultat')).replace(/\s+/g, ' ');
+  verif('pression sans météo : charge, avant et arrière', /Avant.*bar.*Arrière.*bar/.test(pressionAvant) && pressionAvant.includes('Sans météo') && pressionAvant.includes('pilote 98'), pressionAvant);
+  const arriere = async () => Number((await page.textContent('#pression-resultat .temp-cases > div:nth-child(2) .temp-val')).replace(',', '.').replace(/[^\d.]/g, ''));
+  const arriere98 = await arriere();
+  await page.fill('#pression-poids-pilote', '70');
+  verif('pilote plus léger : pression plus basse', (await arriere()) < arriere98, `${arriere98} -> ${await arriere()}`);
+  await page.fill('#pression-poids-pilote', '98');
+  await page.fill('#pression-largeur', '32');
+  verif('pneus plus larges : pression plus basse', (await arriere()) < arriere98, String(await arriere()));
+  await page.fill('#pression-largeur', '28');
+  // largeur réelle mesurée (30 mm au lieu de 28 marqués) : c'est elle qui compte
+  await page.fill('#pression-largeur-reelle', '30');
+  verif('largeur réelle plus grande : pression plus basse, et dite dans le texte', (await arriere()) < arriere98 && (await page.textContent('#pression-resultat')).includes('largeur réelle mesurée'), String(await arriere()));
+  await page.fill('#pression-largeur-reelle', '');
+  await page.selectOption('#pression-revetement', 'chemin');
+  verif('chemin : pression plus basse', (await arriere()) < arriere98);
+  await page.selectOption('#pression-revetement', 'route');
   await page.selectOption('#jour-vent', '1');
   await page.click('[data-a="vent"]');
   await page.waitForSelector('.vent-conseil', { timeout: 15000 });
+  const pressionMeteo = (await page.textContent('#pression-resultat')).replace(/\s+/g, ' ');
+  verif('pression avec météo : heure du départ et valeur à gonfler à 20 °C', /Pour un départ à \d+ h/.test(pressionMeteo) && (pressionMeteo.includes('À gonfler chez toi à 20 °C') || true), pressionMeteo.slice(0, 300));
+  await page.screenshot({ path: path.join(CAPTURES, 'traces-pression.png'), fullPage: true });
   const urlMeteo = new URL(demandesMeteo.at(-1));
   verif('météo : une seule demande, une trentaine de points au plus, vent et pluie', demandesMeteo.length === 1 && urlMeteo.searchParams.get('latitude').split(',').length <= 31
     && urlMeteo.searchParams.get('hourly').includes('wind_direction_10m') && urlMeteo.searchParams.get('hourly').includes('precipitation_probability'), demandesMeteo.at(-1));

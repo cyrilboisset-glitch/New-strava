@@ -16,6 +16,11 @@ function formulaire(v) {
   return `
   <form class="velo-form" data-id="${v?.id ?? ''}">
     <label class="champ-ligne"><span>Nom</span><input name="nom" type="text" maxlength="40" required value="${echapper(v?.nom ?? '')}" placeholder="Ex. : vélo de route"></label>
+    <label class="champ-ligne"><span>Poids du vélo (kg)</span><input name="poidsKg" type="number" inputmode="decimal" min="3" max="40" step="0.1" value="${v?.poidsKg ?? ''}" placeholder="Ex. : 8,5"></label>
+    <label class="champ-ligne"><span>Largeur marquée sur le pneu (mm)</span><input name="largeurMm" type="number" inputmode="numeric" min="20" max="70" step="1" value="${v?.largeurMm ?? ''}" placeholder="Ex. : 28"></label>
+    <label class="champ-ligne"><span>Largeur réelle mesurée (mm)</span><input name="largeurReelleMm" type="number" inputmode="decimal" min="20" max="70" step="0.5" value="${v?.largeurReelleMm ?? ''}" placeholder="Ex. : 30,5 (facultatif)"></label>
+    <label class="case"><input name="tubeless" type="checkbox"${v?.tubeless ? ' checked' : ''}> Pneus tubeless (sans chambre à air)</label>
+    <p class="aide">Poids et pneus servent à conseiller la pression des pneus dans Tracés (météo). La largeur réelle (mesurée au pied à coulisse, pneu monté et gonflé) est souvent plus grande que celle marquée : si tu la donnes, c'est elle qui compte.</p>
     <label class="champ-ligne"><span>Km faits avant l'appli</span><input name="kmAvant" type="number" inputmode="numeric" min="0" step="1" value="${v ? Math.round((v.kmAvantM ?? 0) / 1000) : 0}"></label>
     <label class="case"><input name="parDefaut" type="checkbox"${v?.parDefaut ? ' checked' : ''}> Vélo par défaut : mis d'office sur les nouvelles sorties vélo</label>
     <label class="case"><input name="retire" type="checkbox"${v?.retire ? ' checked' : ''}> Retiré (vendu, rangé) : n'est plus proposé</label>
@@ -57,7 +62,7 @@ export async function afficherVelos(bloc, toast) {
       <div class="velo${v.retire ? ' retire' : ''}">
         <div class="velo-texte">
           <p class="velo-nom">${echapper(v.nom)}${v.parDefaut ? ' <span class="badge">par défaut</span>' : ''}${v.retire ? ' <span class="badge">retiré</span>' : ''}</p>
-          <p class="velo-km"><b>${kmTxt(b.distanceM)}</b> · ${b.n} sortie${b.n > 1 ? 's' : ''}${b.derniere ? ` · dernière le ${fmtDate.format(b.derniere)}` : ''}${v.kmAvantM ? ` · dont ${kmTxt(v.kmAvantM)} avant l'appli` : ''}</p>
+          <p class="velo-km"><b>${kmTxt(b.distanceM)}</b> · ${b.n} sortie${b.n > 1 ? 's' : ''}${b.derniere ? ` · dernière le ${fmtDate.format(b.derniere)}` : ''}${v.kmAvantM ? ` · dont ${kmTxt(v.kmAvantM)} avant l'appli` : ''}${v.poidsKg ? ` · ${nombre(v.poidsKg, 1)} kg` : ''}${v.largeurMm ? ` · pneus ${v.largeurMm} mm${v.largeurReelleMm ? ` (réels ${nombre(v.largeurReelleMm, 1)} mm)` : ''}${v.tubeless ? ' tubeless' : ''}` : ''}</p>
         </div>
         <button class="btn secondaire petit" type="button" data-action="modifier" data-id="${v.id}">Modifier</button>
       </div>`;
@@ -130,7 +135,14 @@ export async function afficherVelos(bloc, toast) {
     if (!nom) { toast('Donne un nom au vélo.'); return; }
     const km = Number(f.kmAvant.value || 0);
     if (!(km >= 0 && km < 1e6)) { toast('Km à vérifier.'); return; }
-    const champs = { nom, kmAvantM: Math.round(km) * 1000, parDefaut: f.parDefaut.checked, retire: f.retire.checked };
+    const poids = f.poidsKg.value === '' ? null : Number(f.poidsKg.value);
+    const largeur = f.largeurMm.value === '' ? null : Number(f.largeurMm.value);
+    const largeurReelle = f.largeurReelleMm.value === '' ? null : Number(f.largeurReelleMm.value);
+    if ((poids != null && !(poids >= 3 && poids <= 40)) || (largeur != null && !(largeur >= 20 && largeur <= 70)) || (largeurReelle != null && !(largeurReelle >= 20 && largeurReelle <= 70))) { toast('Poids ou largeur des pneus à vérifier.'); return; }
+    const champs = {
+      nom, kmAvantM: Math.round(km) * 1000, parDefaut: f.parDefaut.checked, retire: f.retire.checked,
+      poidsKg: poids, largeurMm: largeur == null ? null : Math.round(largeur), largeurReelleMm: largeurReelle, tubeless: f.tubeless.checked,
+    };
     const id = f.dataset.id;
     let liste;
     if (id) liste = velos.map((v) => (v.id === id ? { ...v, ...champs } : v));
