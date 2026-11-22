@@ -494,6 +494,13 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .etiquette-fin.reglee::before { background: var(--texte-3); }
 #bloc-ftp-histo .segments { margin-top: 10px; }
 #bloc-ftp-histo .courbes-x { margin-right: 58px; }
+.dialogue { width: min(92vw, 460px); max-height: 92vh; overflow-y: auto; padding: 18px 16px; border: 1px solid var(--ligne); border-radius: 18px; background: var(--surface); color: var(--texte); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.dialogue::backdrop { background: rgba(0, 0, 0, 0.6); }
+.saisie-form { display: grid; gap: 6px; }
+.saisie-ligne { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.saisie-duree { grid-template-columns: repeat(3, 1fr); }
+.saisie-ligne .champ-ligne { min-width: 0; }
+.saisie-actions { margin: 8px 0 0; }
 .pression { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ligne); }
 .pression-champs { display: grid; gap: 4px; margin-bottom: 8px; }
 .pression .temp-cases { margin-bottom: 6px; }

@@ -88,6 +88,20 @@ export async function completerSortie(id, maj) {
   if (champs && Object.keys(champs).length) { await requete(store.put({ ...sortie, ...champs })); versionDonnees++; }
 }
 
+// Retire une sortie (et son fichier d'origine s'il y en a un)
+export async function supprimerSortie(id) {
+  const db = await ouvrirBase();
+  const tx = db.transaction(['sorties', 'fichiers'], 'readwrite');
+  versionDonnees++;
+  tx.objectStore('sorties').delete(id);
+  tx.objectStore('fichiers').delete(id);
+  return new Promise((resoudre, rejeter) => {
+    tx.oncomplete = () => resoudre();
+    tx.onerror = () => rejeter(tx.error);
+    tx.onabort = () => rejeter(tx.error);
+  });
+}
+
 // Mêmes champs changés sur plusieurs sorties, en une transaction
 export async function mettreAJourSorties(ids, champs) {
   if (!ids.length) return;

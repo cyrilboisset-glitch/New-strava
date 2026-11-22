@@ -181,7 +181,7 @@ async function texteToast(page) {
   await page.waitForFunction(() => document.getElementById('menu-synchro').classList.contains('ouvert'));
   await page.waitForTimeout(250); // fin du fondu d'ouverture (capture)
   const actions = await page.$$eval('#menu-synchro .menu-item:not([hidden])', (els) => els.map((e) => e.firstElementChild.nextElementSibling.firstChild.textContent.trim()));
-  verif('actions du menu sans dossier', JSON.stringify(actions) === JSON.stringify(['Choisir le dossier Gadgetbridge', 'Importer depuis Téléchargements', 'Importer un fichier', 'Restaurer une sauvegarde']), JSON.stringify(actions));
+  verif('actions du menu sans dossier', JSON.stringify(actions) === JSON.stringify(['Choisir le dossier Gadgetbridge', 'Importer depuis Téléchargements', 'Importer un fichier', 'Ajouter une activité', 'Restaurer une sauvegarde']), JSON.stringify(actions));
   verif('état dans le menu', (await page.textContent('#menu-synchro .menu-etat')).includes('Aucun dossier relié'));
   await page.screenshot({ path: path.join(CAPTURES, 'accueil-menu-synchro.png') });
   await page.keyboard.press('Escape');
@@ -1573,6 +1573,53 @@ async function texteToast(page) {
     const c = [...document.querySelectorAll('a.sortie')].slice(0, 3);
     return c[1].textContent.includes('Nom changé') && c[0].dataset.marque === 'm0' && c[2].dataset.marque === 'm2' && !c[1].dataset.marque;
   }));
+
+  // Activité saisie à la main, sans fichier : ajout, détail, modification, suppression
+  await page.evaluate(() => { location.hash = ''; });
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.waitForFunction(() => !document.documentElement.dataset.transition);
+  await page.click('#btn-menu-synchro');
+  await page.waitForSelector('#menu-synchro.ouvert');
+  await page.click('#btn-ajout-manuel');
+  await page.waitForSelector('#dialogue-saisie[open] form');
+  verif('saisie : formulaire ouvert, vélo proposé en premier', (await page.$eval('#dialogue-saisie select[name="type"]', (e) => e.selectedOptions[0].textContent)) === 'Vélo');
+  await page.click('#dialogue-saisie button[type="submit"]');
+  verif('saisie sans durée : refusée avec un message', (await page.isVisible('#dialogue-saisie [data-erreurs]')) && (await page.textContent('#dialogue-saisie [data-erreurs]')).includes('durée'));
+  await page.selectOption('#dialogue-saisie select[name="type"]', { label: 'Kayak' });
+  await page.fill('#dialogue-saisie input[name="nom"]', 'Kayak sur le lac');
+  await page.fill('#dialogue-saisie input[name="jour"]', '2026-03-14');
+  await page.fill('#dialogue-saisie input[name="heure"]', '10:15');
+  await page.fill('#dialogue-saisie input[name="h"]', '1');
+  await page.fill('#dialogue-saisie input[name="min"]', '30');
+  await page.fill('#dialogue-saisie input[name="km"]', '12.5');
+  await page.fill('#dialogue-saisie input[name="fc"]', '131');
+  await page.screenshot({ path: path.join(CAPTURES, 'saisie-activite.png') });
+  await page.click('#dialogue-saisie button[type="submit"]');
+  await page.waitForFunction(() => !document.querySelector('#dialogue-saisie[open]'));
+  const saisie = await page.evaluate(async () => {
+    const { toutesLesSorties } = await import('./js/db.js');
+    const s = (await toutesLesSorties()).find((x) => x.source === 'manuel');
+    return s && { id: s.id, nom: s.nom, nomSport: s.nomSport, sport: s.sport, dureeChronoS: s.dureeChronoS, distanceM: s.distanceM, fcMoy: s.fcMoy, sansTrace: s.sansTrace, debut: new Date(s.debut).toISOString().slice(0, 10) };
+  });
+  verif('activité ajoutée : Kayak, 1 h 30, 12,5 km, FC 131, sans trace', saisie && saisie.nomSport === 'Kayak' && saisie.sport === 41 && saisie.dureeChronoS === 5400 && saisie.distanceM === 12500 && saisie.fcMoy === 131 && saisie.sansTrace && saisie.debut === '2026-03-14', JSON.stringify(saisie));
+  await page.evaluate((id) => { location.hash = `#sortie=${id}`; }, saisie.id);
+  await page.waitForSelector('#modifier-saisie');
+  verif('détail : titre, note « saisie à la main », bouton Modifier', (await page.textContent('.detail-nom')).includes('Kayak sur le lac') && (await page.textContent('#page-detail')).includes('Activité saisie à la main'));
+  await page.click('#modifier-saisie');
+  await page.waitForSelector('#dialogue-saisie[open] form');
+  verif('modification : formulaire prérempli', (await page.inputValue('#dialogue-saisie input[name="km"]')) === '12.5' && (await page.inputValue('#dialogue-saisie input[name="min"]')) === '30');
+  await page.fill('#dialogue-saisie input[name="min"]', '45');
+  await page.click('#dialogue-saisie button[type="submit"]');
+  await page.waitForFunction(() => !document.querySelector('#dialogue-saisie[open]'));
+  await page.waitForFunction(() => document.querySelector('#page-detail')?.textContent.includes('1:45:00') || document.querySelector('#page-detail')?.textContent.includes('1 h 45'));
+  verif('modification : nouvelle durée 1 h 45 affichée', true);
+  page.once('dialog', (d) => d.accept());
+  await page.click('#modifier-saisie');
+  await page.waitForSelector('#dialogue-saisie[open] form');
+  await page.click('#dialogue-saisie [data-a="supprimer"]');
+  await page.waitForFunction(() => !document.querySelector('#dialogue-saisie[open]'));
+  const reste = await page.evaluate(async () => (await (await import('./js/db.js')).toutesLesSorties()).filter((x) => x.source === 'manuel').length);
+  verif('suppression : l\'activité saisie à la main a disparu', reste === 0, String(reste));
 
   verif('aucune erreur dans la console', erreursConsole.length === 0, erreursConsole.join(' | '));
   await browser.close();

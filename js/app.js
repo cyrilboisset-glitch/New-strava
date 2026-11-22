@@ -6,6 +6,7 @@ import { chargeSortie } from './analyse.js';
 import { lireProfil, calculerEstimationsManquantes, calculerEffortsManquants, reglerFtpAuto } from './profil.js';
 import { htmlCarteStatique } from './carte-statique.js';
 import { afficherDetail, fermerDetail } from './detail.js';
+import { ouvrirSaisie } from './saisie-ui.js';
 import { afficherReglages } from './reglages.js';
 import { afficherProgres, htmlFiltres } from './progres.js';
 import { afficherSegment, mettreAJourPassages, suivreRecherche, recordsDesSorties } from './segments.js';
@@ -21,7 +22,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.10 · largeur réelle des pneus';
+export const VERSION_APPLI = '0.39.11 · activités saisies à la main';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));
@@ -417,6 +418,7 @@ el.menuSynchro.addEventListener('click', (e) => { if (e.target.closest('.menu-it
 document.addEventListener('click', (e) => { if (menuOuvert() && !e.target.closest('.menu')) ouvrirMenu(false); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOuvert()) { ouvrirMenu(false); el.btnMenuSynchro.focus(); } });
 $('btn-restaurer-menu').addEventListener('click', () => el.champ.click());
+$('btn-ajout-manuel').addEventListener('click', () => ouvrirSaisie({ toast, apres: () => { if (pageActuelle === 'sorties') afficherListe().catch((e) => console.warn('Liste', e)); } }));
 
 // Avancement de l'analyse des segments dans le bandeau (sauf pendant un import)
 suivreRecherche((t) => { if (!occupe) progression(t); });
@@ -440,7 +442,7 @@ function toast(texte) {
 function occuper(oui) {
   occupe = oui;
   if (!oui && rechargerApres) { location.reload(); return; }
-  for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnChanger, $('btn-restaurer-menu'), $('btn-telechargements')]) b.disabled = oui;
+  for (const b of [el.btnDossier, el.btnSynchro, el.btnImporter, el.btnChanger, $('btn-restaurer-menu'), $('btn-telechargements'), $('btn-ajout-manuel')]) b.disabled = oui;
   el.btnMenuSynchro.classList.toggle('occupe', oui);
   el.btnMenuSynchro.classList.toggle('tourne', oui);
 }
