@@ -17,6 +17,7 @@ import { creerVue3d, construireTrace, GCOL } from './vue3d.js';
 import { retirerCarte } from './carte-statique.js';
 import { MODES, MODE_DEFAUT, valeursPoints, morceauxMode, modeDisponible, legende, htmlLegende } from './couleurs-trace.js';
 import { htmlBlocMuscles, installerMuscles, avecMuscles, nettoyer as nettoyerMuscles } from './mannequin.js';
+import { ouvrirSaisie } from './saisie-ui.js';
 import { afficherSegmentsSortie, fermerApercuSegment, recordsDesSorties, changerModeVirtuel } from './segments.js';
 import { records, ftpApresSortie } from './stats.js';
 import { htmlCourbePuissance, RECORDS_AFFICHES } from './progres.js';
@@ -706,7 +707,8 @@ export async function afficherDetail(page, id, toast = () => {}) {
     charge.source === 'compteur' ? `IF et TSS calculés par le compteur avec une FTP de ${s.ftpCompteurW} W.` : '',
     charge.source === 'appli' ? `IF et TSS calculés par l'appli avec ta FTP de ${profil.ftpW} W.` : '',
     estimee ? `Pas de capteur de puissance : puissance estimée avec la vitesse, la pente et ta masse (${profil.poidsKg} kg + 8 kg de vélo, CdA 0,32, Crr 0,004), sans vent. Écart possible d'environ 20 % ; pas comptée dans les records.` : '',
-    s.sansTrace ? 'Sans trace (saisie à la main sur Strava ou fichier inutilisable) : chiffres repris de Strava.' : '',
+    s.source === 'manuel' ? 'Activité saisie à la main : les chiffres sont ceux que tu as donnés' + (s.puissanceMoyW ? ' (sans points, la puissance normalisée est prise égale à la moyenne).' : '.') : '',
+    s.sansTrace && s.source !== 'manuel' ? 'Sans trace (saisie à la main sur Strava ou fichier inutilisable) : chiffres repris de Strava.' : '',
     s.format === 'gpx' || s.format === 'tcx'
       ? `Fichier ${s.format.toUpperCase()}${s.source === 'strava' ? ' de Strava' : ''} : chiffres calculés depuis les points.` : '',
     s.source === 'strava' && !s.sansTrace && s.format === 'fit' ? "Fichier FIT récupéré dans l'archive Strava." : '',
@@ -725,6 +727,7 @@ export async function afficherDetail(page, id, toast = () => {}) {
     </div>
     ${familleSortie(s).cle === 'sport-2' || s.veloId ? htmlChoixVelo(velos, s) : ''}
     ${estVirtuel(s) ? htmlModeVirtuel(s) : ''}
+    ${s.source === 'manuel' ? '<div class="saisie-actions"><button class="btn secondaire petit" type="button" id="modifier-saisie">✎ Modifier cette activité</button></div>' : ''}
     <div class="partage-sortie">${htmlBoutonImage()}</div>
   </section>
   ${htmlBlocImage()}
@@ -842,6 +845,10 @@ export async function afficherDetail(page, id, toast = () => {}) {
     installerMuscles(blocMuscles.querySelector('.muscles-contenu'), s, toast);
   }
   // Vélo virtuel : workout (temps seulement) ou parcours réel (segments comptés, avec ★)
+  page.querySelector('#modifier-saisie')?.addEventListener('click', () => ouvrirSaisie({
+    sortie: s, toast,
+    apres: (r) => { if (r.supprimee) document.getElementById('btn-retour')?.click(); else afficherDetail(page, id, toast); },
+  }));
   page.querySelector('#mode-virtuel')?.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-mode]');
     if (!b || b.dataset.mode === modeVirtuel(s)) return;

@@ -119,6 +119,13 @@ const TYPES = [
   [/soccer|football/i, 7, 0, 'Football'],
 ];
 
+/** Les types d'activité proposés pour une saisie à la main : [{nom, sport, sousSport}] (sport FIT) */
+export function typesProposes() {
+  const liste = TYPES.map(([, sport, sousSport, nom]) => ({ nom, sport, sousSport }));
+  liste.splice(1, 0, { nom: 'Home trainer', sport: 2, sousSport: 6 });
+  return liste;
+}
+
 export function typeStrava(texte) {
   const t = (texte ?? '').trim();
   for (const [re, sport, sousSport, nomSport] of TYPES) if (re.test(t)) return { sport, sousSport, nomSport };

@@ -115,7 +115,8 @@ async function importerSansTrace(infos, bilan, connues) {
 }
 
 async function sortiesConnues() {
-  return (await toutesLesSorties()).map((s) => ({ id: s.id, debut: s.debut }));
+  // les activités saisies à la main ne comptent pas comme doublons : un fichier de la même sortie est quand même importé
+  return (await toutesLesSorties()).filter((s) => s.source !== 'manuel').map((s) => ({ id: s.id, debut: s.debut }));
 }
 
 /**
