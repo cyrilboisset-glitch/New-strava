@@ -22,7 +22,7 @@ import {
 } from './import.js';
 
 
-export const VERSION_APPLI = '0.39.11 · activités saisies à la main';
+export const VERSION_APPLI = '0.39.12 · courbe des objectifs';
 
 // Noms de lieux (OpenStreetMap) gardés dans le réglage « lieux »
 brancherCache(() => lireReglage('lieux'), (c) => ecrireReglage('lieux', c));

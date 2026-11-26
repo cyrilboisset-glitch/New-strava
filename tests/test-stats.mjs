@@ -1,7 +1,7 @@
 // Tests de la page Progrès : bilans par période, forme / fatigue, records.
 // Valeurs connues d'avance. Lancer : TZ=Europe/Paris node tests/test-stats.mjs
 // (les semaines et les mois se comptent en heure locale)
-import { bilanPeriodes, formeFatigue, etatFraicheur, records, debutPeriode, avancementObjectif, ftpApresSortie, historiqueFtp } from '../js/stats.js';
+import { bilanPeriodes, formeFatigue, etatFraicheur, records, debutPeriode, avancementObjectif, ftpApresSortie, historiqueFtp, courbeObjectif, valeurCourbe, reperesPeriode } from '../js/stats.js';
 
 process.env.TZ = process.env.TZ || 'Europe/Paris';
 let echecs = 0;
@@ -141,6 +141,35 @@ const objVirtuel = avancementObjectif({ type: 'distance', periode: 'mois', cible
   { debut: date(2026, 11, 3), distanceM: 40000, sport: 2, sousSport: 7 }, { debut: date(2026, 11, 4), distanceM: 25000, sport: 2, sousSport: 6 },
 ], date(2026, 11, 10));
 egal('objectif distance : le workout virtuel n\'ajoute rien', objVirtuel.fait, 40);
+
+// Courbe d'un objectif : cumul réel et ligne droite à tenir
+{
+  const maint = date(2026, 11, 10);
+  const velo = (j, km, h = 9) => ({ debut: date(2026, 11, j, h), distanceM: km * 1000, dureeChronoS: 3600, denivelePosM: km * 10, sport: 2, sousSport: 7 });
+  const c = courbeObjectif({ type: 'distance', periode: 'mois', cible: 300 }, [velo(2, 40), velo(2, 20, 15), velo(6, 50), { ...velo(1, 99), debut: date(2026, 10, 30) }], maint);
+  egal('courbe : début au 1er novembre, 30 jours', [new Date(c.debutMs).getDate(), Math.round((c.finMs - c.debutMs) / 86400000)], [1, 30]);
+  egal('courbe : objectif = droite de 0 à 300', [c.objectif[0].v, c.objectif[1].v], [0, 300]);
+  egal('courbe : cumul final 110 km (la sortie d\'octobre ne compte pas)', c.reel[c.reel.length - 1].v, 110);
+  egal('courbe : deux sorties le 2 = un palier de 60 km', valeurCourbe(c.reel, date(2026, 11, 3, 0)), 60);
+  egal('courbe : plat entre deux sorties (4 nov. = 60 km)', valeurCourbe(c.reel, date(2026, 11, 4, 12)), 60);
+  egal('courbe : sorties, temps, km, D+ de la période', [c.totaux.n, c.totaux.dureeS, c.totaux.distanceM, c.totaux.denivelePosM], [3, 10800, 110000, 1100]);
+  egal('courbe : monotone', c.reel.every((p, i) => i === 0 || (p.v >= c.reel[i - 1].v && p.t >= c.reel[i - 1].t)), true);
+  const virtuel = courbeObjectif({ type: 'distance', periode: 'mois', cible: 300 }, [velo(2, 40), { ...velo(3, 25), sousSport: 6 }], maint);
+  egal('courbe : un workout virtuel n\'ajoute pas de km (seuls les vélos dehors comptent, filtrés en amont)', virtuel.reel[virtuel.reel.length - 1].v, 40);
+  egal('valeur hors période : null', valeurCourbe(c.reel, date(2026, 12, 20)), null);
+  const an = reperesPeriode(date(2026, 1, 1, 0), date(2027, 1, 1, 0), 'annee');
+  egal('repères de l\'année : 12 traits, 4 étiquettes (janv., avr., juil., oct.)', [an.traits.length, an.etiquettes.map((e) => e.texte)], [12, ['janv.', 'avr.', 'juil.', 'oct.']]);
+  egal('repères du mois : 30 traits, étiquettes 1, 8, 15, 22, 29', [reperesPeriode(c.debutMs, c.finMs, 'mois').traits.length, reperesPeriode(c.debutMs, c.finMs, 'mois').etiquettes.map((e) => e.texte)], [30, ['1', '8', '15', '22', '29']]);
+  egal('repères de la semaine : 7 jours', reperesPeriode(date(2026, 11, 9, 0), date(2026, 11, 16, 0), 'semaine').etiquettes.map((e) => e.texte), ['L', 'M', 'M', 'J', 'V', 'S', 'D']);
+  // FTP : de la FTP du début de la période à l'objectif, courbe = FTP estimée après chaque sortie
+  const ftp = courbeObjectif({ type: 'ftp', periode: 'annee', cible: 260 }, [
+    { id: 'a', debut: date(2025, 12, 20), dureeChronoS: 3600, effortsW: { 1200: 220 } },
+    { id: 'b', debut: date(2026, 3, 1), dureeChronoS: 3600, effortsW: { 1200: 240 } },
+    { id: 'c', debut: date(2026, 9, 1), dureeChronoS: 3600, effortsW: { 1200: 250 } },
+  ], maint, { ftpW: 200 });
+  egal('courbe FTP : départ 209 W (95 % de 220), objectif 260 W en fin d\'année', [ftp.objectif[0].v, ftp.objectif[1].v], [209, 260]);
+  egal('courbe FTP : points 209 (début), 228, 238', ftp.reel.slice(0, 3).map((p) => p.v), [209, 228, 238]);
+}
 
 console.log(`\n${echecs} échec(s)`);
 process.exit(echecs ? 1 : 0);

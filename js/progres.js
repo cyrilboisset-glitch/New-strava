@@ -6,10 +6,10 @@ import { UNITES_OBJECTIF, OBJECTIFS_MUSCU, sortiesObjectif, valeurObjectif, anne
 import { lireProfil, calculerEffortsManquants, wKg, lireHaussesFtp } from './profil.js';
 import {
   bilanPeriodes, formeFatigue, etatFraicheur, records, CONSTANTE_FORME_J, CONSTANTE_FATIGUE_J,
-  avancementObjectif, TYPES_OBJECTIF, PERIODES_OBJECTIF, historiqueFtp,
+  avancementObjectif, TYPES_OBJECTIF, PERIODES_OBJECTIF, historiqueFtp, courbeObjectif, valeurCourbe, reperesPeriode,
 } from './stats.js';
 import { DUREES_EFFORTS_S, JOURS_ESTIMATION_FTP } from './analyse.js';
-import { nombre, km, duree, echapper, majuscule, fmtDate } from './format.js';
+import { nombre, km, duree, echapper, majuscule, fmtDate, htmlRepli, suivreReplis } from './format.js';
 
 const NB_PERIODES = { semaine: 12, mois: 12, annee: 0 };
 const NOMS_TYPES = { semaine: 'Semaines', mois: 'Mois', annee: 'Années' };
@@ -69,6 +69,86 @@ function formulaireObjectif(o) {
   </form>`;
 }
 
+// ---- Courbe d'un objectif : progression réelle contre progression régulière à tenir ----
+
+const fmtJourCourt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+
+function htmlCourbeObjectif(o, c, a) {
+  const etat = etatAvancement(a);
+  const valeurs = [...c.reel.map((p) => p.v), c.cible];
+  // FTP : l'axe ne part pas de zéro (sinon la courbe est écrasée en haut)
+  const bas = o.type === 'ftp' ? Math.floor((Math.min(...c.reel.map((p) => p.v), c.objectif[0].v) * 0.95) / 10) * 10 : 0;
+  const haut = Math.max(...valeurs) * 1.04;
+  const x = (t) => ((t - c.debutMs) / (c.finMs - c.debutMs)) * 300;
+  const y = (v) => 100 - ((v - bas) / (haut - bas || 1)) * 100;
+  const trace = (pts) => pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(2)} ${y(p.v).toFixed(2)}`).join('');
+  const reperes = reperesPeriode(c.debutMs, c.finMs, o.periode);
+  const traits = reperes.traits.map((t) => `<line class="objectif-trait" x1="${x(t).toFixed(2)}" x2="${x(t).toFixed(2)}" y1="0" y2="100"/>`).join('');
+  const dernier = c.reel[c.reel.length - 1];
+  const pctX = (x(Math.min(c.maintenantMs, c.finMs)) / 300) * 100;
+  // étiquettes au bout des lignes, écartées si elles se chevauchent
+  let hautObjectif = y(c.cible);
+  let hautReel = y(dernier.v);
+  if (Math.abs(hautObjectif - hautReel) < 12) {
+    const milieu = (hautObjectif + hautReel) / 2;
+    const reelEnBas = dernier.v < c.cible;
+    hautObjectif = Math.min(100, Math.max(0, milieu + (reelEnBas ? -6 : 6)));
+    hautReel = Math.min(100, Math.max(0, milieu + (reelEnBas ? 6 : -6)));
+  }
+  const tot = c.totaux;
+  const totaux = o.type === 'ftp' ? '' : [
+    `${nombre(tot.n)} ${OBJECTIFS_MUSCU.includes(o.type) ? 'séance' : 'sortie'}${tot.n > 1 ? 's' : ''}`,
+    duree(tot.dureeS),
+    !OBJECTIFS_MUSCU.includes(o.type) ? `${nombre(tot.distanceM / 1000, 1)} km` : '',
+    !OBJECTIFS_MUSCU.includes(o.type) ? `${nombre(tot.denivelePosM)} m D+` : '',
+  ].filter(Boolean).join(' · ');
+  return `
+    ${totaux ? `<p class="objectif-totaux">${totaux}</p>` : ''}
+    <p class="courbes-position" data-position>Touchez le graphique pour lire une date</p>
+    <div class="objectif-graph" data-graph="${o.id}">
+      <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+        ${traits}
+        <path class="objectif-ligne" d="${trace(c.objectif)}"/>
+        <path class="objectif-reel ${etat}" d="${trace(c.reel)}"/>
+      </svg>
+      <span class="objectif-point ${etat}" style="left:${pctX.toFixed(2)}%;top:${y(dernier.v).toFixed(1)}%"></span>
+      <span class="etiquette-fin etiq-cible" style="top:${hautObjectif.toFixed(1)}%">Objectif</span>
+      <span class="etiquette-fin etiq-reel ${etat}" style="top:${hautReel.toFixed(1)}%">Réel</span>
+      <span class="curseur" hidden></span>
+    </div>
+    <div class="objectif-axe">${reperes.etiquettes.map((e) => `<span style="left:${(x(e.t) / 300 * 100).toFixed(2)}%">${e.texte}</span>`).join('')}</div>`;
+}
+
+/** Résumé de la flèche : où on en est par rapport à la ligne à tenir */
+function resumeCourbe(o, a) {
+  if (a.fait >= a.cible) return 'objectif atteint';
+  if (a.ecart == null || Math.abs(a.ecart) < a.cible * 0.005) return 'pile dans le rythme';
+  return `${valeurObjectif(o.type, Math.abs(a.ecart))} ${a.ecart > 0 ? 'd\'avance' : 'de retard'}`;
+}
+
+// Toucher le graphique : la date, la valeur réelle et la valeur à avoir
+function installerCourbesObjectifs(page, objectifs, toutes, profil, maintenantMs) {
+  for (const graph of page.querySelectorAll('.objectif-graph')) {
+    const o = objectifs.find((x) => x.id === graph.dataset.graph);
+    if (!o) continue;
+    const c = courbeObjectif(o, sortiesObjectif(o.type, toutes), maintenantMs, { ftpW: profil.ftpW });
+    const position = graph.parentElement.querySelector('[data-position]');
+    const curseur = graph.querySelector('.curseur');
+    const placer = (clientX) => {
+      const r = graph.getBoundingClientRect();
+      const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+      const t = c.debutMs + f * (c.finMs - c.debutMs);
+      curseur.hidden = false;
+      curseur.style.left = `${(f * 100).toFixed(2)}%`;
+      const attendu = valeurCourbe(c.objectif, t);
+      const reel = valeurCourbe(c.reel, t);
+      position.textContent = `${fmtJourCourt.format(t)} · à avoir ${valeurObjectif(o.type, attendu)}${reel != null ? ` · réel ${valeurObjectif(o.type, reel)}` : ' · pas encore'}`;
+    };
+    graph.addEventListener('pointerdown', (e) => placer(e.clientX));
+    graph.addEventListener('pointermove', (e) => placer(e.clientX));
+  }
+}
+
 function blocObjectifs(objectifs, toutes, profil, maintenantMs) {
   const ordre = (o) => Object.keys(TYPES_OBJECTIF).indexOf(o.type) * 3 + Object.keys(PERIODES_OBJECTIF).indexOf(o.periode);
   const lignes = [...objectifs].sort((a, b) => ordre(a) - ordre(b)).map((o) => {
@@ -114,6 +194,7 @@ function blocObjectifs(objectifs, toutes, profil, maintenantMs) {
         <li><span class="puce cible"></span>Objectif : <b>${valeurObjectif(o.type, a.cible)}</b></li>
       </ul>
       ${detail ? `<p class="objectif-detail">${detail}</p>` : ''}
+      ${htmlRepli(`obj-${o.id}`, 'Voir la progression', resumeCourbe(o, a), htmlCourbeObjectif(o, courbeObjectif(o, sortiesObjectif(o.type, toutes), maintenantMs, { ftpW: profil.ftpW }), a))}
     </div>`;
   }).join('');
   return `<section class="carte bloc" id="bloc-objectifs">
@@ -478,6 +559,8 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
     ${blocRecords(sorties, maintenantMs, calcul, profil.poidsKg)}`;
     installerCurseurForme(page, toutes, profil, maintenantMs);
     installerCurseurFtp(page, toutes, profil, maintenantMs);
+    suivreReplis(page.querySelector('#bloc-objectifs'));
+    installerCourbesObjectifs(page, objectifs, toutes, profil, maintenantMs);
   };
   rendre();
 
@@ -485,6 +568,8 @@ export async function afficherProgres(page, options, maintenantMs = Date.now()) 
   const garderObjectifs = async (liste) => { objectifs = liste; await ecrireReglage('objectifs', liste); };
   const rendreObjectifs = () => {
     page.querySelector('#bloc-objectifs').outerHTML = blocObjectifs(objectifs, toutes, profil, maintenantMs);
+    suivreReplis(page.querySelector('#bloc-objectifs'));
+    installerCourbesObjectifs(page, objectifs, toutes, profil, maintenantMs);
     page.querySelector('.objectif-form input[name="cible"]')?.focus();
   };
   page.onsubmit = async (e) => {
