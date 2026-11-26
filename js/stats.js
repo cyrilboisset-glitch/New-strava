@@ -178,6 +178,99 @@ export function historiqueFtp(sorties, jours = JOURS_ESTIMATION_FTP) {
  * @param {{ftpW?: number}} options  FTP réglée dans l'appli
  * @returns {{debutMs, finMs, fait, cible, part, attendu, ecart, reste, partEcoulee, joursRestants, sortieFtp?, departFtpW?}}
  */
+/**
+ * Courbe d'un objectif sur sa période (semaine, mois ou année) : la progression réelle (cumul des
+ * sorties, un palier le jour de chaque sortie ; pour la FTP, la FTP estimée après chaque sortie) et
+ * la progression régulière à avoir (ligne droite de 0 à l'objectif ; pour la FTP, de la FTP du début
+ * de la période à l'objectif).
+ * @returns {{debutMs, finMs, cible, maintenantMs, reel: {t, v}[], objectif: {t, v}[], totaux: {n, dureeS, distanceM, denivelePosM}}}
+ */
+export function courbeObjectif(obj, sorties, maintenantMs = Date.now(), { ftpW = null } = {}) {
+  const a = avancementObjectif(obj, sorties, maintenantMs, { ftpW });
+  const { debutMs, finMs, cible } = a;
+  const dans = sorties.filter((s) => s.debut >= debutMs && s.debut < finMs && s.debut <= maintenantMs).sort((x, y) => x.debut - y.debut);
+  const totaux = {
+    n: dans.length, dureeS: dans.reduce((t, s) => t + (s.dureeChronoS ?? 0), 0),
+    distanceM: dans.reduce((t, s) => t + distanceCompteeM(s), 0), denivelePosM: dans.reduce((t, s) => t + denivelePosCompteM(s), 0),
+  };
+  let reel;
+  let objectif;
+  if (obj.type === 'ftp') {
+    const depart = a.departFtpW ?? ftpW ?? null;
+    const points = historiqueFtp(sorties).filter((p) => p.tMs >= debutMs && p.tMs <= maintenantMs).map((p) => ({ t: p.tMs, v: p.ftpW }));
+    reel = [...(depart != null ? [{ t: debutMs, v: depart }] : []), ...points];
+    if (reel.length && reel[reel.length - 1].t < maintenantMs) reel.push({ t: maintenantMs, v: a.fait || reel[reel.length - 1].v });
+    objectif = [{ t: debutMs, v: depart != null && depart < cible ? depart : cible }, { t: finMs, v: cible }];
+  } else {
+    const valeur = {
+      distance: (s) => distanceCompteeM(s) / 1000, denivele: (s) => denivelePosCompteM(s),
+      seances: () => 1, tempsmuscu: (s) => (s.dureeChronoS ?? 0) / 3600,
+    }[obj.type];
+    let cumul = 0;
+    reel = [{ t: debutMs, v: 0 }];
+    // un palier le jour de chaque sortie : la courbe monte pendant ce jour-là, reste plate entre deux sorties
+    let jour = null;
+    for (const s of dans) {
+      const j = debutJour(s.debut);
+      if (j !== jour) { if (j > reel[reel.length - 1].t) reel.push({ t: j, v: cumul }); jour = j; }
+      cumul += valeur(s);
+      const fin = Math.min(maintenantMs, j + JOUR_MS);
+      const dernier = reel[reel.length - 1];
+      if (dernier.t === fin) dernier.v = cumul; else reel.push({ t: fin, v: cumul });
+    }
+    if (reel[reel.length - 1].t < maintenantMs) reel.push({ t: maintenantMs, v: cumul });
+    objectif = [{ t: debutMs, v: 0 }, { t: finMs, v: cible }];
+  }
+  return { debutMs, finMs, cible, maintenantMs, reel, objectif, totaux };
+}
+
+/** Valeur d'une courbe (points {t, v} dans l'ordre du temps) à l'instant t, par interpolation ; null hors de la courbe */
+export function valeurCourbe(points, t) {
+  if (!points.length || t < points[0].t || t > points[points.length - 1].t) return null;
+  for (let i = 1; i < points.length; i++) {
+    if (t <= points[i].t) {
+      const a = points[i - 1]; const b = points[i];
+      return b.t === a.t ? b.v : a.v + ((b.v - a.v) * (t - a.t)) / (b.t - a.t);
+    }
+  }
+  return points[points.length - 1].v;
+}
+
+/**
+ * Repères de l'axe du temps d'une période : traits (début de chaque mois ou jour) et étiquettes.
+ * @returns {{traits: number[], etiquettes: {t: number, texte: string}[]}}
+ */
+export function reperesPeriode(debutMs, finMs, periode) {
+  const traits = [];
+  const etiquettes = [];
+  if (periode === 'annee') {
+    const mois = new Intl.DateTimeFormat('fr-FR', { month: 'short' });
+    const d = new Date(debutMs);
+    for (let m = 0; m < 12; m++) {
+      const t = new Date(d.getFullYear(), m, 1).getTime();
+      traits.push(t);
+      if (m % 3 === 0) etiquettes.push({ t, texte: mois.format(t) });
+    }
+  } else if (periode === 'mois') {
+    const d = new Date(debutMs);
+    const nb = Math.round((finMs - debutMs) / JOUR_MS);
+    for (let j = 0; j < nb; j++) {
+      const t = new Date(d.getFullYear(), d.getMonth(), 1 + j).getTime();
+      traits.push(t);
+      if (j % 7 === 0) etiquettes.push({ t, texte: String(j + 1) });
+    }
+  } else {
+    const jours = new Intl.DateTimeFormat('fr-FR', { weekday: 'narrow' });
+    const d = new Date(debutMs);
+    for (let j = 0; j < 7; j++) {
+      const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + j).getTime();
+      traits.push(t);
+      etiquettes.push({ t, texte: jours.format(t).toUpperCase() });
+    }
+  }
+  return { traits, etiquettes };
+}
+
 export function avancementObjectif(obj, sorties, maintenantMs = Date.now(), { ftpW = null } = {}) {
   const debutMs = debutPeriode(maintenantMs, obj.periode);
   const finMs = periodeSuivante(debutMs, obj.periode);

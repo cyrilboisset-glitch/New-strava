@@ -393,6 +393,33 @@ async function texteToast(page) {
   verif('objectif distance sur l\'année : libellé, chiffres, rythme', new RegExp(`Distance · ${new Date().getFullYear()}.*0 % ?de l'objectif.*Fait : 0 km.*Prévu à ce jour : [\\d ]+ km.*Objectif : 5 000 km.*reste .* km, soit .* km par semaine`).test(objTxt), objTxt);
   const arcs = await page.$eval('#bloc-objectifs .objectif', (o) => ({ rouge: !!o.querySelector('.anneau-fait'), bleu: o.querySelector('.anneau-attendu')?.getAttribute('stroke-dasharray') }));
   verif('anneau : pas d\'arc rouge (0 km), arc bleu = part de l\'année écoulée', !arcs.rouge && Number(arcs.bleu?.split(' ')[0]) > 0, JSON.stringify(arcs));
+  // Courbe de l'objectif : flèche « Voir la progression », ligne à tenir et progression réelle
+  // Quelques sorties vélo cette année (retirées juste après) pour voir la courbe monter
+  const anneeEnCours = new Date().getFullYear();
+  await page.evaluate(async (annee) => {
+    const db = await import('./js/db.js');
+    const sortie = (id, mois, jour, km) => ({ id, nomFichier: null, source: 'manuel', sansTrace: true, debut: new Date(annee, mois, jour, 9).getTime(), sport: 2, sousSport: 7, nomSport: 'Vélo', dureeChronoS: km * 150, dureeTotaleS: km * 150, distanceM: km * 1000, denivelePosM: km * 9, trace: [] });
+    for (const [id, m, j, km] of [['tmp-a', 0, 20, 90], ['tmp-b', 1, 14, 120], ['tmp-c', 3, 5, 200], ['tmp-d', 5, 18, 260], ['tmp-e', 7, 9, 150], ['tmp-f', 9, 3, 180]]) await db.enregistrerSortie(sortie(id, m, j, km), null, null);
+  }, anneeEnCours);
+  await page.click('#onglet-sorties');
+  await page.waitForSelector('#accueil:not([hidden])');
+  await page.click('#onglet-progres');
+  await page.waitForSelector('#bloc-objectifs .objectif');
+  verif('flèche « Voir la progression » fermée au départ', (await page.textContent('#bloc-objectifs .objectif .repli-titre')) === 'Voir la progression' && !(await page.isVisible('#bloc-objectifs .objectif .objectif-graph')));
+  await page.click('#bloc-objectifs .objectif .repli > summary');
+  await page.waitForSelector('#bloc-objectifs .objectif .objectif-graph', { state: 'visible' });
+  verif('courbe : ligne de l\'objectif, ligne réelle, repères de l\'année, point du jour', !!(await page.$('#bloc-objectifs .objectif-ligne')) && !!(await page.$('#bloc-objectifs .objectif-reel'))
+    && (await page.$$('#bloc-objectifs .objectif-trait')).length === 12 && !!(await page.$('#bloc-objectifs .objectif-point')));
+  verif('courbe : axe janv., avr., juil., oct.', (await page.$$eval('#bloc-objectifs .objectif-axe span', (e) => e.map((x) => x.textContent))).join(' ') === 'janv. avr. juil. oct.');
+  await page.locator('#bloc-objectifs .objectif-graph').click({ position: { x: 100, y: 60 } });
+  const posObj = await page.textContent('#bloc-objectifs [data-position]');
+  verif('toucher la courbe : date, valeur à avoir et valeur réelle', /à avoir [\d\s\u202f\u00a0]+ km · réel/.test(posObj), posObj);
+  await (await page.$('#bloc-objectifs .objectif')).screenshot({ path: path.join(CAPTURES, 'objectif-courbe.png') });
+  verif('courbe : la ligne réelle monte avec les sorties (1 000 km)', /réel [\d\s\u202f\u00a0]+ km/.test(posObj) && !/réel 0 km/.test(posObj), posObj);
+  await page.evaluate(async () => {
+    const db = await import('./js/db.js');
+    for (const id of ['tmp-a', 'tmp-b', 'tmp-c', 'tmp-d', 'tmp-e', 'tmp-f']) await db.supprimerSortie(id);
+  });
   await page.click('[data-obj="ajouter"]');
   await page.selectOption('.objectif-form select[name="type"]', 'ftp');
   verif('unité qui suit le type', (await page.textContent('.objectif-form .unite-objectif')) === 'W');
@@ -1362,7 +1389,7 @@ async function texteToast(page) {
   const heureConseil = Number(conseil.match(/Pars à (\d+) h/)?.[1]);
   // 18 h à 20 h : retour après la nuit tombée (coucher vers 17 h en novembre) -> écartées
   verif('meilleure heure : vent faible, sans pluie, de jour (13 h, 14 h ou 15 h)', [13, 14, 15].includes(heureConseil), conseil);
-  verif('conseil : lever, coucher, retour avant la nuit ; risque de pluie', /☀ Lever \d+ h \d+ · coucher 1[67] h \d+ : retour vers .* avant la nuit/.test(conseil) && /🌧 Pluie : risque (faible|possible)/.test(conseil), conseil);
+  verif('conseil : lever, coucher, retour avant la nuit ; risque de pluie', /☀ Lever \d+ h( \d+)? · coucher 1[67] h( \d+)? : retour vers .* avant la nuit/.test(conseil) && /🌧 Pluie : risque (faible|possible)/.test(conseil), conseil);
   const lignesNuit = await page.$$eval('.vent-tableau tbody tr', (els) => els.map((e) => [e.textContent.trim().split(/\s+/).slice(0, 2).join(' '), e.classList.contains('nuit'), e.querySelector('td:nth-child(5)').className]));
   const ligneDe = (h) => lignesNuit.find(([t]) => t.startsWith(`${h} h`));
   verif('tableau : 6 h et 20 h de nuit (🌙), 10 h de jour ; 16 h et 17 h pluie probable', ligneDe(6)[1] && ligneDe(20)[1] && !ligneDe(10)[1]

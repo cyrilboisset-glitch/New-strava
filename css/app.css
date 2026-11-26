@@ -749,6 +749,25 @@ body.sous-page .barre { justify-content: flex-start; gap: 12px; }
 .puce.fait.atteint { background: var(--or); }
 .puce.attendu { background: var(--objectif); }
 .puce.cible { background: transparent; border: 2px solid var(--objectif); width: 8px; height: 8px; }
+.objectif:has(.repli[open]) { grid-column: 1 / -1; }
+.objectif > .repli { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--ligne); }
+.objectif-totaux { margin: 0 0 6px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.objectif-graph { position: relative; height: 150px; margin-right: 58px; border-bottom: 1px solid var(--ligne); touch-action: pan-y; cursor: crosshair; }
+.objectif-graph svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.objectif-trait { stroke: var(--ligne); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.7; }
+.objectif-ligne { fill: none; stroke: var(--texte-3); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.objectif-reel { fill: none; stroke: var(--avance); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.objectif-reel.retard { stroke: var(--retard); }
+.objectif-reel.atteint { stroke: var(--or); }
+.objectif-point { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--avance); box-shadow: 0 0 0 5px color-mix(in srgb, var(--avance) 30%, transparent); pointer-events: none; }
+.objectif-point.retard { background: var(--retard); box-shadow: 0 0 0 5px color-mix(in srgb, var(--retard) 30%, transparent); }
+.objectif-point.atteint { background: var(--or); box-shadow: 0 0 0 5px color-mix(in srgb, var(--or) 30%, transparent); }
+.etiquette-fin.etiq-cible::before { background: var(--texte-3); }
+.etiquette-fin.etiq-reel::before { background: var(--avance); }
+.etiquette-fin.etiq-reel.retard::before { background: var(--retard); }
+.etiquette-fin.etiq-reel.atteint::before { background: var(--or); }
+.objectif-axe { position: relative; height: 18px; margin: 4px 58px 0 0; font-size: 12px; color: var(--texte-3); }
+.objectif-axe span { position: absolute; top: 0; transform: translateX(2px); }
 .objectif-detail { margin: 6px 0 0; font-size: 12px; color: var(--texte-3); }
 .objectif-form { padding: 10px 0; border-top: 1px solid var(--ligne); }
 #bloc-objectifs > .btn { margin-top: 14px; }
